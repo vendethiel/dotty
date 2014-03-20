@@ -894,6 +894,9 @@ class TypeComparer(initctx: Context) extends DotClass {
     // this does not change anything semantically (i.e. merging or not merging
     // gives =:= types), but it keeps the type smaller.
     case tp1: RefinedType =>
+      // opportunistically merge same-named refinements
+      // this does not change anything semantically (i.e. merging or not merging
+      // gives =:= types), but it keeps the type smaller.
       tp2 match {
         case tp2: RefinedType if tp1.refinedName == tp2.refinedName =>
           tp1.derivedRefinedType(
