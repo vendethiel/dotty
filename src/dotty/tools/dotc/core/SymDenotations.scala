@@ -684,7 +684,8 @@ object SymDenotations {
 
     /** The symbol, in class `inClass`, that is overridden by this denotation. */
     final def overriddenSymbol(inClass: ClassSymbol)(implicit ctx: Context): Symbol =
-      matchingSymbol(inClass, owner.thisType)
+      if ((this is Private) && (owner ne inClass)) NoSymbol
+      else matchingSymbol(inClass, owner.thisType)
 
     /** All symbols overriden by this denotation. */
     final def allOverriddenSymbols(implicit ctx: Context): Iterator[Symbol] =

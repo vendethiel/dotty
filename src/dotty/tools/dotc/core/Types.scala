@@ -656,15 +656,6 @@ object Types {
         if (res.exists) res else TypeRef(this, name, denot)
     }
 
-    /** The type <this . name> , reduced if possible, with given denotation if unreduced */
-    def selectNonMember(name: Name, denot: Denotation)(implicit ctx: Context): Type = name match {
-      case name: TermName =>
-        TermRef(this, name, denot)
-      case name: TypeName =>
-        val res = lookupRefined(name)
-        if (res.exists) res else TypeRef(this, name, denot)
-    }
-
     /** The type <this . name> with given symbol, reduced if possible */
     def select(sym: Symbol)(implicit ctx: Context): Type =
       if (sym.isTerm) TermRef(this, sym.asTerm)
