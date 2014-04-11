@@ -69,6 +69,8 @@ class tests extends CompilerTest {
   @Test def neg_t0625_structural = compileFile(negDir, "t0625", xerrors = 1)
   @Test def neg_t0654_polyalias = compileFile(negDir, "t0654", xerrors = 2)
   @Test def neg_t1192_legalPrefix = compileFile(negDir, "t1192", xerrors = 1)
+  @Test def neg_t1381_invalidPrefix = compileFile(negDir, "t1381-new", xerrors = 2)
+  @Test def neg_t1843_bestInstance = compileFile(negDir, "t1843", xerrors = 1)
 
   @Test def dotc = compileDir(dotcDir + "tools/dotc", twice)
   @Test def dotc_ast = compileDir(dotcDir + "tools/dotc/ast", twice)
