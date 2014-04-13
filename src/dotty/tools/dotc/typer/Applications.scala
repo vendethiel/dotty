@@ -126,8 +126,11 @@ trait Applications extends Compatibility { self: Typer =>
       case methType: MethodType =>
         // apply the result type constraint, unless method type is dependent
         if (!methType.isDependent)
-          if (!constrainResult(methType.resultType, resultType))
-            fail(err.typeMismatchStr(methType.resultType, resultType))
+          if (!constrainResult(methType.resultType, resultType)) {
+            if (!resultType.isInstanceOf[ProtoType] ||
+                this.isInstanceOf[TestApplication[_]])
+              fail(err.typeMismatchStr(methType.resultType, resultType))
+          }
         // match all arguments with corresponding formal parameters
         matchArgs(orderedArgs, methType.paramTypes, 0)
       case _ =>
@@ -448,18 +451,22 @@ trait Applications extends Compatibility { self: Typer =>
       methPart(fun1).tpe match {
         case funRef: TermRef =>
           tryEither { implicit ctx =>
+            println(s"try either $funRef")
             val app =
               if (proto.argsAreTyped) new ApplyToTyped(tree, fun1, funRef, proto.typedArgs, pt)
               else new ApplyToUntyped(tree, fun1, funRef, proto, pt)
             val result = app.result
             ConstFold(result)
-          } { (failedVal, failedState) => fun1 match {
+          } { (failedVal, failedState) =>
+            println(s"failing $fun1")
+              fun1 match {
               case Select(qual, name) =>
                 // try with prototype `[].name(args)`, this might succeed by inserting an
                 // implicit conversion around []. (an example is Int + BigInt).
                 tryEither { implicit ctx =>
                   val simpleFunProto = new FunProto(tree.args, WildcardType, this) // drop result type, because views are disabled
                   val selProto = SelectionProto(name, simpleFunProto, NoViewsAllowed)
+                  println(s"trying with $selProto")
                   val qual1 = adaptInterpolated(qual, selProto)
                   if (qual eq qual1) ctx.error("no progress")
                   if (ctx.reporter.hasErrors) qual1
@@ -474,6 +481,7 @@ trait Applications extends Compatibility { self: Typer =>
                   failedVal
                 }
               case _ =>
+                println(s"failing $fun1")
                 failedState.commit()
                 failedVal
             }
