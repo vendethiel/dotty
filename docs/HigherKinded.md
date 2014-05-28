@@ -1,4 +1,4 @@
-The Duality
+The duality
 -----------
 
 The core idea: A parameterized class such as
@@ -16,7 +16,7 @@ A type-instance such as `Map[String, Int]` would then be treated as equivalent t
 
     Map { type Map$K = String; type Map$V = Int }
 
-Named Type Parameters
+Named type parameters
 ---------------------
 
 Type parameters can have unmangled names. This is achieved by adding the `type` keyword
@@ -50,7 +50,7 @@ is equivalent to
 Type parameters
 ---------------
 
-Under the duality, we use thge following definition for what type parameters are.
+Under the duality, we use the following definition for what type parameters are.
 
  - The type parameters of a class or trait type are those parameter fields that are not yet instantiated.
  - The type parameters of an abstract type are the type parameters of its upper bound
@@ -61,7 +61,7 @@ parameters of  `U`.
 Partial applications
 --------------------
 
-The definition of type parameters in the previous section, leads to a simple model of partial applications.
+The definition of type parameters in the previous section leads to a simple model of partial applications.
 Consider for instance:
 
     type Histogram = Map[_, Int]
@@ -227,7 +227,7 @@ In each case, we instantiate the open type parameter(s) of the right hand side
 with the type parameters of the `TC` type. After the instantiation, only the
 type parameters of the `TC` type remain to be filled.
 
-Full Example
+Full example
 ------------
 
 Consider the higher-kinded `Functor` type class
