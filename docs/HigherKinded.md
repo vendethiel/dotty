@@ -16,6 +16,19 @@ A type-instance such as `Map[String, Int]` would then be treated as equivalent t
 
     Map { type Map$K = String; type Map$V = Int }
 
+Named Type Parameters
+=====================
+
+Type parameters can have unmangled names. This is achieved by adding the `type` keyword
+to a type parameter declaration, analogous to how `val` indicates a named field. For instance,
+
+    class Map[type K, type V]
+
+is treated as equivalent to
+
+    class Map { type K; type V }
+
+The parameters are made visible as fields.
 
 Wildcards
 =========
@@ -24,7 +37,7 @@ A wildcard type such as `Map[_, Int]` is equivalent to
 
     Map { type Map$V = Int }
 
-I.e. `_`]s omit parameters from being instantiated. On the other hand, wildcard arguments
+I.e. `_`'s omit parameters from being instantiated. Wildcard arguments
 can have bounds. E.g.
 
     Map[_ <: AnyRef, Int]
