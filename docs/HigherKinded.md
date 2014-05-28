@@ -1,5 +1,5 @@
 The Duality
-===========
+-----------
 
 The core idea: A parameterized class such as
 
@@ -17,7 +17,7 @@ A type-instance such as `Map[String, Int]` would then be treated as equivalent t
     Map { type Map$K = String; type Map$V = Int }
 
 Named Type Parameters
-=====================
+---------------------
 
 Type parameters can have unmangled names. This is achieved by adding the `type` keyword
 to a type parameter declaration, analogous to how `val` indicates a named field. For instance,
@@ -47,8 +47,8 @@ is equivalent to
     Map { type Map$K <: AnyRef; type Map$V = Int }
 
 
-Partial applications:
-=====================
+Partial applications
+====================
 
 Type parameters of a type are those parameter fields that are not yet instantiated.
 So, writing
@@ -56,9 +56,7 @@ So, writing
     type Histogram = Map[_, Int]
 
 `Histogram` is a higher-kinded type that still has one type paraneter.
-
-    Histogram[String]
-
+`Histogram[String]`
 would be a possible instance, and it would be equivalent to `Map[String, Int]`.
 
 
@@ -217,8 +215,8 @@ In each case, we instantiate the open type parameter(s) of the right hand side
 with the type parameters of the `TC` type. After the instantiation, only the
 type parameters of the `TC` type remain to be filled.
 
-Full example:
-=============
+Full Example
+============
 
 Consider the higher-kinded `Functor` type class
 
