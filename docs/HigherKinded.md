@@ -5,7 +5,7 @@ The core idea: A parameterized class such as
 
     class Map[K, V]
 
-is treated as a equivalent to a type with type members:
+is treated as equivalent to a type with type members:
 
     class Map { type Map$K; type Map$V }
 
@@ -47,17 +47,28 @@ is equivalent to
     Map { type Map$K <: AnyRef; type Map$V = Int }
 
 
+Type parameters
+---------------
+
+Under the duality, we use thge following definition for what type parameters are.
+
+ - The type parameters of a class or trait type are those parameter fields that are not yet instantiated.
+ - The type parameters of an abstract type are the type parameters of its upper bound
+ - The type parameters of an alias type are the type parameters of its right hand side
+ - An intersection type `T & U` is well-formed only if at most one of `T` and `U` has type parameters. The type parameters of `T & U` are then the union of the type parameters of `T` and the type
+parameters of  `U`.
+
 Partial applications
 --------------------
 
-Type parameters of a type are those parameter fields that are not yet instantiated.
-So, writing
+The definition of type parameters in the previous section, leads to a simple model of partial applications.
+Consider for instance:
 
     type Histogram = Map[_, Int]
 
-`Histogram` is a higher-kinded type that still has one type paraneter.
+`Histogram` is a higher-kinded type that still has one type parameter.
 `Histogram[String]`
-would be a possible instance, and it would be equivalent to `Map[String, Int]`.
+would be a possible type instance, and it would be equivalent to `Map[String, Int]`.
 
 
 Modelling polymorphic type declarations
@@ -90,8 +101,9 @@ is expanded to a monomorphic type alias like this:
     type Pair = Tuple2 { type Tuple2$T2 = Tuple2$T1 }
 
 More generally, each type parameter of the left-hand side must
-appear as a type member of the right hand side type. References
-to the type parameter are then translated to references to the
+appear as a type member of the right hand side type. Type members
+must appear in the same order as their corresponding type parameters.
+References to the type parameter are then translated to references to the
 type member. The type member itself is left uninstantiated.
 
 This technique can expand most polymorphic type aliases appearing
@@ -118,7 +130,7 @@ To model more general polymorphic type aliases, introduce a family of types
 
     type TCi[T1, ..., Ti]  (i = 1, ...)
 
-Type `Tci` represents type constructors of arity `i`. A type alias
+Type `TCi` represents type constructors of arity `i`. A type alias
 
     type T[X1,...,Xm] = C1 & ... & Cn
 
