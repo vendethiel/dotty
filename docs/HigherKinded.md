@@ -31,7 +31,7 @@ is treated as equivalent to
 The parameters are made visible as fields.
 
 Wildcards
-=========
+---------
 
 A wildcard type such as `Map[_, Int]` is equivalent to
 
@@ -48,7 +48,7 @@ is equivalent to
 
 
 Partial applications
-====================
+--------------------
 
 Type parameters of a type are those parameter fields that are not yet instantiated.
 So, writing
@@ -61,7 +61,7 @@ would be a possible instance, and it would be equivalent to `Map[String, Int]`.
 
 
 Modelling polymorphic type declarations
-=======================================
+---------------------------------------
 
 The partial application scheme gives us a new -- and quite elegant --
 way to do higher-kinded types. But how do we interprete the
@@ -75,7 +75,7 @@ allow the definition of type members so we have to interprete
 polymorphic type aliases and abstract types specially.
 
 Modelling polymorphic type aliases: simple case
-===============================================
+-----------------------------------------------
 
 A polymorphic type alias such as
 
@@ -112,7 +112,7 @@ And in `collection/immutable/HashMap.scala`:
     private type MergeFunction[A1, B1] = ((A1, B1), (A1, B1)) => (A1, B1)
 
 Modelling polymorphic type aliases: general case
-================================================
+------------------------------------------------
 
 To model more general polymorphic type aliases, introduce a family of types
 
@@ -164,7 +164,7 @@ hand side.  The classical example is:
 Contracting type declarations cannot be modelled and are therefore forbidden.
 
 Modelling higher-kinded types
-=============================
+-----------------------------
 
 The encoding of higher-kinded types uses again the `TC` traits to represent type constructors.
 Consider the higher-kinded type declaration
@@ -216,7 +216,7 @@ with the type parameters of the `TC` type. After the instantiation, only the
 type parameters of the `TC` type remain to be filled.
 
 Full Example
-============
+------------
 
 Consider the higher-kinded `Functor` type class
 
