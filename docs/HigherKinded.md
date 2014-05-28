@@ -1,3 +1,19 @@
+Higher-Kinded Types in Dotty
+============================
+
+This note outlines how we intend to represent higher-kinded types in
+Dotty.  The principal idea is to collapse the four previously
+disparate features of refinements, type parameters, existentials and
+higher-kinded types into just one: refinements of type members. All
+other features will be encoded using these refinements.
+
+The complexity of type systems tends to grow exponentially with the
+number of independent features, because there are an exponential
+number of possible feature interactions. Consequently, a reduction
+from 4 to 1 fundamental features achieves a dramatic reduction of
+complexity. It also adds some nice usablilty improvements, notably in
+the area of partial type application.
+
 The duality
 -----------
 
