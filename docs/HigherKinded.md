@@ -1,5 +1,7 @@
-Higher-Kinded Types in Dotty
-============================
+Higher-Kinded Types in Dotty (superseded)
+=========================================
+
+*Note*: This proposal as been superseded by HigherKinded-v2.md. It is no longer peing pursued.
 
 This note outlines how we intend to represent higher-kinded types in
 Dotty.  The principal idea is to collapse the four previously
