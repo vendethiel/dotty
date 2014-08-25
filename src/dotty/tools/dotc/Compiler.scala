@@ -62,7 +62,8 @@ class Compiler {
       List(new ElimByName,
            new TypeTestsCasts,
            new InterceptedMethods,
-           new Literalize),
+           new Literalize,
+           new AttachOuter),
       List(new Erasure)
     )
 
