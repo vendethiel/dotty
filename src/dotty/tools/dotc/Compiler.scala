@@ -54,7 +54,7 @@ class Compiler {
            new ElimRepeated,
            new ElimLocals),
       List(new ExtensionMethods),
-      List(new TailRec),
+      List(new TailRec, new OuterAccessors),
       List(new PatternMatcher,
            // new LazyValTranformContext().transformer, // disabled, awaiting fixes
            new Splitter,
@@ -62,8 +62,7 @@ class Compiler {
       List(new ElimByName,
            new TypeTestsCasts,
            new InterceptedMethods,
-           new Literalize,
-           new AttachOuter),
+           new Literalize),
       List(new Erasure)
     )
 
