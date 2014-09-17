@@ -618,8 +618,6 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
   }
 
-  def runtimeCall(name: TermName, args: List[Tree])(implicit ctx: Context): Tree = ???
-
   // ensure that constructors are fully applied?
   // ensure that normal methods are fully applied?
 
