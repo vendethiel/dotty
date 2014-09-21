@@ -13,7 +13,7 @@ class tests extends CompilerTest {
 //        "-Yshow-suppressed-errors",
         "-pagewidth", "160")
 
-  implicit val defaultOptions = noCheckOptions ++ List("-Ycheck:literalize,capturedVars")
+  implicit val defaultOptions = noCheckOptions ++ List("-Ycheck:literalize,constructors")
 
   val twice = List("#runs", "2", "-YnoDoubleBindings", "-Ystop-before:terminal")
   val doErase = List("-Ystop-before:terminal")
@@ -86,6 +86,7 @@ class tests extends CompilerTest {
   @Test def nef_t1279a = compileFile(negDir, "t1279a", xerrors = 1)
   @Test def neg_t1843 = compileFile(negDir, "t1843", xerrors = 1)
   @Test def neg_t1843_variances = compileFile(negDir, "t1843-variances", xerrors = 1)
+  @Test def neg_t2660_ambi = compileFile(negDir, "t2660", xerrors = 2)
   @Test def neg_t2994 = compileFile(negDir, "t2994", xerrors = 2)
   @Test def neg_variances = compileFile(negDir, "variances", xerrors = 2)
   @Test def neg_badAuxConstr = compileFile(negDir, "badAuxConstr", xerrors = 2)
