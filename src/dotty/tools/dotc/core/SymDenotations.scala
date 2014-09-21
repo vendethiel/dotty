@@ -431,7 +431,7 @@ object SymDenotations {
 
     /** Does this symbol denote the primary constructor of its enclosing class? */
     final def isPrimaryConstructor(implicit ctx: Context) =
-      isConstructor && owner.primaryConstructor == this
+      isConstructor && owner.primaryConstructor == symbol
 
     /** Is this a subclass of the given class `base`? */
     def isSubClass(base: Symbol)(implicit ctx: Context) = false
@@ -1406,8 +1406,14 @@ object SymDenotations {
 
     override def primaryConstructor(implicit ctx: Context): Symbol = {
       val cname = if (this is ImplClass) nme.IMPLCLASS_CONSTRUCTOR else nme.CONSTRUCTOR
-      decls.denotsNamed(cname).first.symbol
+      decls.denotsNamed(cname).last.symbol // denotsNamed returns Symbols in reverse order of occurrence
     }
+
+    /** The parameter accessors of this class. Term and type accessors,
+     *  getters and setters are all returned int his list
+     */
+    def paramAccessors(implicit ctx: Context): List[Symbol] =
+      decls.filter(_ is ParamAccessor).toList
 
     /** If this class has the same `decls` scope reference in `phase` and
      *  `phase.next`, install a new denotation with a cloned scope in `phase.next`.
