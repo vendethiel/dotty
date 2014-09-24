@@ -26,7 +26,7 @@ class tests extends CompilerTest {
   val dotcDir = "./src/dotty/"
 
 
-  @Test def pos_t2168_pat = compileFile(posDir, "t2168", doErase)
+  /*@Test def pos_t2168_pat = compileFile(posDir, "t2168", doErase)
   @Test def pos_erasure = compileFile(posDir, "erasure", doErase)
   @Test def pos_Coder() = compileFile(posDir, "Coder", doErase)
   @Test def pos_blockescapes() = compileFile(posDir, "blockescapes", doErase)
@@ -36,7 +36,8 @@ class tests extends CompilerTest {
   @Test def pos_inferred() = compileFile(posDir, "inferred", doErase)
   @Test def pos_Patterns() = compileFile(posDir, "Patterns")
   @Test def pos_selftypes() = compileFile(posDir, "selftypes", doErase)
-  @Test def pos_varargs() = compileFile(posDir, "varargs", doErase)
+  @Test def pos_varargs() = compileFile(posDir, "varargs", doErase)*/
+  @Test def pos_varargs() = compileFile(posDir, "vararg-pattern", doErase)/*
   @Test def pos_opassign() = compileFile(posDir, "opassign", doErase)
   @Test def pos_typedapply() = compileFile(posDir, "typedapply", doErase)
   @Test def pos_nameddefaults() = compileFile(posDir, "nameddefaults", doErase)
@@ -134,7 +135,7 @@ class tests extends CompilerTest {
       dotcDir + "tools/dotc/config/PathResolver.scala",
       //"-Ylog:frontend",
       "-Xprompt",
-      "#runs", "2"))
+      "#runs", "2"))*/
 
   //@Test def dotc_compilercommand = compileFile(dotcDir + "tools/dotc/config/", "CompilerCommand")
 }
