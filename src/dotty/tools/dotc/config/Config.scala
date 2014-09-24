@@ -27,7 +27,7 @@ object Config {
   /** Show subtype traces for all deep subtype recursions */
   final val traceDeepSubTypeRecursions = false
 
-  final val verboseExplainSubtype = false
+  final val verboseExplainSubtype = true
 
   /** When set, use new signature-based matching.
    *  Advantantage of doing so: It's supposed to be faster
@@ -48,4 +48,7 @@ object Config {
    *  variance of the underlying lambda class.
    */
   final val checkLambdaVariance = false
+
+  /** Check that certain types cannot be created in erasedTypes phases */
+  final val checkUnerased = true
 }

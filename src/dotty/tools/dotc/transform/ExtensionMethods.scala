@@ -27,9 +27,9 @@ class ExtensionMethods extends MacroTransform with DenotTransformer with FullPar
   import tpd._
 
   /** the following two members override abstract members in Transform */
-  val name: String = "extmethods"
+  override def phaseName: String = "extmethods"
 
-  override def runsAfter: Set[String] = Set("elimrepeated") // TODO: add tailrec
+  override def runsAfter: Set[Class[_ <: Phase]] = Set(classOf[ElimRepeated])
 
   override def transform(ref: SingleDenotation)(implicit ctx: Context): SingleDenotation = ref match {
     case ref: ClassDenotation if ref is ModuleClass =>
@@ -156,16 +156,12 @@ class ExtensionMethods extends MacroTransform with DenotTransformer with FullPar
              wrap over other value classes anyway.
             checkNonCyclic(ctx.owner.pos, Set(), ctx.owner) */
             extensionDefs(ctx.owner.linkedClass) = new mutable.ListBuffer[Tree]
-            ctx.owner.primaryConstructor.makeNotPrivateAfter(NoSymbol, thisTransformer)
-            // SI-7859 make param accessors accessible so the erasure can generate unbox operations.
-            val paramAccessors = ctx.owner.info.decls.filter(_.is(TermParamAccessor))
-            paramAccessors.foreach(_.makeNotPrivateAfter(ctx.owner, thisTransformer))
             super.transform(tree)
           } else if (ctx.owner.isStaticOwner) {
-            val tree1 @ Template(constr, parents, selfType, body) = super.transform(tree)
+            val tree1 @ Template(_, _, _, body) = super.transform(tree)
             extensionDefs remove tree1.symbol.owner match {
               case Some(defns) if defns.nonEmpty =>
-                cpy.Template(tree1, constr, parents, selfType, body ++ defns)
+                cpy.Template(tree1)(body = body ++ defns)
               case _ =>
                 tree1
             }
@@ -178,7 +174,7 @@ class ExtensionMethods extends MacroTransform with DenotTransformer with FullPar
           val extensionMeth = extensionMethod(origMeth)
           ctx.log(s"Value class $origClass spawns extension method.\n  Old: ${origMeth.showDcl}\n  New: ${extensionMeth.showDcl}")
           extensionDefs(staticClass) += fullyParameterizedDef(extensionMeth, ddef)
-          cpy.DefDef(tree, ddef.mods, ddef.name, ddef.tparams, ddef.vparamss, ddef.tpt,
+          cpy.DefDef(tree)(ddef.mods, ddef.name, ddef.tparams, ddef.vparamss, ddef.tpt,
               forwarder(extensionMeth, ddef))
         case _ =>
           super.transform(tree)
