@@ -28,6 +28,12 @@ class Run(comp: Compiler)(implicit ctx: Context) {
     compileSources(sources)
   }
 
+  /** TODO: There's a fundamental design problem here: We assmble phases using `squash`
+   *  when we first build the compiler. But we modify them with -Yskip, -Ystop
+   *  on each run. That modification needs to either trasnform the tree structure,
+   *  or we need to assmeble phases on each run, and take -Yskip, -Ystop into
+   *  account. I think the latter would be preferable.
+   */
   def compileSources(sources: List[SourceFile]) = Stats.monitorHeartBeat {
     if (sources forall (_.exists)) {
       units = sources map (new CompilationUnit(_))
@@ -36,7 +42,7 @@ class Run(comp: Compiler)(implicit ctx: Context) {
         ctx.settings.YstopAfter.value.containsPhase(phase.prev)
       val phasesToRun = ctx.allPhases.init
         .takeWhile(!stoppedBefore(_))
-        .filterNot(ctx.settings.Yskip.value.containsPhase(_))
+        .filterNot(ctx.settings.Yskip.value.containsPhase(_)) // TODO: skip only subphase
       for (phase <- phasesToRun)
         if (!ctx.reporter.hasErrors) {
           phase.runOn(units)
@@ -55,7 +61,7 @@ class Run(comp: Compiler)(implicit ctx: Context) {
   private def printTree(ctx: Context) = {
     val unit = ctx.compilationUnit
     println(s"result of $unit after ${ctx.phase.prev}:")
-    println(unit.tpdTree)
+    println(unit.tpdTree.show(ctx))
   }
 
   def compile(sourceCode: String): Unit = {
