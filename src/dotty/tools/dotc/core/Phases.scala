@@ -13,7 +13,7 @@ import dotty.tools.dotc.transform.TreeTransforms
 import Periods._
 import typer.{FrontEnd, RefChecks}
 import ast.tpd
-import dotty.tools.dotc.transform.{Erasure, Flatten}
+import dotty.tools.dotc.transform.{Erasure, Flatten, GettersSetters}
 
 trait Phases {
   self: Context =>
@@ -169,11 +169,13 @@ object Phases {
     private val refChecksCache = new PhaseCache(classOf[RefChecks])
     private val erasureCache = new PhaseCache(classOf[Erasure])
     private val flattenCache = new PhaseCache(classOf[Flatten])
+    private val gettersSettersCache = new PhaseCache(classOf[GettersSetters])
 
     def typerPhase = typerCache.phase
     def refchecksPhase = refChecksCache.phase
     def erasurePhase = erasureCache.phase
     def flattenPhase = flattenCache.phase
+    def gettersSettersPhase = gettersSettersCache.phase
 
     def isAfterTyper(phase: Phase): Boolean = phase.id > typerPhase.id
   }
