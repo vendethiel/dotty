@@ -13,7 +13,7 @@ class tests extends CompilerTest {
 //        "-Yshow-suppressed-errors",
         "-pagewidth", "160")
 
-  implicit val defaultOptions = noCheckOptions ++ List("-Ycheck:literalize,constructors")
+  implicit val defaultOptions = noCheckOptions ++ List("-Ycheck:gettersSetters,constructors")
 
   val twice = List("#runs", "2", "-YnoDoubleBindings")
   val doErase = List("-Ystop-before:terminal")
