@@ -691,6 +691,9 @@ import RefChecks._
  *  Unlike in Scala 2.x not-private members keep their name. It is
  *  up to the backend to find a unique expanded name for them. The
  *  rationale to do name changes that late is that they are very fragile.
+
+ *  todo: But RefChecks is not done yet. It's still a somewhat dirty port from the Scala 2 version.
+ *  todo: move untrivial logic to their own mini-phases
  */
 class RefChecks extends MiniPhase with SymTransformer { thisTransformer =>
 
@@ -809,6 +812,22 @@ class RefChecks extends MiniPhase with SymTransformer { thisTransformer =>
 
     override def transformNew(tree: New)(implicit ctx: Context, info: TransformerInfo) = {
       currentLevel.enterReference(tree.tpe.typeSymbol, tree.pos)
+      tree
+    }
+
+    override def transformTypeApply(tree: tpd.TypeApply)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
+      tree.fun match {
+        case fun@Select(qual, selector) =>
+          val sym = tree.symbol
+
+          if (sym == defn.Any_isInstanceOf) {
+            val argType = tree.args.head.tpe
+            val qualCls = qual.tpe.widen.classSymbol
+            val argCls = argType.classSymbol
+            if (qualCls.isPrimitiveValueClass && !argCls.isPrimitiveValueClass) ctx.error("isInstanceOf cannot test if value types are references", tree.pos)
+          }
+        case _ =>
+      }
       tree
     }
   }

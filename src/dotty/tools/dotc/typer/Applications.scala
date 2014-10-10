@@ -31,6 +31,53 @@ object Applications {
   private val isNamedArg = (arg: Any) => arg.isInstanceOf[Trees.NamedArg[_]]
   def hasNamedArg(args: List[Any]) = args exists isNamedArg
 
+  def extractorMemberType(tp: Type, name: Name, errorPos: Position = NoPosition)(implicit ctx:Context) = {
+    val ref = tp member name
+    if (ref.isOverloaded)
+      errorType(i"Overloaded reference to $ref is not allowed in extractor", errorPos)
+    else if (ref.info.isInstanceOf[PolyType])
+      errorType(i"Reference to polymorphic $ref: ${ref.info} is not allowed in extractor", errorPos)
+    else
+      ref.info.widenExpr.dealias
+  }
+
+  def productSelectorTypes(tp: Type, errorPos: Position = NoPosition)(implicit ctx:Context): List[Type] = {
+    val sels = for (n <- Iterator.from(0)) yield extractorMemberType(tp, nme.selectorName(n), errorPos)
+    sels.takeWhile(_.exists).toList
+  }
+
+  def productSelectors(tp: Type)(implicit ctx:Context): List[Symbol] = {
+    val sels = for (n <- Iterator.from(0)) yield tp.member(nme.selectorName(n)).symbol
+    sels.takeWhile(_.exists).toList
+  }
+
+  def getUnapplySelectors(tp: Type, args:List[untpd.Tree], pos: Position = NoPosition)(implicit ctx: Context): List[Type] =
+    if (defn.isProductSubType(tp) && args.length > 1) productSelectorTypes(tp, pos)
+    else tp :: Nil
+
+  def unapplyArgs(unapplyResult: Type, unapplyFn:Tree, args:List[untpd.Tree], pos: Position = NoPosition)(implicit ctx: Context): List[Type] = {
+
+    def seqSelector = defn.RepeatedParamType.appliedTo(unapplyResult.elemType :: Nil)
+    def getTp = extractorMemberType(unapplyResult, nme.get, pos)
+
+    // println(s"unapply $unapplyResult ${extractorMemberType(unapplyResult, nme.isDefined)}")
+    if (extractorMemberType(unapplyResult, nme.isDefined, pos) isRef defn.BooleanClass) {
+      if (getTp.exists)
+        if (unapplyFn.symbol.name == nme.unapplySeq) {
+          val seqArg = boundsToHi(getTp.firstBaseArgInfo(defn.SeqClass))
+          if (seqArg.exists) return args map Function.const(seqArg)
+        }
+        else return getUnapplySelectors(getTp, args, pos)
+      else if (defn.isProductSubType(unapplyResult)) return productSelectorTypes(unapplyResult, pos)
+    }
+    if (unapplyResult derivesFrom defn.SeqClass) seqSelector :: Nil
+    else if (unapplyResult isRef defn.BooleanClass) Nil
+    else {
+      ctx.error(i"$unapplyResult is not a valid result type of an unapply method of an extractor", pos)
+      Nil
+    }
+  }
+
   def wrapDefs(defs: mutable.ListBuffer[Tree], tree: Tree)(implicit ctx: Context): Tree =
     if (defs != null && defs.nonEmpty) tpd.Block(defs.toList, tree) else tree
 }
@@ -85,7 +132,8 @@ trait Applications extends Compatibility { self: Typer =>
 
     protected def appPos: Position
 
-    /** The current function part, which might be affected by lifting.
+    /** If constructing trees, the current function part, which might be
+     *  affected by lifting. EmptyTree otherwise.
      */
     protected def normalizedFun: Tree
 
@@ -544,7 +592,7 @@ trait Applications extends Compatibility { self: Typer =>
     assignType(cpy.TypeApply(tree)(typedFn, typedArgs), typedFn, typedArgs)
   }
 
-  def typedUnApply(tree: untpd.Apply, pt: Type)(implicit ctx: Context): Tree = track("typedUnApply") {
+  def typedUnApply(tree: untpd.Apply, selType: Type)(implicit ctx: Context): Tree = track("typedUnApply") {
     val Apply(qual, args) = tree
 
     def notAnExtractor(tree: Tree) =
@@ -583,7 +631,7 @@ trait Applications extends Compatibility { self: Typer =>
      */
     def trySelectUnapply(qual: untpd.Tree)(fallBack: Tree => Tree): Tree = {
       val genericProto = new UnapplyFunProto(WildcardType, this)
-      def specificProto = new UnapplyFunProto(pt, this)
+      def specificProto = new UnapplyFunProto(selType, this)
       // try first for non-overloaded, then for overloaded ocurrences
       def tryWithName(name: TermName)(fallBack: Tree => Tree)(implicit ctx: Context): Tree =
         tryEither {
@@ -613,45 +661,6 @@ trait Applications extends Compatibility { self: Typer =>
 
     def fromScala2x = unapplyFn.symbol.exists && (unapplyFn.symbol.owner is Scala2x)
 
-    def unapplyArgs(unapplyResult: Type)(implicit ctx: Context): List[Type] = {
-      def extractorMemberType(tp: Type, name: Name) = {
-        val ref = tp member name
-        if (ref.isOverloaded)
-          errorType(i"Overloaded reference to $ref is not allowed in extractor", tree.pos)
-        else if (ref.info.isInstanceOf[PolyType])
-          errorType(i"Reference to polymorphic $ref: ${ref.info} is not allowed in extractor", tree.pos)
-        else
-          ref.info.widenExpr.dealias
-      }
-
-      def productSelectors(tp: Type): List[Type] = {
-        val sels = for (n <- Iterator.from(0)) yield extractorMemberType(tp, nme.selectorName(n))
-        sels.takeWhile(_.exists).toList
-      }
-      def seqSelector = defn.RepeatedParamType.appliedTo(unapplyResult.elemType :: Nil)
-      def getSelectors(tp: Type): List[Type] =
-        if (defn.isProductSubType(tp) && args.length > 1) productSelectors(tp)
-        else tp :: Nil
-      def getTp = extractorMemberType(unapplyResult, nme.get)
-
-      // println(s"unapply $unapplyResult ${extractorMemberType(unapplyResult, nme.isDefined)}")
-      if (extractorMemberType(unapplyResult, nme.isDefined) isRef defn.BooleanClass) {
-        if (getTp.exists)
-          if (unapplyFn.symbol.name == nme.unapplySeq) {
-            val seqArg = boundsToHi(getTp.firstBaseArgInfo(defn.SeqClass))
-            if (seqArg.exists) return args map Function.const(seqArg)
-          }
-          else return getSelectors(getTp)
-        else if (defn.isProductSubType(unapplyResult)) return productSelectors(unapplyResult)
-      }
-      if (unapplyResult derivesFrom defn.SeqClass) seqSelector :: Nil
-      else if (unapplyResult isRef defn.BooleanClass) Nil
-      else {
-        ctx.error(i"$unapplyResult is not a valid result type of an unapply method of an extractor", tree.pos)
-        Nil
-      }
-    }
-
     /** Can `subtp` be made to be a subtype of `tp`, possibly by dropping some
      *  refinements in `tp`?
      */
@@ -665,19 +674,19 @@ trait Applications extends Compatibility { self: Typer =>
     unapplyFn.tpe.widen match {
       case mt: MethodType if mt.paramTypes.length == 1 && !mt.isDependent =>
         val unapplyArgType = mt.paramTypes.head
-        unapp.println(i"unapp arg tpe = $unapplyArgType, pt = $pt")
-        def wpt = widenForMatchSelector(pt) // needed?
+        unapp.println(i"unapp arg tpe = $unapplyArgType, pt = $selType")
+        def wpt = widenForMatchSelector(selType) // needed?
         val ownType =
-          if (pt <:< unapplyArgType) {
-            fullyDefinedType(unapplyArgType, "extractor argument", tree.pos)
+          if (selType <:< unapplyArgType) {
+            //fullyDefinedType(unapplyArgType, "extractor argument", tree.pos)
             unapp.println(i"case 1 $unapplyArgType ${ctx.typerState.constraint}")
-            pt
+            selType
           } else if (isSubTypeOfParent(unapplyArgType, wpt)(ctx.addMode(Mode.GADTflexible))) {
             maximizeType(unapplyArgType) match {
               case Some(tvar) =>
                 def msg =
                   d"""There is no best instantiation of pattern type $unapplyArgType
-                     |that makes it a subtype of selector type $pt.
+                     |that makes it a subtype of selector type $selType.
                      |Non-variant type variable ${tvar.origin} cannot be uniquely instantiated.""".stripMargin
                 if (fromScala2x) {
                   // We can't issue an error here, because in Scala 2, ::[B] is invariant
@@ -711,7 +720,7 @@ trait Applications extends Compatibility { self: Typer =>
           case Apply(unapply, `dummyArg` :: Nil) => Nil
         }
 
-        var argTypes = unapplyArgs(unapplyApp.tpe)
+        var argTypes = unapplyArgs(unapplyApp.tpe, unapplyFn, args, tree.pos)
         for (argType <- argTypes) assert(!argType.isInstanceOf[TypeBounds], unapplyApp.tpe.show)
         val bunchedArgs = argTypes match {
           case argType :: Nil =>
@@ -728,7 +737,7 @@ trait Applications extends Compatibility { self: Typer =>
         val unapplyPatterns = (bunchedArgs, argTypes).zipped map (typed(_, _))
         val result = assignType(cpy.UnApply(tree)(unapplyFn, unapplyImplicits, unapplyPatterns), ownType)
         unapp.println(s"unapply patterns = $unapplyPatterns")
-        if ((ownType eq pt) || ownType.isError) result
+        if ((ownType eq selType) || ownType.isError) result
         else Typed(result, TypeTree(ownType))
       case tp =>
         val unapplyErr = if (tp.isError) unapplyFn else notAnExtractor(unapplyFn)

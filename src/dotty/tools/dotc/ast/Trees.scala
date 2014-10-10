@@ -257,7 +257,8 @@ object Trees {
      *   an UnAssignedTypeException is thrown. (Overridden by empty trees)
      */
     def tpe: T @uncheckedVariance = {
-      if (myTpe == null) throw new UnAssignedTypeException(this)
+      if (myTpe == null)
+        throw new UnAssignedTypeException(this)
       myTpe
     }
 
@@ -713,6 +714,7 @@ object Trees {
    *  @param implicits Any implicit parameters passed to the unapply after the selector
    *  @param patterns  The argument patterns in the pattern match.
    *
+   *  It is typed with same type as first `fun` argument
    *  Given a match selector `sel` a pattern UnApply(fun, implicits, patterns) is roughly translated as follows
    *
    *    val result = fun(sel)(implicits)
@@ -1212,7 +1214,9 @@ object Trees {
         case EmptyValDef =>
           tree
         case ValDef(mods, name, tpt, rhs) =>
-          cpy.ValDef(tree)(mods, name, transform(tpt), transform(rhs))
+          val tpt1 = transform(tpt)
+          val rhs1 = transform(rhs)
+          cpy.ValDef(tree)(mods, name, transform(tpt1), transform(rhs1))
         case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
           cpy.DefDef(tree)(mods, name, transformSub(tparams), vparamss mapConserve (transformSub(_)), transform(tpt), transform(rhs))
         case tree @ TypeDef(mods, name, rhs) =>

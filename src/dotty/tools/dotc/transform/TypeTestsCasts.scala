@@ -20,13 +20,18 @@ import Erasure.Boxing._
  *   - use the object methods $isInstanceOf and $asInstanceOf
  *   - have a reference type as receiver
  *   - can be translated directly to machine instructions
+ *
+ *
+ * Unfortunately this phase ended up being not Y-checkable unless types are erased. A cast to an ConstantType(3) or x.type
+ * cannot be rewritten before erasure.
  */
-class TypeTestsCasts extends MiniPhaseTransform {
+
+trait TypeTestsCasts {
   import ast.tpd._
 
-  override def phaseName: String = "typeTestsCasts"
+  // override def phaseName: String = "typeTestsCasts"
 
-  override def transformTypeApply(tree: TypeApply)(implicit ctx: Context, info: TransformerInfo): Tree = ctx.traceIndented(s"transforming ${tree.show}", show = true) {
+  def interceptTypeApply(tree: TypeApply)(implicit ctx: Context): Tree = ctx.traceIndented(s"transforming ${tree.show}", show = true) {
     tree.fun match {
       case fun @ Select(qual, selector) =>
         val sym = tree.symbol
@@ -42,12 +47,9 @@ class TypeTestsCasts extends MiniPhaseTransform {
           def argCls = argType.classSymbol
           if (expr.tpe <:< argType)
             Literal(Constant(true)) withPos tree.pos
-          else if (qualCls.isPrimitiveValueClass) {
-            if (argCls.isPrimitiveValueClass) Literal(Constant(qualCls == argCls))
-            else errorTree(tree, "isInstanceOf cannot test if value types are references")
-          }
           else if (argCls.isPrimitiveValueClass)
-            transformIsInstanceOf(expr, defn.boxedClass(argCls).typeRef)
+            if (qualCls.isPrimitiveValueClass) Literal(Constant(qualCls == argCls))
+            else transformIsInstanceOf(expr, defn.boxedClass(argCls).typeRef)
           else argType.dealias match {
             case _: SingletonType =>
               val cmpOp = if (argType derivesFrom defn.AnyValClass) defn.Any_equals else defn.Object_eq
@@ -78,7 +80,7 @@ class TypeTestsCasts extends MiniPhaseTransform {
         }
 
         def transformAsInstanceOf(argType: Type): Tree = {
-          def argCls = argType.classSymbol
+          def argCls = argType.widen.classSymbol
           if (qual.tpe <:< argType)
             Typed(qual, tree.args.head)
           else if (qualCls.isPrimitiveValueClass) {

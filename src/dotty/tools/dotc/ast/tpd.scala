@@ -345,6 +345,20 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     Thicket(valdef, clsdef)
   }
 
+  def initValue(tpe: Types.Type)(implicit ctx: Context) = {
+    val tpw = tpe.widen
+    // !!! replace with isRef
+    if (tpw =:= defn.IntType) Literal(Constant(0))
+    else if (tpw =:= defn.LongType) Literal(Constant(0L))
+    else if (tpw =:= defn.BooleanType) Literal(Constant(false))
+    else if (tpw =:= defn.CharType) Literal(Constant('\u0000'))
+    else if (tpw =:= defn.FloatType) Literal(Constant(0f))
+    else if (tpw =:= defn.DoubleType) Literal(Constant(0d))
+    else if (tpw =:= defn.ByteType) Literal(Constant(0.toByte))
+    else if (tpw =:= defn.ShortType) Literal(Constant(0.toShort))
+    else Literal(Constant(null)).select(defn.Any_asInstanceOf).appliedToType(tpe)
+  }
+
   private class FindLocalDummyAccumulator(cls: ClassSymbol)(implicit ctx: Context) extends TreeAccumulator[Symbol] {
     def apply(sym: Symbol, tree: Tree) =
       if (sym.exists) sym
@@ -511,8 +525,19 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     def subst(from: List[Symbol], to: List[Symbol])(implicit ctx: Context): ThisTree =
       new TreeTypeMap(substFrom = from, substTo = to).apply(tree)
 
-    def changeOwner(from: Symbol, to: Symbol)(implicit ctx: Context): ThisTree =
-      new TreeTypeMap(oldOwners = from :: Nil, newOwners = to :: Nil).apply(tree)
+    /** Change owner from `from` to `to`. If `from` is a weak owner, also change its
+     *  owner to `to`, and continue until a non-weak owner is reached.
+     */
+    def changeOwner(from: Symbol, to: Symbol)(implicit ctx: Context): ThisTree = {
+      def loop(from: Symbol, froms: List[Symbol], tos: List[Symbol]): ThisTree = {
+        if (from.isWeakOwner) loop(from.owner, from :: froms, to :: tos)
+        else {
+          //println(i"change owner ${from :: froms}%, % ==> $tos of $tree")
+          new TreeTypeMap(oldOwners = from :: froms, newOwners = tos).apply(tree)
+        }
+      }
+      loop(from, Nil, to :: Nil)
+    }
 
     def select(name: Name)(implicit ctx: Context): Select =
       Select(tree, name)
@@ -540,7 +565,13 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     def appliedToArgss(argss: List[List[Tree]])(implicit ctx: Context): Tree =
       ((tree: Tree) /: argss)(Apply(_, _))
 
-    def appliedToNone(implicit ctx: Context): Apply = appliedToArgs(Nil)
+    def appliedToNone(implicit ctx: Context): Tree = {
+     tree.tpe.widen match {
+        case fntpe: MethodType => appliedToArgs(Nil)
+        case _ => tree
+      }
+    }
+
 
     def appliedToType(targ: Type)(implicit ctx: Context): Tree =
       appliedToTypes(targ :: Nil)
@@ -630,6 +661,9 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       Block(vdef :: Nil, within(Ident(vdef.namedType)))
     }
   }
+
+  def runtimeCall(name: TermName, args: List[Tree])(implicit ctx: Context): Tree =
+    Ident(defn.ScalaRuntimeModule.requiredMethod(name).termRef).appliedToArgs(args)
 
   /** A traverser that passes the enlcosing class or method as an argumenr
    *  to the traverse method.

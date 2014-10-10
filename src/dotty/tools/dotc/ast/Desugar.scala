@@ -99,7 +99,7 @@ object desugar {
       val setterParam = makeSyntheticParameter(tpt = (new SetterParamTree).watching(vdef))
       val setterRhs = if (vdef.rhs.isEmpty) EmptyTree else unitLiteral
       val setter = cpy.DefDef(vdef)(
-        mods | Accessor, name.setterName, Nil, (setterParam :: Nil) :: Nil,
+        (mods | Accessor) &~ CaseAccessor, name.setterName, Nil, (setterParam :: Nil) :: Nil,
         TypeTree(defn.UnitType), setterRhs) // rhs gets filled in later, when field is generated and getter has parameters
       Thicket(vdef, setter)
     }
@@ -287,7 +287,6 @@ object desugar {
         def syntheticProperty(name: TermName, rhs: Tree) =
           DefDef(synthetic, name, Nil, Nil, TypeTree(), rhs)
         val isDefinedMeth = syntheticProperty(nme.isDefined, Literal(Constant(true)))
-        val productArityMeth = syntheticProperty(nme.productArity, Literal(Constant(arity)))
         val caseParams = constrVparamss.head.toArray
         val productElemMeths = for (i <- 0 until arity) yield
           syntheticProperty(nme.selectorName(i), Select(This(EmptyTypeName), caseParams(i).name))
@@ -302,7 +301,7 @@ object desugar {
               cpy.ValDef(vparam)(rhs = EmptyTree))
             DefDef(synthetic, nme.copy, derivedTparams, copyFirstParams :: copyRestParamss, TypeTree(), creatorExpr) :: Nil
           }
-        copyMeths ::: isDefinedMeth :: productArityMeth :: productElemMeths.toList
+        copyMeths ::: isDefinedMeth :: productElemMeths.toList
       }
       else Nil
 
@@ -862,7 +861,7 @@ object desugar {
       case tree @ Bind(_, tree1) =>
         add(tree, TypeTree())
         collect(tree1)
-      case Typed(id: Ident, t) if isVarPattern(id) && id.name != nme.WILDCARD =>
+      case Typed(id: Ident, t) if isVarPattern(id) && id.name != nme.WILDCARD && !isWildcardStarArg(tree) =>
         add(id, t)
       case id: Ident if isVarPattern(id) && id.name != nme.WILDCARD =>
         add(id, TypeTree())
