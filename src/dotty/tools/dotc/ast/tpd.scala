@@ -387,10 +387,12 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       val tree1 = untpd.cpy.Select(tree)(qualifier, name)
       tree match {
         case tree: Select if (qualifier.tpe eq tree.qualifier.tpe) => tree1.withTypeUnchecked(tree.tpe)
-        case _ => tree.tpe match {
-          case tpe: NamedType => tree1.withType(tpe.derivedSelect(qualifier.tpe))
-          case _ => tree1.withTypeUnchecked(tree.tpe)
-        }
+        case _ =>
+          val tp = tree.tpe match {
+            case tpe: NamedType => tpe.derivedSelect(qualifier.tpe)
+            case _ => tree.tpe
+          }
+          ta.assignType(tree1, tp)
       }
     }
 

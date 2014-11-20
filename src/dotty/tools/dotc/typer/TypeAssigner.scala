@@ -215,6 +215,9 @@ trait TypeAssigner {
     tree.withType(tp)
   }
 
+  def assignType(tree: untpd.Select, tp: Type)(implicit ctx: Context): Select =
+    tree.withType(tp)
+
   def assignType(tree: untpd.SelectFromTypeTree, qual: Tree)(implicit ctx: Context) =
     tree.withType(accessibleSelectionType(tree, qual))
 
