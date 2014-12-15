@@ -222,16 +222,16 @@ class Definitions {
   lazy val traversableDropMethod  = ctx.requiredMethod(ScalaRuntimeClass, nme.drop)
   lazy val uncheckedStableClass: ClassSymbol = ctx.requiredClass("scala.annotation.unchecked.uncheckedStable")
 
-  lazy val UnitClass = valueClassSymbol("scala.Unit", BoxedUnitClass, java.lang.Void.TYPE, UnitEnc)
-  lazy val BooleanClass = valueClassSymbol("scala.Boolean", BoxedBooleanClass, java.lang.Boolean.TYPE, BooleanEnc)
+  lazy val UnitClass = valueClassSymbol("scala.Unit", BoxedUnitClass, java.lang.Void.TYPE, UnitEnc, ())
+  lazy val BooleanClass = valueClassSymbol("scala.Boolean", BoxedBooleanClass, java.lang.Boolean.TYPE, BooleanEnc, false)
     lazy val Boolean_!   = BooleanClass.requiredMethod(nme.UNARY_!)
     lazy val Boolean_&& = BooleanClass.requiredMethod(nme.ZAND)
     lazy val Boolean_||  = BooleanClass.requiredMethod(nme.ZOR)
 
-  lazy val ByteClass = valueClassSymbol("scala.Byte", BoxedByteClass, java.lang.Byte.TYPE, ByteEnc)
-  lazy val ShortClass = valueClassSymbol("scala.Short", BoxedShortClass, java.lang.Short.TYPE, ShortEnc)
-  lazy val CharClass = valueClassSymbol("scala.Char", BoxedCharClass, java.lang.Character.TYPE, CharEnc)
-  lazy val IntClass = valueClassSymbol("scala.Int", BoxedIntClass, java.lang.Integer.TYPE, IntEnc)
+  lazy val ByteClass = valueClassSymbol("scala.Byte", BoxedByteClass, java.lang.Byte.TYPE, ByteEnc, 0.toByte)
+  lazy val ShortClass = valueClassSymbol("scala.Short", BoxedShortClass, java.lang.Short.TYPE, ShortEnc, 0.toShort)
+  lazy val CharClass = valueClassSymbol("scala.Char", BoxedCharClass, java.lang.Character.TYPE, CharEnc, 0.toChar)
+  lazy val IntClass = valueClassSymbol("scala.Int", BoxedIntClass, java.lang.Integer.TYPE, IntEnc, 0)
     lazy val Int_-   = IntClass.requiredMethod(nme.MINUS, List(IntType))
     lazy val Int_+   = IntClass.requiredMethod(nme.PLUS, List(IntType))
     lazy val Int_/   = IntClass.requiredMethod(nme.DIV, List(IntType))
@@ -239,15 +239,15 @@ class Definitions {
     lazy val Int_==   = IntClass.requiredMethod(nme.EQ, List(IntType))
     lazy val Int_>=   = IntClass.requiredMethod(nme.GE, List(IntType))
     lazy val Int_<=   = IntClass.requiredMethod(nme.LE, List(IntType))
-  lazy val LongClass = valueClassSymbol("scala.Long", BoxedLongClass, java.lang.Long.TYPE, LongEnc)
+  lazy val LongClass = valueClassSymbol("scala.Long", BoxedLongClass, java.lang.Long.TYPE, LongEnc, 0L)
     lazy val Long_XOR_Long = LongClass.info.member(nme.XOR).requiredSymbol(
       x => (x is Method) && (x.info.firstParamTypes.head isRef defn.LongClass)
     )
     lazy val Long_LSR_Int = LongClass.info.member(nme.LSR).requiredSymbol(
       x => (x is Method) && (x.info.firstParamTypes.head isRef defn.IntClass)
     )
-  lazy val FloatClass = valueClassSymbol("scala.Float", BoxedFloatClass, java.lang.Float.TYPE, FloatEnc)
-  lazy val DoubleClass = valueClassSymbol("scala.Double", BoxedDoubleClass, java.lang.Double.TYPE, DoubleEnc)
+  lazy val FloatClass = valueClassSymbol("scala.Float", BoxedFloatClass, java.lang.Float.TYPE, FloatEnc, 0.0f)
+  lazy val DoubleClass = valueClassSymbol("scala.Double", BoxedDoubleClass, java.lang.Double.TYPE, DoubleEnc, 0.0)
 
   lazy val BoxedUnitClass = ctx.requiredClass("scala.runtime.BoxedUnit")
 
@@ -546,20 +546,23 @@ class Definitions {
   private[this] val _javaTypeToValueClass = mutable.Map[Class[_], Symbol]()
   private[this] val _valueClassToJavaType = mutable.Map[Symbol, Class[_]]()
   private[this] val _valueClassEnc = mutable.Map[Symbol, Int]()
+  private[this] val _nullValue = mutable.Map[Symbol, Any]()
 
   val boxedClass: collection.Map[Symbol, Symbol] = _boxedClass
   val unboxedClass: collection.Map[Symbol, Symbol] = _boxedClass
   val javaTypeToValueClass: collection.Map[Class[_], Symbol] = _javaTypeToValueClass
   val valueClassToJavaType: collection.Map[Symbol, Class[_]] = _valueClassToJavaType
   val valueClassEnc: collection.Map[Symbol, Int] = _valueClassEnc
+  val nullValue: collection.Map[Symbol, Any] = _nullValue
 
-  private def valueClassSymbol(name: String, boxed: ClassSymbol, jtype: Class[_], enc: Int): ClassSymbol = {
+  private def valueClassSymbol(name: String, boxed: ClassSymbol, jtype: Class[_], enc: Int, nul: Any): ClassSymbol = {
     val vcls = ctx.requiredClass(name)
     _unboxedClass(boxed) = vcls
     _boxedClass(vcls) = boxed
     _javaTypeToValueClass(jtype) = vcls
     _valueClassToJavaType(vcls) = jtype
     _valueClassEnc(vcls) = enc
+    _nullValue(vcls) = nul
     vcls
   }
 

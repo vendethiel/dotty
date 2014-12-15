@@ -11,6 +11,7 @@ import SymDenotations._
 import Types._
 import Decorators._
 import DenotTransformers._
+import Constants._
 import StdNames._
 import NameOps._
 import Phases._
@@ -100,9 +101,14 @@ class Mixin extends MiniPhaseTransform with SymTransformer { thisTransform =>
         case stat: DefDef if stat.symbol.isGetter && !stat.rhs.isEmpty =>
           val vsym = stat.symbol
           val isym = initializer(vsym)
-          val rhs = Block(
-            initBuf.toList.map(_.changeOwner(impl.symbol, isym)),
-            stat.rhs.changeOwner(vsym, isym))
+          val expr = stat.rhs match {
+            case Ident(nme.WILDCARD) =>
+              Literal(Constant(
+                defn.nullValue.getOrElse(vsym.info.resultType.classSymbol, null)))
+            case _ =>
+              stat.rhs.changeOwner(vsym, isym)
+          }
+          val rhs = Block(initBuf.toList.map(_.changeOwner(impl.symbol, isym)), expr)
           initBuf.clear()
           cpy.DefDef(stat)(rhs = EmptyTree) :: DefDef(isym, rhs) :: Nil
         case stat: DefDef if stat.symbol.isSetter =>
