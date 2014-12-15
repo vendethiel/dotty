@@ -60,6 +60,9 @@ class ReTyper extends Typer {
     untpd.cpy.Bind(tree)(tree.name, body1).withType(tree.typeOpt)
   }
 
+//  override def typedUnApply(tree: untpd.UnApply, selType: Type)(implicit ctx: Context) =
+//    promote(tree)
+
   override def localDummy(cls: ClassSymbol, impl: untpd.Template)(implicit ctx: Context) = impl.symbol
 
   override def retrieveSym(tree: untpd.Tree)(implicit ctx: Context): Symbol = tree.symbol

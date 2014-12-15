@@ -763,15 +763,10 @@ trait Applications extends Compatibility { self: Typer =>
     }
   }
 
-  /** A dummmy typed unapply, to make re-typers between frontend and pattern matcher
-   *  visit all subnodes of an unApply tree.
+  /** Typed unapply hook, to make re-typers between frontend and pattern matcher not choke.
    */
-  def typedUnApply(tree: untpd.UnApply, selType: Type)(implicit ctx: Context) = {
-    val unappType = typed(tree.fun)
-    tree.implicits.foreach(typed(_))
-    tree.patterns.foreach(typedPattern(_))
-    tree.withType(selType)
-  }
+  def typedUnApply(tree: untpd.UnApply, selType: Type)(implicit ctx: Context) =
+    throw new UnsupportedOperationException(s"cannot typecheck UnApply nodes")
 
   /** Is given method reference applicable to type arguments `targs` and argument trees `args`?
    *  @param  resultType   The expected result type of the application

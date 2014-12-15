@@ -1213,7 +1213,7 @@ object TreeTransforms {
 
     private var crashingTree: Tree = EmptyTree
 
-    def transform(tree: Tree, info: TransformerInfo, cur: Int)(implicit ctx: Context): Tree = ctx.traceIndented(s"transforming ${tree.show} at ${ctx.phase}", transforms, show = true) {
+    def transform(tree: Tree, info: TransformerInfo, cur: Int)(implicit ctx: Context): Tree = ctx.traceIndented(s"transforming ${tree.show} of class ${tree.getClass} at ${ctx.phase}", transforms, show = true) {
       try
         if (cur < info.transformers.length) {
           // if cur > 0 then some of the symbols can be created by already performed transformations

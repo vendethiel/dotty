@@ -28,6 +28,6 @@ object Printers {
   val variances = noPrinter
   val incremental = noPrinter
   val config = noPrinter
-  val transforms = noPrinter
+  val transforms = new Printer
   val cyclicErrors = noPrinter
 }

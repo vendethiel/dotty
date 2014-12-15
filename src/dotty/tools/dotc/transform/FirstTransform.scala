@@ -43,7 +43,7 @@ class FirstTransform extends MiniPhaseTransform with IdentityDenotTransformer wi
       assert(qual.tpe derivesFrom tree.symbol.owner, i"non member selection of ${tree.symbol.showLocated} from ${qual.tpe}")
     case _: TypeTree =>
     case _: Import | _: NamedArg | _: TypTree =>
-      assert(false, i"illegal tree: $tree")
+      assert(false, i"illegal tree: $tree of class ${tree.getClass}")
     case _ =>
   }
 
@@ -88,7 +88,7 @@ class FirstTransform extends MiniPhaseTransform with IdentityDenotTransformer wi
 
     def skipJava(stats: List[Tree]): List[Tree] = // packages get a JavaDefined flag. Dont skip them
       stats.filter(t => !(t.symbol is(Flags.JavaDefined, Flags.Package)))
-    
+
     addMissingCompanions(reorder(skipJava(stats)))
   }
 
@@ -142,6 +142,7 @@ class FirstTransform extends MiniPhaseTransform with IdentityDenotTransformer wi
       val bounds = tparams.map(tparam =>
         tparam.info.asSeenFrom(tycon.tpe.normalizedPrefix, tparam.owner.owner).bounds)
       Checking.checkBounds(args, bounds, _.substDealias(tparams, _))
+      println(i"normalizing $tree")
       normalizeType(tree)
     case tree =>
       normalizeType(tree)
