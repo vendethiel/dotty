@@ -60,7 +60,8 @@ class tests extends CompilerTest {
   @Test def pos_nullarify = compileFile(posDir, "nullarify", "-Ycheck:nullarify" :: doErase)
   @Test def pos_subtyping = compileFile(posDir, "subtyping", doErase)
   @Test def pos_t2613 = compileFile(posSpecialDir, "t2613", doErase)(allowDeepSubtypes)
-
+  @Test def pos_packageObj = compileFile(posDir, "i0239")
+  
   @Test def pos_all = compileFiles(posDir, twice)
   @Test def new_all = compileFiles(newDir, twice)
 
