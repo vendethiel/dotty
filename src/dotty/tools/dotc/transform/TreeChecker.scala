@@ -146,7 +146,7 @@ class TreeChecker extends Phase {
             assert(isSubType(tree1.tpe, tree.typeOpt), divergenceMsg(tree1.tpe, tree.typeOpt))
           tree1
       }
-      if (!ctx.settings.Yskip.value.contains("pickler")) checkNoOrphans(res.tpe)
+      checkNoOrphans(res.tpe)
       phasesToCheck.foreach(_.checkPostCondition(res))
       res
     }
