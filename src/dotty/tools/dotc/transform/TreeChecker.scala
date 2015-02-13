@@ -162,6 +162,8 @@ class TreeChecker extends Phase {
             definedBinders -= tp
           case tp: ParamType =>
             assert(definedBinders.contains(tp.binder), s"orphan param: $tp")
+          case tp: TypeVar =>
+            apply(tp.underlying)
           case _ =>
             mapOver(tp)
         }
