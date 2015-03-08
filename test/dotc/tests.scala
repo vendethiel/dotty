@@ -22,7 +22,7 @@ class tests extends CompilerTest {
   val doEmitBytecode = List("-Ystop-before:terminal")
   val failedbyName = List("-Ystop-before:collectEntryPoints") // #288
   val failedUnderscore = List("-Ystop-before:collectEntryPoints") // #289
-  val testPickling = List("-Ytest-pickler", "-Ystop-after:pickler")
+  val testPickling = List("-Xprint-types", "-Ytest-pickler", "-Ystop-after:pickler")
 
   val failedOther = List("-Ystop-before:collectEntryPoints") // some non-obvious reason. need to look deeper
   val twice = List("#runs", "2", "-YnoDoubleBindings")
@@ -35,8 +35,8 @@ class tests extends CompilerTest {
   val newDir = "./tests/new/"
   val dotcDir = "./src/dotty/"
 
-  @Test def pickle_pickleOK = compileDir(posDir + "pickleOK/", "-Xprint-types" :: testPickling)
-  @Test def pickle_pickling = compileDir(dotcDir + "tools/dotc/core/pickling", testPickling)
+  @Test def pickle_pickleOK = compileDir(posDir + "pickleOK/", testPickling)
+  @Test def pickle_pickling = compileDir(dotcDir + "tools/dotc/core/pickling/", testPickling)
 
   @Test def pos_t2168_pat = compileFile(posDir, "t2168")
   @Test def pos_erasure = compileFile(posDir, "erasure")
