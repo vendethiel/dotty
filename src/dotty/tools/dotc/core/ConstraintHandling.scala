@@ -27,11 +27,15 @@ trait ConstraintHandling {
   val state: TyperState
   import state.constraint
   
-  private var addConstraintInvocations = 0
-
-  /** If the constraint is frozen we cannot add new bounds to the constraint. */
+  /** If the constraint is frozen, we cannot add new bounds to it. */
   protected var frozenConstraint = false
    
+  /** Used for internal constraint checking, controlled by Config.checkConstraintsPropagated */
+  private var addConstraintInvocations = 0
+
+  /** Add new `bound` to parameter `param`, and check that its bounds 
+   *  are still nonempty. No propagation is performed.
+   */
   private def addOneBound(param: PolyParam, bound: Type, isUpper: Boolean): Boolean =
     !constraint.contains(param) || {
       val c1 = constraint.narrowBound(param, bound, isUpper)
@@ -42,6 +46,9 @@ trait ConstraintHandling {
       }
     }
 
+  /** Add `param <: bound` to constraint, including propagation.
+   *  @return The resulting constraint is still satisfiable
+   */
   protected def addUpperBound(param: PolyParam, bound: Type): Boolean = {
     def description = i"constraint $param <: $bound to\n$constraint"
     if (bound.isRef(defn.NothingClass) && ctx.typerState.isGlobalCommittable) {
@@ -58,6 +65,9 @@ trait ConstraintHandling {
     res
   }
     
+  /** Add param >: bound to constraint, including propagation.
+   *  @return The resulting constraint is still satisfiable
+   */
   protected def addLowerBound(param: PolyParam, bound: Type): Boolean = {
     def description = i"constraint $param >: $bound to\n$constraint"
     constr.println(i"adding $description")
@@ -69,6 +79,10 @@ trait ConstraintHandling {
     res
   }
  
+  /** install the transitive closure of the current constraint and p1 <: p2
+   *  as the current constraint.
+   *  @return The resulting constraint is still satisfiable
+   */
   protected def addLess(p1: PolyParam, p2: PolyParam): Boolean = {
     def description = i"ordering $p1 <: $p2 to\n$constraint"
     val res =
@@ -89,6 +103,7 @@ trait ConstraintHandling {
   
   /** Make p2 = p1, transfer all bounds of p2 to p1
    *  @pre  less(p1)(p2)
+   *  @return The resulting constraint is still satisfiable
    */
   private def unify(p1: PolyParam, p2: PolyParam): Boolean = {
     constr.println(s"unifying $p1 $p2")
@@ -104,6 +119,7 @@ trait ConstraintHandling {
     up.forall(addOneBound(_, lo, isUpper = false))
   }
   
+  /** `tp1 <: tp2` without having to add to the constraint */
   protected final def isSubTypeWhenFrozen(tp1: Type, tp2: Type): Boolean = {
     val saved = frozenConstraint
     frozenConstraint = true
@@ -111,8 +127,7 @@ trait ConstraintHandling {
     finally frozenConstraint = saved
   }
 
-  /** Test whether the lower bounds of all parameters in this
-   *  constraint are a solution to the constraint.
+  /** Test that all bounds of constrained parameters are satisfiable.
    */
   protected final def isSatisfiable: Boolean =
     constraint.forallParams { param =>
@@ -202,7 +217,7 @@ trait ConstraintHandling {
   final def canConstrain(param: PolyParam): Boolean =
     !frozenConstraint && (constraint contains param)
 
-  /** Add constraint `param <: bond` if `fromBelow` is true, `param >: bound` otherwise.
+  /** Add constraint `param <: bound` if `fromBelow` is true, `param >: bound` otherwise.
    *  `bound` is assumed to be in normalized form, as specified in `firstTry` and
    *  `secondTry` of `TypeComparer`. In particular, it should not be an alias type,
    *  lazy ref, typevar, wildcard type, error type. In addition, upper bounds may
