@@ -80,7 +80,7 @@
  <check level="warning" class="org.scalastyle.scalariform.StructuralTypeChecker" enabled="false"></check>
  <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
   <parameters>
-   <parameter name="regex"><![CDATA[if\(]]></parameter>
+   <parameter name="regexp"><![CDATA[if\\(]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.NumberOfTypesChecker" enabled="false">
