@@ -1,6 +1,6 @@
 object test {
 
-  def foo(x: Int) = {
+  /*def foo(x: Int) = {
 
     def bar(y: Int) = x + y
     def baz(z: Int) = bar(z)
@@ -8,8 +8,21 @@ object test {
     baz(1)
 
   }
+*/
+  def forwarder(x: Int => Int, arg: Int) = x(arg)
 
-  def foo2(x: Int) = {
+  class B {
+    def boo(x: Int) = {
+
+      class B2 {
+        forwarder(_ + x, x)
+
+      }
+
+    }
+  }
+
+ /* def foo2(x: Int) = {
 
     class C {
       def bam(y: Int): String => Int = {
@@ -21,9 +34,9 @@ object test {
     val fun = new C().bam(1)
     fun("abc")
 
-  }
+  }*/
 }
-
+/*
 class Super(x: Int)
 
 class Sub extends Super({
@@ -44,3 +57,4 @@ class Sub extends Super({
   }
   foo3(22)
 })
+*/
