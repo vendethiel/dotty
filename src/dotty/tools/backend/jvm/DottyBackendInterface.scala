@@ -550,7 +550,14 @@ class DottyBackendInterface()(implicit ctx: Context) extends BackendInterface{
     def fullName(sep: Char): String = sym.showFullName
     def fullName: String = sym.showFullName
     def simpleName: Name = sym.name
-    def javaSimpleName: Name = toDenot(sym).name // addModuleSuffix(simpleName.dropLocal)
+
+    def javaSimpleName: Name = {
+      val nm = toDenot(sym).name  // addModuleSuffix(simpleName.dropLocal)
+      if (!(sym is Flags.NotJavaPrivate)) {
+        nm
+      } else nm ++ "$njp$" ++ toDenot(sym).owner.fullNameSeparated('$')
+    }
+
     def javaBinaryName: Name = toDenot(sym).fullNameSeparated('/') // addModuleSuffix(fullNameInternal('/'))
     def javaClassName: String = toDenot(sym).fullName.toString// addModuleSuffix(fullNameInternal('.')).toString
     def name: Name = sym.name
@@ -570,7 +577,7 @@ class DottyBackendInterface()(implicit ctx: Context) extends BackendInterface{
     def isConstructor: Boolean = toDenot(sym).isConstructor
     def isAnonymousFunction: Boolean = toDenot(sym).isAnonymousFunction
     def isMethod: Boolean = sym is Flags.Method
-    def isPublic: Boolean =  sym.flags.is(Flags.EmptyFlags, Flags.Private | Flags.Protected)
+    def isPublic: Boolean = sym.flags.is(Flags.NotJavaPrivate) || sym.flags.is(Flags.EmptyFlags, butNot = Flags.Private | Flags.Protected)
     def isSynthetic: Boolean = sym is Flags.Synthetic
     def isPackageClass: Boolean = sym is Flags.PackageClass
     def isModuleClass: Boolean = sym is Flags.ModuleClass
@@ -587,9 +594,13 @@ class DottyBackendInterface()(implicit ctx: Context) extends BackendInterface{
     def isJavaDefined: Boolean = sym is Flags.JavaDefined
     def isJavaDefaultMethod: Boolean = !((sym is Flags.Deferred)  || toDenot(sym).isClassConstructor)
     def isDeferred: Boolean = sym is Flags.Deferred
-    def isPrivate: Boolean = sym is Flags.Private
-    def getsJavaFinalFlag: Boolean =
-      isFinal &&  !toDenot(sym).isClassConstructor && !(sym is Flags.Mutable) &&  !(sym.enclosingClass is Flags.Trait)
+    def isPrivate: Boolean = {
+      sym.is(Flags.Private, butNot = Flags.NotJavaPrivate)
+    }
+    def getsJavaFinalFlag: Boolean = {
+
+      isFinal && !toDenot(sym).isClassConstructor && !(sym is Flags.Mutable) && !(sym.enclosingClass is Flags.Trait)
+    }
 
     def getsJavaPrivateFlag: Boolean =
       isPrivate //|| (sym.isPrimaryConstructor && sym.owner.isTopLevelModuleClass)
