@@ -101,7 +101,8 @@ class ImportInfo(symf: => Symbol, val selectors: List[untpd.Tree], val isRootImp
       case Pair(_, Ident(nme.WILDCARD)) => true
       case _ => false
     }
-    if ((defn.RootImports contains sym) && hasMaskingSelector) sym else NoSymbol
+    if ((defn.RootImports contains sym) &&
+        (selectors.isEmpty || hasMaskingSelector)) sym else NoSymbol
   }
 
   override def toString = {

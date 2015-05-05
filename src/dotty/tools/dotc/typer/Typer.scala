@@ -88,11 +88,8 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     /** Is this import a root import that has been shadowed by an explicit
      *  import in the same program?
      */
-    def isDisabled(imp: ImportInfo, site: Type): Boolean = {
-      if (imp.isRootImport && (importedFromRoot contains site.termSymbol)) return true
-      if (imp.hiddenRoot.exists) importedFromRoot += imp.hiddenRoot
-      false
-    }
+    def isDisabled(imp: ImportInfo, site: Type): Boolean =
+      imp.isRootImport && (importedFromRoot contains site.termSymbol)
 
     /** Does this identifier appear as a constructor of a pattern? */
     def isPatternConstr =
@@ -233,6 +230,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
         def isPossibleImport(prec: Int) =
           prevPrec < prec || prevPrec == prec && (prevCtx.scope eq ctx.scope)
         if (isPossibleImport(namedImport) && (curImport ne outer.importInfo) && !curImport.sym.isCompleting) {
+          if (curImport.hiddenRoot.exists) importedFromRoot += curImport.hiddenRoot
           val namedImp = namedImportRef(curImport.site, curImport.selectors)
           if (namedImp.exists)
             return findRef(checkNewOrShadowed(namedImp, namedImport), namedImport, ctx)(outer)
