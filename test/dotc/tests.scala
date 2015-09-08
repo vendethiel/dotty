@@ -53,6 +53,8 @@ class tests extends CompilerTest {
 // This directory doesn't exist anymore
 // @Test def pickle_pickling = compileDir(coreDir, "pickling", testPickling)
   @Test def pickle_ast = compileDir(dotcDir, "ast", testPickling)
+  @Test def pos_i778() = compileDir(posDir, "i778", twice)
+
 
   //@Test def pickle_core = compileDir(dotcDir, "core", testPickling, xerrors = 2) // two spurious comparison errors in Types and TypeOps
 
