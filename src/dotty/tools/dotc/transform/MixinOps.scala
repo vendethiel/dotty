@@ -42,7 +42,6 @@ class MixinOps(cls: ClassSymbol, thisTransform: DenotTransformer)(implicit ctx: 
     def needsDisambiguation = !overridenSymbols.forall(_ is Deferred)
     def hasNonInterfaceDefinition = overridenSymbols.forall(!_.owner.is(Trait))
     meth.is(Method, butNot = PrivateOrAccessorOrDeferred) &&
-    isCurrent(meth) &&
     (needsDisambiguation || hasNonInterfaceDefinition || meth.owner.is(Scala2x))
   }
 
