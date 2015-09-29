@@ -82,6 +82,10 @@ trait TypeAssigner {
           }
         case tp: RefinedType =>
           val tp1 @ RefinedType(parent1, _) = mapOver(tp)
+          println(i"tp1: $tp1")
+          println(i"parent1: $parent1")
+          println(i"parent1.classSymbol: ${parent1.classSymbol}")
+          println(i"tp1.baseTypeWithArgs(parent1.classSymbol): ${tp1.baseTypeWithArgs(parent1.classSymbol)}")
           if (tp1.refinedInfo.existsPart(toAvoid) && variance > 0) {
             typr.println(s"dropping refinement from $tp1")
             parent1
