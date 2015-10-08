@@ -559,7 +559,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
             val pos = params indexWhere (_.name == param.name)
             if (pos < mtpe.paramTypes.length) {
               val ptype = mtpe.paramTypes(pos)
-              if (isFullyDefined(ptype, ForceDegree.none)) return ptype
+              if (isFullyDefined(ptype, ForceDegree.noBottom)) return ptype
             }
           case _ =>
         }

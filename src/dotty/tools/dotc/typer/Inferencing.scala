@@ -255,8 +255,13 @@ trait Inferencing { this: Checking =>
     val constraint = ctx.typerState.constraint
     val qualifies = (tvar: TypeVar) =>
       (tree contains tvar.owningTree) || ownedBy.exists && tvar.owner == ownedBy
-    def interpolate() = Stats.track("interpolateUndetVars") {
+    def interpolate(): Unit = Stats.track("interpolateUndetVars") {
       val tp = tree.tpe.widen
+      tp match {
+        case _: MethodType if !tree.isDef =>
+          return
+        case _ =>
+      }
       constr.println(s"interpolate undet vars in ${tp.show}, pos = ${tree.pos}, mode = ${ctx.mode}, undets = ${constraint.uninstVars map (tvar => s"${tvar.show}@${tvar.owningTree.pos}")}")
       constr.println(s"qualifying undet vars: ${constraint.uninstVars filter qualifies map (tvar => s"$tvar / ${tvar.show}")}, constraint: ${constraint.show}")
 
