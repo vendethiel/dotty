@@ -25,10 +25,10 @@ class Definitions {
     ctx.newSymbol(owner, name, flags | Permanent, info)
 
   private def newClassSymbol(owner: Symbol, name: TypeName, flags: FlagSet, infoFn: ClassSymbol => Type) =
-    ctx.newClassSymbol(owner, name, flags | Permanent, infoFn).entered
+    ctx.newClassSymbol(owner, name, flags | Permanent, infoFn)
 
   private def newCompleteClassSymbol(owner: Symbol, name: TypeName, flags: FlagSet, parents: List[TypeRef], decls: Scope = newScope) =
-    ctx.newCompleteClassSymbol(owner, name, flags | Permanent, parents, decls).entered
+    ctx.newCompleteClassSymbol(owner, name, flags | Permanent, parents, decls)
 
   private def newTopClassSymbol(name: TypeName, flags: FlagSet, parents: List[TypeRef]) =
     completeClass(newCompleteClassSymbol(ScalaPackageClass, name, flags, parents))
