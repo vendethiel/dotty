@@ -10,6 +10,7 @@ abstract class SimpleMap[K <: AnyRef, +V >: Null <: AnyRef] extends (K => V) {
   def contains(k: K): Boolean = apply(k) != null
   def mapValuesNow[V1 >: V <: AnyRef](f: (K, V1) => V1): SimpleMap[K, V1]
   def foreachBinding(f: (K, V) => Unit): Unit
+  def fold[A](z: A)(op: Function3[K, V, A, A]): A
   def map2[T](f: (K, V) => T): List[T] = {
     val buf = new ListBuffer[T]
     foreachBinding((k, v) => buf += f(k, v))
@@ -34,6 +35,7 @@ object SimpleMap {
     def updated[V1 >: Null <: AnyRef](k: AnyRef, v: V1) = new Map1(k, v)
     def mapValuesNow[V1 >: Null <: AnyRef](f: (AnyRef, V1) => V1) = this
     def foreachBinding(f: (AnyRef, Null) => Unit) = ()
+    def fold[A](z: A)(op: (AnyRef, Null, A) => A): A = z
   }
 
   def Empty[K <: AnyRef] = myEmpty.asInstanceOf[SimpleMap[K, Null]]
@@ -53,6 +55,11 @@ object SimpleMap {
       val w1 = f(k1, v1)
       if (v1 eq w1) this else new Map1(k1, w1)
     }
+
+    def fold[A](z: A)(op: (K, V, A) => A): A = {
+      op(k1, v1, z)
+    }
+
     def foreachBinding(f: (K, V) => Unit) = f(k1, v1)
   }
 
@@ -75,6 +82,10 @@ object SimpleMap {
       if ((v1 eq w1) && (v2 eq w2)) this
       else new Map2(k1, w1, k2, w2)
     }
+    def fold[A](z: A)(op: (K, V, A) => A): A = {
+      op(k2, v2, op(k1, v1, z))
+    }
+
     def foreachBinding(f: (K, V) => Unit) = { f(k1, v1); f(k2, v2) }
   }
 
@@ -99,6 +110,9 @@ object SimpleMap {
       val w1 = f(k1, v1); val w2 = f(k2, v2); val w3 = f(k3, v3)
       if ((v1 eq w1) && (v2 eq w2) && (v3 eq w3)) this
       else new Map3(k1, w1, k2, w2, k3, w3)
+    }
+    def fold[A](z: A)(op: (K, V, A) => A): A = {
+      op(k3, v1, op(k2, v2, op(k1, v1, z)))
     }
     def foreachBinding(f: (K, V) => Unit) = { f(k1, v1); f(k2, v2); f(k3, v3) }
   }
@@ -127,6 +141,9 @@ object SimpleMap {
       val w1 = f(k1, v1); val w2 = f(k2, v2); val w3 = f(k3, v3); val w4 = f(k4, v4)
       if ((v1 eq w1) && (v2 eq w2) && (v3 eq w3) && (v4 eq w4)) this
       else new Map4(k1, w1, k2, w2, k3, w3, k4, w4)
+    }
+    def fold[A](z: A)(op: (K, V, A) => A): A = {
+      op(k4, v4, op(k3, v1, op(k2, v2, op(k1, v1, z))))
     }
     def foreachBinding(f: (K, V) => Unit) = { f(k1, v1); f(k2, v2); f(k3, v3); f(k4, v4) }
   }
@@ -218,6 +235,16 @@ object SimpleMap {
         f(key(i), value(i))
         i += 2
       }
+    }
+
+    def fold[A](z: A)(op: (K, V, A) => A): A = {
+      var i = 0
+      var acc: A = z
+      while (i < bindings.length) {
+        acc = op(key(i), value(i), acc)
+        i += 2
+      }
+      acc
     }
   }
 }

@@ -465,7 +465,45 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     noneLeft
   }
 
-// ---------- Exploration --------------------------------------------------------
+  def merge(other: Constraint)(implicit ctx: Context): Constraint = synchronized {
+    other match {
+      case other: OrderingConstraint =>
+        val newBoundsMap = other.boundsMap.fold(this.boundsMap){ (k: PolyType, v: Array[Type], acc: ParamBounds) =>
+          if(!acc.contains(k)) {
+            acc.updated(k, v)
+          }
+          else {
+            assert(acc(k).length == v.length)
+            val zips = acc(k).drop(v.length/2) zip v.drop(v.length/2)
+            zips.foreach(x => assert(x._1 =:= x._2))
+            acc
+          }
+        }
+        val newLowerMap = other.lowerMap.fold(this.lowerMap){(k: PolyType, v: Array[List[PolyParam]], acc: ParamOrdering)
+        => if(!acc.contains(k)) {
+          acc.updated(k, v)
+        }
+        else {
+          assert(acc(k).sameElements(v))
+          acc
+        }
+        }
+        val newUpperMap = other.lowerMap.fold(this.upperMap){(k: PolyType, v: Array[List[PolyParam]], acc: ParamOrdering) =>
+          if(!acc.contains(k)) {
+            acc.updated(k, v)
+          }
+          else {
+            assert(acc(k).sameElements(v))
+            acc
+          }
+        }
+        new OrderingConstraint(newBoundsMap, newLowerMap, newUpperMap)
+      case _ =>
+        ???
+    }
+  }
+
+  // ---------- Exploration --------------------------------------------------------
 
   def domainPolys: List[PolyType] = boundsMap.keys
 

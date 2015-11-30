@@ -2,6 +2,9 @@ package dotty.tools
 package dotc
 package core
 
+import java.lang.Thread.UncaughtExceptionHandler
+import java.util.concurrent.{ConcurrentLinkedQueue, ForkJoinPool}
+
 import Decorators._
 import Periods._
 import Names._
@@ -28,6 +31,8 @@ import printing._
 import config.{Settings, ScalaSettings, Platform, JavaPlatform}
 import language.implicitConversions
 import DenotTransformers.DenotTransformer
+
+import scala.collection.concurrent.TrieMap
 
 object Contexts {
 
@@ -507,6 +512,48 @@ object Contexts {
 
     /** The platform */
     val platform: Platform = new JavaPlatform
+
+    val executors = new ForkJoinPool(Runtime.getRuntime.availableProcessors, ForkJoinPool.defaultForkJoinWorkerThreadFactory, new UncaughtExceptionHandler{
+      def uncaughtException(t: Thread, e: Throwable): Unit = {
+          val ueh: Thread.UncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler
+          if (ueh != null) {
+            ueh.uncaughtException(t, e)
+          }
+          else if (!(e.isInstanceOf[ThreadDeath])) {
+            System.err.print("Exception in thread \"" + t.getName + "\" ")
+            e.printStackTrace(System.err)
+          }
+      }
+    }, false)
+
+    def addToWaitList(dependOn: Thread, monitor: Object, msg: => String): Boolean = {
+      val thisThread = Thread.currentThread()
+      def followAliases(cur: Thread): Thread = {
+        val nxt = waitList.getOrElse(cur, null)
+        if ((nxt ne null) && (nxt ne thisThread))
+          followAliases(nxt)
+        else
+          nxt
+      }
+      if (followAliases(dependOn) eq null) {
+        waitList.put(Thread.currentThread(), dependOn)
+        println(s"$thisThread waiting for $dependOn for " + msg)
+        monitor.synchronized {
+          // wait for initialization to complete. Do nothing
+          waitList.remove(Thread.currentThread())
+        }
+        true
+      } else false
+    }
+
+    val waitList = new TrieMap[Thread, Thread]()
+
+    val constrains2Merge = new ConcurrentLinkedQueue[TyperState]()
+
+    def collectAsyncConstrains(t: TyperState): Unit = synchronized {
+      constrains2Merge.add(t)
+    }
+
 
     /** The loader that loads the members of _root_ */
     def rootLoader(root: TermSymbol)(implicit ctx: Context): SymbolLoader = platform.rootLoader(root)

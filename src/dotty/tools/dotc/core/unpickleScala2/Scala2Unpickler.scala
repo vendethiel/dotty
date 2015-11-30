@@ -241,7 +241,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
 
   private var postReadOp: Context => Unit = null
 
-  def run()(implicit ctx: Context) =
+  def run()(implicit ctx: Context) = synchronized {
     try {
       var i = 0
       while (i < index.length) {
@@ -278,6 +278,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
     } catch {
       case ex: RuntimeException => handleRuntimeException(ex)
     }
+  }
 
   def source(implicit ctx: Context): AbstractFile = {
     val f = classRoot.symbol.associatedFile
@@ -332,7 +333,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   /** Does entry represent a refinement symbol?
    *  pre: Entry is a class symbol
    */
-  protected def isRefinementSymbolEntry(i: Int)(implicit ctx: Context): Boolean = {
+  protected def isRefinementSymbolEntry(i: Int)(implicit ctx: Context): Boolean = synchronized {
     val savedIndex = readIndex
     readIndex = index(i)
     val tag = readByte().toInt
@@ -343,6 +344,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
     readIndex = savedIndex
     result
   }
+
 
   protected def isRefinementClass(sym: Symbol)(implicit ctx: Context): Boolean =
     sym.name == tpnme.REFINE_CLASS
@@ -358,7 +360,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
    *  operation <code>op</code> with <code>readIndex at start of i'th
    *  entry. Restore <code>readIndex</code> afterwards.
    */
-  protected def at[T <: AnyRef](i: Int, op: () => T): T = {
+  protected def at[T <: AnyRef](i: Int, op: () => T): T = synchronized {
     var r = entries(i)
     if (r eq null) {
       r = atReadPos(index(i), op)
@@ -369,10 +371,12 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   }
 
   protected def atReadPos[T](start: Int, op: () => T): T = {
-    val savedIndex = readIndex
-    readIndex = start
-    try op()
-    finally readIndex = savedIndex
+    this.synchronized {
+      val savedIndex = readIndex
+      readIndex = start
+      try op()
+      finally readIndex = savedIndex
+    }
   }
 
   /** Read a name */
@@ -855,7 +859,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   }
 
   /* Read a reference to a pickled item */
-  protected def readSymbolRef()(implicit ctx: Context): Symbol = { //OPT inlined from: at(readNat(), readSymbol) to save on closure creation
+  protected def readSymbolRef()(implicit ctx: Context): Symbol = synchronized { //OPT inlined from: at(readNat(), readSymbol) to save on closure creation
     val i = readNat()
     var r = entries(i)
     if (r eq null) {

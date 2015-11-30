@@ -28,7 +28,7 @@ class SymbolLoaders {
 
   protected def enterNew(
       owner: Symbol, member: Symbol,
-      completer: SymbolLoader, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = {
+      completer: SymbolLoader, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = synchronized{
     assert(scope.lookup(member.name) == NoSymbol, s"${owner.fullName}.${member.name} already has a symbol")
     owner.asClass.enter(member, scope)
     member
@@ -38,7 +38,7 @@ class SymbolLoaders {
    */
   def enterClass(
       owner: Symbol, name: PreName, completer: SymbolLoader,
-      flags: FlagSet = EmptyFlags, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = {
+      flags: FlagSet = EmptyFlags, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = synchronized{
     val cls = ctx.newClassSymbol(owner, name.toTypeName, flags, completer, assocFile = completer.sourceFileOrNull)
     enterNew(owner, cls, completer, scope)
   }
@@ -47,7 +47,7 @@ class SymbolLoaders {
    */
   def enterModule(
       owner: Symbol, name: PreName, completer: SymbolLoader,
-      modFlags: FlagSet = EmptyFlags, clsFlags: FlagSet = EmptyFlags, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = {
+      modFlags: FlagSet = EmptyFlags, clsFlags: FlagSet = EmptyFlags, scope: Scope = EmptyScope)(implicit ctx: Context): Symbol = synchronized {
     val module = ctx.newModuleSymbol(
       owner, name.toTermName, modFlags, clsFlags,
       (module, _) => completer.proxy withDecls newScope withSourceModule (_ => module),
@@ -59,7 +59,7 @@ class SymbolLoaders {
   /** Enter package with given `name` into scope of `owner`
    *  and give them `completer` as type.
    */
-  def enterPackage(owner: Symbol, pkg: ClassPath)(implicit ctx: Context): Symbol = {
+  def enterPackage(owner: Symbol, pkg: ClassPath)(implicit ctx: Context): Symbol = synchronized {
     val pname = pkg.name.toTermName
     val preExisting = owner.info.decls lookup pname
     if (preExisting != NoSymbol) {
@@ -156,7 +156,8 @@ class SymbolLoaders {
       val pre = root.owner.thisType
       root.info = ClassInfo(pre, root.symbol.asClass, Nil, currentDecls, pre select sourceModule)
       if (!sourceModule.isCompleted)
-        sourceModule.completer.complete(sourceModule)
+         sourceModule.completer.complete(sourceModule) // todo: am I sure that this gets executed only by a single thread?
+         //sourceModule.info
       if (!root.isRoot) {
         for (classRep <- classpath.classes)
           if (!maybeModuleClass(classRep))

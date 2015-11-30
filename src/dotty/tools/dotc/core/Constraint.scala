@@ -149,4 +149,6 @@ abstract class Constraint extends Showable {
 
   /** Check that constraint only refers to PolyParams bound by itself */
   def checkClosed()(implicit ctx: Context): Unit
+
+  def merge(other: Constraint)(implicit ctx: Context): Constraint
 }

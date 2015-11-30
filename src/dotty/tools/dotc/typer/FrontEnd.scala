@@ -1,6 +1,8 @@
 package dotty.tools.dotc
 package typer
 
+import java.util.function.Consumer
+
 import core._
 import Phases._
 import Contexts._
@@ -68,7 +70,13 @@ class FrontEnd extends Phase {
     unitContexts foreach (enterSyms(_))
     unitContexts foreach (typeCheck(_))
     record("totalTrees", ast.Trees.ntrees)
-    unitContexts.map(_.compilationUnit).filterNot(discardAfterTyper)
+
+    val res = unitContexts.map(_.compilationUnit).filterNot(discardAfterTyper)
+    ctx.executors.awaitQuiescence(1, java.util.concurrent.TimeUnit.DAYS)
+    ctx.constrains2Merge.iterator().forEachRemaining(new Consumer[TyperState] {
+      def accept(t: TyperState): Unit = ctx.typerState.merge(t)(ctx)
+    })
+    res
   }
 
   override def run(implicit ctx: Context): Unit = {

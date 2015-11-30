@@ -12,28 +12,31 @@ import config.Printers._
  */
 class StoreReporter(outer: Reporter) extends Reporter {
 
-  private var infos: mutable.ListBuffer[Diagnostic] = null
+  var infos: mutable.ListBuffer[Diagnostic] = null
 
-  def doReport(d: Diagnostic)(implicit ctx: Context): Boolean = {
+  def doReport(d: Diagnostic)(implicit ctx: Context): Boolean = synchronized{
     typr.println(s">>>> StoredError: ${d.msg}") // !!! DEBUG
     if (infos == null) infos = new mutable.ListBuffer
     infos += d
     true
   }
 
-  override def hasPending: Boolean = infos != null && {
-    infos exists {
-      case d: Error => true
-      case d: Warning => true
-      case _ => false
+  override def hasPending: Boolean = synchronized {
+    infos != null && {
+      infos exists {
+        case d: Error => true
+        case d: Warning => true
+        case _ => false
+      }
     }
   }
 
-  override def flush()(implicit ctx: Context) =
+  override def flush()(implicit ctx: Context) = synchronized {
     if (infos != null) {
       infos foreach ctx.reporter.report
       infos = null
     }
+  }
 
   override def errorsReported = hasErrors || outer.errorsReported
 }

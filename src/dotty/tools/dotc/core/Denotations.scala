@@ -601,7 +601,7 @@ object Denotations {
      *  is brought forward to be valid in the new runId. Otherwise
      *  the symbol is stale, which constitutes an internal error.
      */
-    def currentIfExists(implicit ctx: Context): SingleDenotation = {
+    def currentIfExists(implicit ctx: Context): SingleDenotation = synchronized {
       val currentPeriod = ctx.period
       val valid = myValidFor
       if (valid.code <= 0) {

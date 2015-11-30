@@ -17,19 +17,19 @@ import annotation.tailrec
  */
 class LRUCache[Key >: Null <: AnyRef : ClassTag, Value >: Null: ClassTag] {
   import LRUCache._
-  val keys = new Array[Key](Retained)
-  val values = new Array[Value](Retained)
-  var next = new SixteenNibbles(initialRing.bits)
-  var last = Retained - 1 // value is arbitrary
-  var lastButOne: Int = last - 1
+  private val keys = new Array[Key](Retained)
+  private val values = new Array[Value](Retained)
+  private var next = new SixteenNibbles(initialRing.bits)
+  private var last = Retained - 1 // value is arbitrary
+  private var lastButOne: Int = last - 1
 
-  def first = next(last)
+  def first = synchronized {next(last)}
 
   /** Lookup key, returning value or `null` for not found.
    *  As a side effect, sets `lastButOne` to the element before `last`
    *  if key was not found.
    */
-  def lookup(key: Key): Value = {
+  def lookup(key: Key): Value = synchronized {
     @tailrec
     def lookupNext(prev: Int, current: Int, nx: SixteenNibbles): Value = {
       val follow = nx(current)
@@ -58,7 +58,7 @@ class LRUCache[Key >: Null <: AnyRef : ClassTag, Value >: Null: ClassTag] {
    *  first in the queue. If there was no preceding lookup, the element
    *  is inserted at a random position in the queue.
    */
-  def enter(key: Key, value: Value): Unit = {
+  def enter(key: Key, value: Value): Unit = synchronized {
     keys(last) = key
     values(last) = value
     last = lastButOne
@@ -67,15 +67,15 @@ class LRUCache[Key >: Null <: AnyRef : ClassTag, Value >: Null: ClassTag] {
   /** Invalidate key. The invalidated element becomes
    *  the last in the queue.
    */
-  def invalidate(key: Key): Unit =
+   def invalidate(key: Key): Unit = synchronized {
     if (lookup(key) != null) {
       keys(first) = null
       last = first
-    }
+    } }
 
-  def indices: Iterator[Int] = Iterator.iterate(first)(next.apply)
+  private def indices: Iterator[Int] = Iterator.iterate(first)(next.apply)
 
-  def keysIterator: Iterator[Key] =
+  private def keysIterator: Iterator[Key] =
     indices take Retained map keys filter (_ != null)
 
   override def toString = {

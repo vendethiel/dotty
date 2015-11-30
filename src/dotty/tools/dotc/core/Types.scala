@@ -1274,9 +1274,9 @@ object Types {
 
     assert(prefix.isValueType || (prefix eq NoPrefix), s"invalid prefix $prefix")
 
-    private[this] var lastDenotation: Denotation = _
+    @volatile private[this] var lastDenotation: Denotation = _
     private[this] var lastSymbol: Symbol = _
-    private[this] var checkedPeriod = Nowhere
+    @volatile private[this] var checkedPeriod = Nowhere
 
     // Invariants:
     // (1) checkedPeriod != Nowhere  =>  lastDenotation != null
@@ -1303,13 +1303,13 @@ object Types {
     /** The denotation currently denoted by this type */
     final def denot(implicit ctx: Context): Denotation = {
       val now = ctx.period
-      if (checkedPeriod == now) lastDenotation else denotAt(now)
+      if (checkedPeriod == now && (lastDenotation ne null)) lastDenotation else denotAt(now)
     }
 
     /** A first fall back to do a somewhat more expensive calculation in case the first
      *  attempt in `denot` does not yield a denotation.
      */
-    private def denotAt(now: Period)(implicit ctx: Context): Denotation = {
+    private def denotAt(now: Period)(implicit ctx: Context): Denotation = synchronized {
       val d = lastDenotation
       if (d != null && (d.validFor contains now)) {
         checkedPeriod = now
@@ -1401,7 +1401,7 @@ object Types {
         this
       }
 
-    private[dotc] final def setDenot(denot: Denotation)(implicit ctx: Context): Unit = {
+    private[dotc] final def setDenot(denot: Denotation)(implicit ctx: Context): Unit = synchronized{
       if (Config.checkNoDoubleBindings)
         if (ctx.settings.YnoDoubleBindings.value)
           checkSymAssign(denot.symbol)
@@ -1428,7 +1428,7 @@ object Types {
       uncheckedSetSym(sym)
     }
 
-    private[dotc] final def uncheckedSetSym(sym: Symbol): Unit = {
+    private[dotc] final def uncheckedSetSym(sym: Symbol): Unit = synchronized{
       lastDenotation = null
       lastSymbol = sym
       checkedPeriod = Nowhere
@@ -3272,7 +3272,9 @@ object Types {
 
   class CyclicReference private (val denot: SymDenotation)
     extends TypeError(s"cyclic reference involving $denot") {
-    def show(implicit ctx: Context) = s"cyclic reference involving ${denot.show}"
+    val thread = Thread.currentThread()
+    val stack = new Exception()
+    def show(implicit ctx: Context) = s"cyclic reference involving ${denot.show} in $thread. Stack: ${stack.getStackTrace.mkString("\n")}"
   }
 
   object CyclicReference {

@@ -905,7 +905,17 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     val tpt1 = checkSimpleKinded(typedType(tpt))
     val rhs1 = vdef.rhs match {
       case rhs @ Ident(nme.WILDCARD) => rhs withType tpt1.tpe
-      case rhs => typedExpr(rhs, tpt1.tpe)
+      case rhs =>
+        val typedAhead = expanded(rhs).getAttachment(TypedAhead)
+
+        if (typedAhead.isDefined || rhs.isEmpty || ctx.isAfterTyper||true) {
+          typedExpr(rhs, tpt1.tpe)
+        } else {
+
+          val asyncTree = tpd.TypedAsync(rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
+          ctx.executors.execute(new Runnable{def run = asyncTree.trees})
+          asyncTree
+        }
     }
     assignType(cpy.ValDef(vdef)(name, tpt1, rhs1), sym)
   }
@@ -924,8 +934,20 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     val vparamss1 = vparamss nestedMapconserve (typed(_).asInstanceOf[ValDef])
     if (sym is Implicit) checkImplicitParamsNotSingletons(vparamss1)
     val tpt1 = checkSimpleKinded(typedType(tpt))
-    val rhs1 = typedExpr(ddef.rhs, tpt1.tpe)
-    assignType(cpy.DefDef(ddef)(name, tparams1, vparamss1, tpt1, rhs1), sym)
+
+    val typedAhead = expanded(ddef.rhs).getAttachment(TypedAhead)
+
+    if (typedAhead.isDefined || ddef.rhs.isEmpty || ctx.isAfterTyper) {
+      val rhs1 = typedExpr(ddef.rhs, tpt1.tpe)
+
+      assignType(cpy.DefDef(ddef)(name, tparams1, vparamss1, tpt1, rhs1), sym)
+    } else {
+
+      val asyncTree = tpd.TypedAsync(ddef.rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
+      ctx.executors.execute(new Runnable{def run = asyncTree.trees})
+
+      assignType(cpy.DefDef(ddef)(name, tparams1, vparamss1, tpt1, asyncTree), sym)
+    }
     //todo: make sure dependent method types do not depend on implicits or by-name params
   }
 

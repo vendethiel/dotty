@@ -18,7 +18,7 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
   var writeIndex = to
 
   /** Double bytes array */
-  private def dble(): Unit = {
+  private def dble(): Unit = synchronized {
     val bytes1 = new Array[Byte](bytes.length * 2)
     Array.copy(bytes, 0, bytes1, 0, writeIndex)
     bytes = bytes1
@@ -30,7 +30,7 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
   // -- Basic output routines --------------------------------------------
 
   /** Write a byte of data */
-  def writeByte(b: Int): Unit = {
+  def writeByte(b: Int): Unit = synchronized {
     if (writeIndex == bytes.length) dble()
     bytes(writeIndex) = b.toByte
     writeIndex += 1
@@ -66,7 +66,7 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
    *  @param pos ...
    *  @param x   ...
    */
-  def patchNat(pos: Int, x: Int): Unit = {
+  def patchNat(pos: Int, x: Int): Unit = synchronized {
     def patchNatPrefix(x: Int): Unit = {
       writeByte(0)
       Array.copy(bytes, pos, bytes, pos + 1, writeIndex - (pos + 1))
@@ -130,7 +130,7 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
    *  (tag, data) of the individual entries.  Saves and restores buffer state.
    */
 
-  def toIndexedSeq: IndexedSeq[(Int, Array[Byte])] = {
+  def toIndexedSeq: IndexedSeq[(Int, Array[Byte])] = synchronized {
     val saved = readIndex
     readIndex = 0
     readNat() ; readNat()     // discarding version
@@ -174,7 +174,7 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
    *  @return an array mapping entry numbers to locations in
    *  the byte array where the entries start.
    */
-  def createIndex: Array[Int] = {
+  def createIndex: Array[Int] = synchronized {
     val index = new Array[Int](readNat()) // nbEntries_Nat
     for (i <- 0 until index.length) {
       index(i) = readIndex

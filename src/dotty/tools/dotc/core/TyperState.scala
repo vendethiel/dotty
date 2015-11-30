@@ -56,6 +56,9 @@ class TyperState(r: Reporter) extends DotClass with Showable {
   /** A fresh type state with the same constraint as this one and the given reporter */
   def withReporter(reporter: Reporter) = new TyperState(reporter)
 
+
+  def wasCommited(): Boolean = false
+
   /** Commit state so that it gets propagated to enclosing context */
   def commit()(implicit ctx: Context): Unit = unsupported("commit")
 
@@ -74,6 +77,8 @@ class TyperState(r: Reporter) extends DotClass with Showable {
   def tryWithFallback[T](op: => T)(fallback: => T)(implicit ctx: Context): T = unsupported("tryWithFallBack")
 
   override def toText(printer: Printer): Text = "ImmutableTyperState"
+
+  def merge(other: TyperState)(implicit ctx: Context): Unit = unsupported("merge")
 }
 
 class MutableTyperState(previous: TyperState, r: Reporter, override val isCommittable: Boolean)
@@ -107,13 +112,18 @@ extends TyperState(r) {
     isCommittable &&
     (!previous.isInstanceOf[MutableTyperState] || previous.isGlobalCommittable)
 
+
+  override def wasCommited(): Boolean = ???
+
+  private var everCommited = false
+
   /** Commit typer state so that its information is copied into current typer state
    *  In addition (1) the owning state of undetermined or temporarily instantiated
    *  type variables changes from this typer state to the current one. (2) Variables
    *  that were temporarily instantiated in the current typer state are permanently
    *  instantiated instead.
    */
-  override def commit()(implicit ctx: Context) = {
+  override def commit()(implicit ctx: Context) = synchronized{
     val targetState = ctx.typerState
     assert(isCommittable)
     targetState.constraint = constraint
@@ -124,6 +134,7 @@ extends TyperState(r) {
     targetState.ephemeral = ephemeral
     targetState.gc()
     reporter.flush()
+    // if (ctx.typerState.)
   }
 
   override def gc()(implicit ctx: Context): Unit = {
@@ -182,4 +193,11 @@ extends TyperState(r) {
   }
 
   override def toText(printer: Printer): Text = constraint.toText(printer)
+
+
+  override def merge(other: TyperState)(implicit ctx: Context): Unit = {
+    other.reporter.flush()(ctx)
+    this.constraint = this.constraint.merge(other.constraint)
+    // merge typer states
+  }
 }
