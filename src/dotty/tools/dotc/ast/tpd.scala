@@ -2,6 +2,7 @@ package dotty.tools
 package dotc
 package ast
 
+import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.transform.{ExplicitOuter, Erasure}
 import dotty.tools.dotc.typer.ProtoTypes.FunProtoTyped
 import transform.SymUtils._
@@ -18,29 +19,6 @@ import scala.annotation.tailrec
 
 /** Some creators for typed trees */
 object tpd extends Trees.Instance[Type] with TypedTreeInfo {
-
-  class TypedAsync(val untypedTree: untpd.Tree, val outerTpe: Type, val ctx:Context) extends Thicket(Nil) {
-
-    var typedTree: tpd.Tree = null
-
-    override def trees = {
-      if (typedTree eq null) {
-        typedTree = ctx.typer.typedExpr(untypedTree, outerTpe)(ctx)
-        // ctx.collectAsyncConstrains(ctx.typerState)
-
-      }
-      ctx.typerState.commit()(ctx.outer)
-      List(typedTree)
-    }
-
-    override def toString: String = s"TypedAsync($untypedTree, $outerTpe)($typedTree)"
-  }
-
-  object TypedAsync{
-    def apply(untp: untpd.Tree, outerTpe: Type, ctx: Context) = {
-      new TypedAsync(untp, outerTpe, ctx)
-    }
-  }
 
   private def ta(implicit ctx: Context) = ctx.typeAssigner
 

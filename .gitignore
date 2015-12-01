@@ -35,3 +35,10 @@ tests/locks/
 # Ignore output files but keep the directory
 out/
 !out/.keep
+
+*.orig
+*.dot
+examples/
+cg/
+tt/
+.idea_bk/

@@ -699,6 +699,42 @@ object Trees {
     override def setPos(pos: Position) = {}
   }
 
+  case class TypedAsync[-T >: Untyped](val untypedTree: untpd.Tree, val outerTpe: Type, val ctx:Context) extends WithoutTypeOrPos[T] {
+
+    type ThisTree[-T >: Untyped] = TypedAsync[T]
+    var typedTree: tpd.Tree = null
+
+    def trees = {
+      if (typedTree eq null) {
+        typedTree = ctx.typer.typedExpr(untypedTree, outerTpe)(ctx)
+        ctx.collectAsyncConstrains(ctx.typerState)
+
+      }
+      // ctx.typerState.commit()(ctx.outer)
+      List(typedTree)
+    }
+
+    override def toString: String = s"TypedAsync($untypedTree, $outerTpe)($typedTree)"
+  }
+
+  case class TypedAsyncStats[-T >: Untyped](val stats: List[untpd.Tree], val ctxs: List[Context]) extends WithoutTypeOrPos[T]{
+
+    type ThisTree[-T >: Untyped] = TypedAsyncStats[T]
+    var typedStats: List[tpd.Tree] = null
+    def trees: List[Trees.Tree[Type]] = {
+      if (typedStats eq null) {
+        typedStats = (stats zip ctxs).map {
+          case (x: tpd.Tree, null) => x
+          case (x: untpd.Tree, ctx) =>
+            val r = ctx.typer.typed(x)(ctx)
+            ctx.collectAsyncConstrains(ctx.typerState)
+            r
+        }
+      }
+      typedStats
+    }
+  }
+
   /** Temporary class that results from translation of ModuleDefs
    *  (and possibly other statements).
    *  The contained trees will be integrated when transformed with

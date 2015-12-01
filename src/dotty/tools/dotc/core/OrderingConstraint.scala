@@ -484,8 +484,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
           acc.updated(k, v)
         }
         else {
-          assert(acc(k).sameElements(v))
-          acc
+          val upd = (acc(k) zip v).map(x => x._2 ::: x._1)
+          acc.updated(k, upd)
         }
         }
         val newUpperMap = other.lowerMap.fold(this.upperMap){(k: PolyType, v: Array[List[PolyParam]], acc: ParamOrdering) =>
@@ -493,8 +493,8 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
             acc.updated(k, v)
           }
           else {
-            assert(acc(k).sameElements(v))
-            acc
+            val upd = (acc(k) zip v).map(x => x._2 ::: x._1)
+            acc.updated(k, upd)
           }
         }
         new OrderingConstraint(newBoundsMap, newLowerMap, newUpperMap)

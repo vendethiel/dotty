@@ -524,7 +524,7 @@ object Contexts {
             e.printStackTrace(System.err)
           }
       }
-    }, false)
+    }, true)
 
     def addToWaitList(dependOn: Thread, monitor: Object, msg: => String): Boolean = {
       val thisThread = Thread.currentThread()

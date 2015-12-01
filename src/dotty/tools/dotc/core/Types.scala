@@ -2834,6 +2834,8 @@ object Types {
 
   abstract class ErrorType extends UncachedGroundType with ValueType
 
+  class ThreadMarker(val thread: Thread) extends ErrorType
+
   object ErrorType extends ErrorType
 
   /** Wildcard type, possibly with bounds */

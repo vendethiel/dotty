@@ -33,6 +33,7 @@ import Implicits._
 import util.Stats.{track, record}
 import config.Printers._
 import language.implicitConversions
+import scala.collection.mutable.ListBuffer
 
 object Typer {
 
@@ -912,7 +913,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
           typedExpr(rhs, tpt1.tpe)
         } else {
 
-          val asyncTree = tpd.TypedAsync(rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
+          val asyncTree = new TypedAsync(rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
           ctx.executors.execute(new Runnable{def run = asyncTree.trees})
           asyncTree
         }
@@ -943,7 +944,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
       assignType(cpy.DefDef(ddef)(name, tparams1, vparamss1, tpt1, rhs1), sym)
     } else {
 
-      val asyncTree = tpd.TypedAsync(ddef.rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
+      val asyncTree = new TypedAsync(ddef.rhs, tpt1.tpe, ctx.fresh.setNewTyperState)
       ctx.executors.execute(new Runnable{def run = asyncTree.trees})
 
       assignType(cpy.DefDef(ddef)(name, tparams1, vparamss1, tpt1, asyncTree), sym)
@@ -1204,11 +1205,15 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     trees mapconserve (typed(_))
 
   def typedStats(stats: List[untpd.Tree], exprOwner: Symbol)(implicit ctx: Context): List[tpd.Tree] = {
-    val buf = new mutable.ListBuffer[Tree]
-    @tailrec def traverse(stats: List[untpd.Tree])(implicit ctx: Context): List[Tree] = stats match {
+    val buf = new mutable.ListBuffer[untpd.Tree]
+    var hasAsync = false
+    val bufc = new ListBuffer[Context]
+    var asyncC: Context = null
+    @tailrec def traverse(stats: List[untpd.Tree])(implicit ctx: Context): List[untpd.Tree] = stats match {
       case (imp: untpd.Import) :: rest =>
         val imp1 = typed(imp)
         buf += imp1
+        bufc += null
         traverse(rest)(importContext(imp1.symbol, imp.selectors))
       case (mdef: untpd.DefTree) :: rest =>
         mdef.removeAttachment(ExpandedTree) match {
@@ -1216,17 +1221,30 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
             traverse(xtree :: rest)
           case none =>
             buf += typed(mdef)
+            bufc += null
             traverse(rest)
         }
       case Thicket(stats) :: rest =>
         traverse(stats ++ rest)
-      case stat :: rest =>
+      case stat :: rest if ctx.isAfterTyper | stat.isInstanceOf[PackageDef] =>
         buf += typed(stat)(ctx.exprContext(stat, exprOwner))
+        traverse(rest)
+      case stat :: rest =>
+        hasAsync = true
+        buf += stat
+        bufc += ctx.exprContext(stat, exprOwner).fresh.setNewTyperState
         traverse(rest)
       case nil =>
         buf.toList
     }
-    traverse(stats)
+    val trees = traverse(stats)
+    if (hasAsync) {
+      if (exprOwner.toString.contains("adaptInterpolated"))
+        println("here")
+      val asyncTree = new TypedAsyncStats (trees, bufc.toList)
+      ctx.executors.execute(new Runnable{def run = asyncTree.trees})
+      List(asyncTree.asInstanceOf[tpd.Tree])
+    } else trees.asInstanceOf[List[tpd.Tree]]
   }
 
   def typedExpr(tree: untpd.Tree, pt: Type = WildcardType)(implicit ctx: Context): Tree =

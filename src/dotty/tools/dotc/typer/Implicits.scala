@@ -27,6 +27,7 @@ import Hashable._
 import config.Config
 import config.Printers._
 import collection.mutable
+import scala.collection.concurrent.TrieMap
 
 /** Implicit resolution */
 object Implicits {
@@ -129,7 +130,7 @@ object Implicits {
    *  @param outerCtx  the next outer context that makes visible further implicits
    */
   class ContextualImplicits(val refs: List[TermRef], val outerImplicits: ContextualImplicits)(initctx: Context) extends ImplicitRefs(initctx) {
-    private val eligibleCache = new mutable.AnyRefMap[Type, List[TermRef]]
+    private val eligibleCache = new TrieMap[Type, List[TermRef]]
 
     /** The implicit references that are eligible for type `tp`. */
     def eligible(tp: Type): List[TermRef] = /*>|>*/ track(s"eligible in ctx") /*<|<*/ {
@@ -147,9 +148,9 @@ object Implicits {
           val savedEphemeral = ctx.typerState.ephemeral
           ctx.typerState.ephemeral = false
           try {
-            val result = computeEligible(tp)
+            var result = computeEligible(tp)
             if (ctx.typerState.ephemeral) record("ephemeral cache miss: eligible")
-            else eligibleCache(tp) = result
+            else result = eligibleCache.putIfAbsent(tp, result).getOrElse(result)
             result
           }
           finally ctx.typerState.ephemeral |= savedEphemeral
@@ -257,7 +258,7 @@ import Implicits._
 /** Info relating to implicits that is kept for one run */
 trait ImplicitRunInfo { self: RunInfo =>
 
-  private val implicitScopeCache = mutable.AnyRefMap[Type, OfTypeImplicits]()
+  private val implicitScopeCache = TrieMap[Type, OfTypeImplicits]()
 
   /** The implicit scope of a type `tp`
    *  @param liftingCtx   A context to be used when computing the class symbols of
@@ -345,11 +346,11 @@ trait ImplicitRunInfo { self: RunInfo =>
         ctx.typerState.ephemeral = false
         try {
           val liftedTp = if (isLifted) tp else liftToClasses(tp)
-          val result =
+          var result =
             if (liftedTp ne tp) iscope(liftedTp, isLifted = true)
             else ofTypeImplicits(collectCompanions(tp))
           if (ctx.typerState.ephemeral) record("ephemeral cache miss: implicitScope")
-          else if (cacheResult) implicitScopeCache(tp) = result
+          else if (cacheResult) result = implicitScopeCache.put(tp, result).getOrElse(result)
           result
         }
         finally ctx.typerState.ephemeral |= savedEphemeral

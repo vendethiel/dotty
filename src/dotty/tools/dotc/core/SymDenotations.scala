@@ -10,6 +10,7 @@ import NameOps._
 import Scopes.Scope
 import collection.mutable
 import collection.immutable.BitSet
+import scala.collection.concurrent.TrieMap
 import scala.reflect.io.AbstractFile
 import Decorators.SymbolIteratorDecorator
 import ast._
@@ -1333,7 +1334,7 @@ object SymDenotations {
     private def checkBasesUpToDate()(implicit ctx: Context) =
       if (baseTypeRefValid != ctx.runId) synchronized {
         if (baseTypeRefValid != ctx.runId) {
-          baseTypeRefCache = new java.util.HashMap[CachedType, Type]
+          baseTypeRefCache.clear()
           myBaseClasses = null
           mySuperClassBits = null
           baseTypeRefValid = ctx.runId
@@ -1583,7 +1584,7 @@ object SymDenotations {
       raw.filterExcluded(excluded).asSeenFrom(pre).toDenot(pre)
     }
 
-    private[this] var baseTypeRefCache: java.util.HashMap[CachedType, Type] = null
+    private[this] var baseTypeRefCache: TrieMap[CachedType, Type] = new TrieMap[CachedType, Type]()
     private[this] var baseTypeRefValid: RunId = NoRunId
 
     /** Compute tp.baseTypeRef(this) */
@@ -1594,7 +1595,13 @@ object SymDenotations {
         case _ => bt
       }
 
-      def inCache(tp: Type) = baseTypeRefCache.containsKey(tp)
+      def inCache(tp: Type) = {
+        tp match {
+          case t: CachedType => baseTypeRefCache.contains(t)
+          case _ => false
+        }
+
+      }
 
       /** We cannot cache:
        *  - type variables which are uninstantiated or whose instances can
@@ -1644,20 +1651,31 @@ object SymDenotations {
       /*>|>*/ ctx.debugTraceIndented(s"$tp.baseTypeRef($this)") /*<|<*/ {
         tp match {
           case tp: CachedType =>
-            this.synchronized {
+
               checkBasesUpToDate()
-              var basetp = baseTypeRefCache get tp
-              if (basetp == null) {
-                baseTypeRefCache.put(tp, NoPrefix)
+              var basetp = baseTypeRefCache getOrElse (tp, null)
+              if ((basetp eq NoPrefix) && !isCachable(tp))
                 basetp = computeBaseTypeRefOf(tp)
+              else if (basetp == null|| (basetp eq NoPrefix)) {
+                val marker = new ThreadMarker(Thread.currentThread())
+                marker.synchronized {
+                  baseTypeRefCache.putIfAbsent(tp, marker)
+                  basetp = computeBaseTypeRefOf(tp)
+                }
                 if (isCachable(tp)) baseTypeRefCache.put(tp, basetp)
-                else baseTypeRefCache.remove(tp)
-              } else if (basetp == NoPrefix) {
-                baseTypeRefCache.put(tp, null)
-                throw CyclicReference(this)
+                else baseTypeRefCache.put(tp, NoPrefix)
+              } else if (basetp.isInstanceOf[ThreadMarker]) {
+                val marker = basetp.asInstanceOf[ThreadMarker]
+                if(marker.thread eq Thread.currentThread()) {
+                  baseTypeRefCache.put(tp, null)
+                  throw CyclicReference(this)
+                } else {
+                  marker.synchronized {
+                    basetp = baseTypeRefOf(tp)
+                  }
+                } // recurse
               }
               basetp
-            }
           case _ =>
             computeBaseTypeRefOf(tp)
         }
