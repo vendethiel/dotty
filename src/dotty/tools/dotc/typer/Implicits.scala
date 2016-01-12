@@ -268,7 +268,7 @@ trait ImplicitRunInfo { self: RunInfo =>
    *                      a type variable, we need the current context, the current
    *                      runinfo context does not do.
    */
-  def implicitScope(tp: Type, liftingCtx: Context): OfTypeImplicits = {
+  def implicitScope(tp: Type, liftingCtx: Context): OfTypeImplicits = ctx.traceIndented(i"implicitScope($tp)", implicits) {
 
     val seen: mutable.Set[Type] = mutable.Set()
 
@@ -341,8 +341,8 @@ trait ImplicitRunInfo { self: RunInfo =>
    /** The implicit scope of type `tp`
      *  @param isLifted    Type `tp` is the result of a `liftToClasses` application
      */
-    def iscope(tp: Type, isLifted: Boolean = false): OfTypeImplicits = {
-      def computeIScope(cacheResult: Boolean) = {
+    def iscope(tp: Type, isLifted: Boolean = false): OfTypeImplicits = ctx.traceIndented(i"iscope($tp, $isLifted)", implicits) {
+      def computeIScope(cacheResult: Boolean) = ctx.traceIndented(i"computeIScope($cacheResult)", implicits) {
         val savedEphemeral = ctx.typerState.ephemeral
         ctx.typerState.ephemeral = false
         try {

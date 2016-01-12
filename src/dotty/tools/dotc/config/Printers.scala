@@ -19,7 +19,7 @@ object Printers {
   val constr: Printer = noPrinter
   val checks: Printer = noPrinter
   val overload: Printer = noPrinter
-  val implicits: Printer = noPrinter
+  val implicits: Printer = new Printer
   val implicitsDetailed: Printer = noPrinter
   val subtyping: Printer = noPrinter
   val unapp: Printer = noPrinter
