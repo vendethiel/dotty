@@ -299,7 +299,9 @@ trait ImplicitRunInfo { self: RunInfo =>
       if (seen contains tp) EmptyTermRefSet
       else {
         seen += tp
-        iscope(tp).companionRefs
+        val refs = iscope(tp).companionRefs
+        seen -= tp
+        refs
       }
 
     // todo: compute implicits directly, without going via companionRefs?
