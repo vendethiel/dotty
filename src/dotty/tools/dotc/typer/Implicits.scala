@@ -307,8 +307,18 @@ trait ImplicitRunInfo { self: RunInfo =>
           if (tpr eq tp)
             return EmptyTermRefSet // avoid loop
 
-          if (seen contains tpr) EmptyTermRefSet
-          else {
+          if (seen contains tpr) {
+            import System.err.println
+            println("##seen: " + seen)
+            println("##tpr: " + tpr)
+            val tprparts = tpr.namedPartsWith(x => x.isType && (x ne tp))
+            println("##tpr parts: " + tprparts)
+            println("##tp: " + tp)
+            val parts = tp.namedPartsWith(x => x.isType && (x ne tp))
+            println("##parts: " + parts)
+            // assert(false)
+            EmptyTermRefSet
+          } else {
             seen += tpr
             val refs = iscope(tpr).companionRefs
             seen -= tpr
@@ -324,7 +334,7 @@ trait ImplicitRunInfo { self: RunInfo =>
             def addClassScope(cls: ClassSymbol): Unit = {
               def addRef(companion: TermRef): Unit = {
                 val compSym = companion.symbol
-                if (compSym is Package)
+                if (compSym is Package) // FIXME: check that this is actually used
                   addRef(TermRef.withSig(companion, nme.PACKAGE, Signature.NotAMethod))
                 else if (compSym.exists)
                   comps += companion.asSeenFrom(pre, compSym.owner).asInstanceOf[TermRef]
@@ -342,6 +352,8 @@ trait ImplicitRunInfo { self: RunInfo =>
               }
               val companion = cls.companionModule
               if (companion.exists) addRef(companion.valRef)
+              //FIXME: instead of fixing prefix in addRef, and getting cycles with impl-pre2.scala
+              //replace classSymbols/addClassScope by something which preserves prefixes
               cls.classParents foreach addParentScope
             }
             tp.classSymbols(liftingCtx) foreach addClassScope
