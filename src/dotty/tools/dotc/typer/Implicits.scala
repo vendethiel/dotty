@@ -295,18 +295,27 @@ trait ImplicitRunInfo { self: RunInfo =>
       }
     }
 
-    def iscopeRefs(tp: Type): TermRefSet =
-      if (seen contains tp) EmptyTermRefSet
-      else {
-        seen += tp
-        val refs = iscope(tp).companionRefs
-        seen -= tp
-        refs
-      }
-
     // todo: compute implicits directly, without going via companionRefs?
     def collectCompanions(tp: Type): TermRefSet = track("computeImplicitScope") {
       ctx.traceIndented(i"collectCompanions($tp)", implicits) {
+        def iscopeRefs(tpr: Type): TermRefSet = {
+          tpr match {
+            case tpr: TypeRef if tpr.symbol is TypeParam =>
+              return EmptyTermRefSet // avoid loop
+            case _ =>
+          }
+          if (tpr eq tp)
+            return EmptyTermRefSet // avoid loop
+
+          if (seen contains tpr) EmptyTermRefSet
+          else {
+            seen += tpr
+            val refs = iscope(tpr).companionRefs
+            seen -= tpr
+            refs
+          }
+        }
+
         val comps = new TermRefSet
         tp match {
           case tp: NamedType =>
@@ -322,8 +331,14 @@ trait ImplicitRunInfo { self: RunInfo =>
               }
               def addParentScope(parent: TypeRef): Unit = {
                 iscopeRefs(parent) foreach addRef
-                for (param <- parent.typeParams)
-                  comps ++= iscopeRefs(tp.member(param.name).info)
+                for (param <- parent.typeParams) {
+                  // avoid loop: Foo[T] extends Bar[T]; tp.member(Bar$$T).info => Foo$$T => loop
+                  val p = tp.member(param.name).info match {
+                    case TypeAlias(alias) => alias
+                    case info => info
+                  }
+                  comps ++= iscopeRefs(p)
+                }
               }
               val companion = cls.companionModule
               if (companion.exists) addRef(companion.valRef)
