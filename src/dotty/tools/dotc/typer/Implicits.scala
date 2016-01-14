@@ -258,6 +258,7 @@ import Implicits._
 
 /** Info relating to implicits that is kept for one run */
 trait ImplicitRunInfo { self: RunInfo =>
+  import System.err.println
 
   private val implicitScopeCache = mutable.AnyRefMap[Type, OfTypeImplicits]()
 
@@ -308,7 +309,6 @@ trait ImplicitRunInfo { self: RunInfo =>
             return EmptyTermRefSet // avoid loop
 
           if (seen contains tpr) {
-            import System.err.println
             println("##seen: " + seen)
             println("##tpr: " + tpr)
             val tprparts = tpr.namedPartsWith(x => x.isType && (x ne tp))
@@ -317,16 +317,24 @@ trait ImplicitRunInfo { self: RunInfo =>
             val parts = tp.namedPartsWith(x => x.isType && (x ne tp))
             println("##parts: " + parts)
             // assert(false)
-            EmptyTermRefSet
+
+            //EmptyTermRefSet
+            implicitScopeCache(tp).companionRefs
           } else {
             seen += tpr
-            val refs = iscope(tpr).companionRefs
+            val scope = iscope(tpr)
             seen -= tpr
-            refs
+            if (scope.isPartial) {
+              scope.companionRefs ++= comps
+              comps = scope.companionRefs
+              EmptyTermRefSet
+            } else {
+              scope.companionRefs
+            }
           }
         }
 
-        val comps = new TermRefSet
+        var comps = new TermRefSet
         tp match {
           case tp: NamedType =>
             val pre = tp.prefix
@@ -386,15 +394,21 @@ trait ImplicitRunInfo { self: RunInfo =>
         finally ctx.typerState.ephemeral |= savedEphemeral
       }
 
-      if (tp.hash == NotCached || !Config.cacheImplicitScopes)
+      if (tp.hash == NotCached || !Config.cacheImplicitScopes) {
         computeIScope(cacheResult = false)
-      else implicitScopeCache get tp match {
+      } else implicitScopeCache get tp match {
         case Some(is) => is
         case None => computeIScope(cacheResult = true)
       }
     }
 
-    iscope(tp)
+    val z = iscope(tp)
+    println("##################################")
+    for ((tp, oftp) <- implicitScopeCache) {
+      println(tp.show + " |||| " + oftp)
+    }
+    println("##################################")
+    z
   }
 
   /** A map that counts the number of times an implicit ref was picked */
