@@ -138,9 +138,7 @@ object Checking {
             case SuperType(thistp, _) => isInteresting(thistp)
             case AndType(tp1, tp2) => isInteresting(tp1) || isInteresting(tp2)
             case OrType(tp1, tp2) => isInteresting(tp1) && isInteresting(tp2)
-            case _: RefinedType => false
-              // Note: it's important not to visit parents of RefinedTypes,
-              // since otherwise spurious #Apply projections might be inserted.
+            case _: RefinedType => true
             case _ => false
           }
           // If prefix is interesting, check info of typeref recursively, marking the referred symbol
@@ -169,9 +167,6 @@ object Checking {
    *  @pre     sym is not yet initialized (i.e. its type is a Completer).
    *  @return  `info` where every legal F-bounded reference is proctected
    *                  by a `LazyRef`, or `ErrorType` if a cycle was detected and reported.
-   *                  Furthermore: Add an #Apply to a fully instantiated type lambda, if none was
-   *                  given before. This is necessary here because sometimes type lambdas are not
-   *                  recognized when they are first formed.
    */
   def checkNonCyclic(sym: Symbol, info: Type, reportErrors: Boolean)(implicit ctx: Context): Type = {
     val checker = new CheckNonCyclicMap(sym, reportErrors)(ctx.addMode(Mode.CheckCyclic))
