@@ -13,14 +13,7 @@ object DottyPredef {
   implicit def typeTag[T]: TypeTag[T] = ???
 
   implicit def arrayTag[T](implicit ctag: ClassTag[T]): ClassTag[Array[T]] =
-    ctag match {
-      case _: VCIntCompanion[_] | _: VCShortCompanion[_] |
-           _: VCLongCompanion[_] | _: VCFloatCompanion[_] |
-           _: VCDoubleCompanion[_] | _: VCBooleanCompanion[_] |
-           _: VCByteCompanion[_] | _: VCObjectCompanion[_] |
-           _: VCCharCompanion[_] => ClassTag[Array[T]](ctag.newArray(0).getClass)
-      case _ => ctag.wrap
-    }
+    ctag.wrap
 
   def wrapVCArray[T](xs: Array[T]): WrappedArray[T] = {
     new WrappedArray[T] {
