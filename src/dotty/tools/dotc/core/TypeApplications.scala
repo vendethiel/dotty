@@ -471,8 +471,8 @@ class TypeApplications(val self: Type) extends AnyVal {
         def tryReduce =
           if (!args.exists(_.isInstanceOf[TypeBounds])) {
             val followAlias = stripped match {
-              case stripped: TypeRef =>
-                stripped.symbol.is(BaseTypeArg)
+              case stripped: TypeRef if stripped.symbol.is(BaseTypeArg) =>
+                true
               case _ =>
                 Config.simplifyApplications && {
                   dealiased.resType match {
