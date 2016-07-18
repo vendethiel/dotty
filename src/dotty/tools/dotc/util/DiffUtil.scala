@@ -40,18 +40,18 @@ object DiffUtil {
       val pos = delta.getRevised.getPosition
       val endPos = pos + delta.getRevised.getLines.size - 1
 
-      delta.getType.toString match { // Issue #1355 forces us to use the toString
-        case "INSERT" =>
+      delta.getType match {
+        case Delta.TYPE.INSERT =>
           lines(pos) = ANSI_GREEN + lines(pos)
           lines(endPos) = lines(endPos) + ANSI_DEFAULT
 
-        case "CHANGE" =>
+        case Delta.TYPE.CHANGE =>
           val old = if (!printDiffDel) "" else
             ANSI_MAGENTA + delta.getOriginal.getLines.mkString + ANSI_DEFAULT
           lines(pos) = old + ANSI_YELLOW + lines(pos)
           lines(endPos) = lines(endPos) + ANSI_DEFAULT
 
-        case "DELETE" if printDiffDel =>
+        case Delta.TYPE.DELETE if printDiffDel =>
           val deleted = delta.getOriginal.getLines.mkString
           if (!deleted.forall(Character.isWhitespace)) {
             lines(pos) = ANSI_RED + deleted + ANSI_DEFAULT + lines(pos)
