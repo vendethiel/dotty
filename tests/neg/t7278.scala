@@ -8,8 +8,7 @@ object Test {
   // should not compile (?)
   // martin says "I'd argue about that"
   // martin retracts his statement: this should not compile
-  type EE[+X <: EC] = X#E // error: X is not a legal path;
-  type EE2[+X <: EC] = X#E // error: X is not a legal path; repeat to get error count to 2
+  type EE[X <: EC] = X#E // error: X is not a legal path;
 
   def fail1(): Unit = {
     val b = new B

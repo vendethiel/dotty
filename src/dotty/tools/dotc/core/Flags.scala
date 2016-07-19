@@ -625,4 +625,11 @@ object Flags {
 
   implicit def conjToFlagSet(conj: FlagConjunction): FlagSet =
     FlagSet(conj.bits)
+
+  /** Map numeric variance to flags */
+  def varianceFlags(v: Int) = v match {
+    case -1 => Contravariant
+    case  0 => EmptyFlags
+    case  1 => Covariant
+  }
 }

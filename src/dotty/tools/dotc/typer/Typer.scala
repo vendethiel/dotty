@@ -992,7 +992,9 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     index(tparams)
     val tparams1 = tparams.mapconserve(typed(_).asInstanceOf[TypeDef])
     val body1 = typedType(tree.body)
-    assignType(cpy.TypeLambdaTree(tree)(tparams1, body1), tparams1, body1)
+    var res = assignType(cpy.TypeLambdaTree(tree)(tparams1, body1), tparams1, body1)
+    VarianceChecker.checkLambda(res.tpe, res.pos)
+    res
   }
 
   def typedByNameTypeTree(tree: untpd.ByNameTypeTree)(implicit ctx: Context): ByNameTypeTree = track("typedByNameTypeTree") {
@@ -1113,7 +1115,9 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
   def typedTypeDef(tdef: untpd.TypeDef, sym: Symbol)(implicit ctx: Context): Tree = track("typedTypeDef") {
     val TypeDef(name, rhs) = tdef
     completeAnnotations(tdef, sym)
-    assignType(cpy.TypeDef(tdef)(name, typedType(rhs), Nil), sym)
+    val res = assignType(cpy.TypeDef(tdef)(name, typedType(rhs), Nil), sym)
+    if (tdef.tparams.nonEmpty) VarianceChecker.checkLambda(sym.info, tdef.pos)
+    res
   }
 
   def typedClassDef(cdef: untpd.TypeDef, cls: ClassSymbol)(implicit ctx: Context) = track("typedClassDef") {

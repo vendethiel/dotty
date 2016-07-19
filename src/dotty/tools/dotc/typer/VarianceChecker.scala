@@ -7,7 +7,9 @@ import Types._, Contexts._, Flags._, Symbols._, Annotations._, Trees._, NameOps.
 import Decorators._
 import Variances._
 import util.Positions._
+import TypeApplications.varianceConforms
 import rewrite.Rewrites.patch
+import ErrorReporting._
 import config.Printers.variances
 
 /** Provides `check` method to check that all top-level definitions
@@ -18,6 +20,31 @@ object VarianceChecker {
   case class VarianceError(tvar: Symbol, required: Variance)
   def check(tree: tpd.Tree)(implicit ctx: Context) =
     new VarianceChecker()(ctx).Traverser.traverse(tree)
+
+  def checkLambda(tp: Type, pos: Position)(implicit ctx: Context): Unit = tp match {
+    case tlambda: TypeLambda if tlambda.variances.exists(_ != 0) =>
+      val validateLambda = new TypeAccumulator[Unit] {
+        def apply(x: Unit, tp: Type) = tp match {
+          case param: PolyParam
+          if ((param.binder eq tlambda) &&
+             !varianceConforms(this.variance, tlambda.variances(param.paramNum))) =>
+            val paramVariance = varianceString(varianceFlags(tlambda.variances(param.paramNum)))
+            val useVariance = varianceString(varianceFlags(this.variance))
+            ctx.error(
+              d"$paramVariance type lambda parameter ${param.paramName} occurs in $useVariance position in ${tlambda.resType}",
+              pos)
+          case _ =>
+            foldOver(x, tp)
+        }
+      }
+      validateLambda((), tlambda.resType)
+    case TypeAlias(alias) =>
+      checkLambda(alias, pos)
+    case TypeBounds(lo, hi) =>
+      checkLambda(lo, pos)
+      checkLambda(hi, pos)
+    case _ =>
+  }
 }
 
 class VarianceChecker()(implicit ctx: Context) {
