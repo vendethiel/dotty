@@ -57,3 +57,23 @@ trait Foo6[-X] { def bar(x: HasY { type Y >: X })(y: x.Y) = y } // error
 trait Foo7[+X] { def bar[Y <: X](y: Y) = y } // error
 trait Foo8[+X] { def bar(x: HasY { type Y <: X })(y: x.Y) = y } // error
 
+object i1252 {
+  abstract class A {
+    type Id[-X]
+    def a: Id[Any]
+    def b: Id[String] = a
+  }
+  class B extends A {
+    type Id[-X] = X // error
+    type T = [+Y] -> Y => Y // error
+    override def a = 1
+  }
+  object Test {
+    def main(args: Array[String]): Unit = {
+      val b = new B
+      println(b.a)
+      println(b.b)
+      val x: String = b.b
+    }
+  }
+}
