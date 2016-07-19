@@ -44,7 +44,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
 
   override protected def recursionLimitExceeded() = {}
 
-  protected val PrintableFlags = (SourceModifierFlags | Label | Module | Local).toCommonFlags
+  protected val PrintableFlags = (SourceModifierFlags | Module | Local).toCommonFlags
 
   override def nameString(name: Name): String = name.decode.toString
 
