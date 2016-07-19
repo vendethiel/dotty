@@ -2603,7 +2603,7 @@ object Types {
   }
 
   /** The parameter of a type lambda */
-  case class LambdaParam(tl: TypeLambda, n: Int) extends TypeParamInfo {
+  case class LambdaParam(tl: TypeLambda, n: Int) extends printing.Showable with TypeParamInfo {
     def isTypeParam(implicit ctx: Context) = true
     def paramName(implicit ctx: Context): TypeName = tl.paramNames(n)
     def paramBounds(implicit ctx: Context): TypeBounds = tl.paramBounds(n)
@@ -2612,6 +2612,8 @@ object Types {
     def paramVariance(implicit ctx: Context): Int = tl.variances(n)
     def toArg: Type = PolyParam(tl, n)
     def paramRef(implicit ctx: Context): Type = PolyParam(tl, n)
+
+    override def toText(p: Printer) = p.toText(this)
   }
 
   object TypeLambda {

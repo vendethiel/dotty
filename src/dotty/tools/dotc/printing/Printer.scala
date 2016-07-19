@@ -3,7 +3,7 @@ package printing
 
 import core._
 import Texts._, ast.Trees._
-import Types.Type, Symbols.Symbol, Contexts.Context, Scopes.Scope, Constants.Constant,
+import Types.{Type, LambdaParam}, Symbols.Symbol, Contexts.Context, Scopes.Scope, Constants.Constant,
        Names.Name, Denotations._, Annotations.Annotation
 
 /** The base class of all printers
@@ -79,6 +79,9 @@ abstract class Printer {
 
   /** Textual representation of type */
   def toText(tp: Type): Text
+
+  /** Textual representation of type lambda parameter */
+  def toText(lp: LambdaParam): Text
 
   /** Textual representation of all symbols in given list,
    *  using `dclText` for displaying each.

@@ -342,6 +342,9 @@ class PlainPrinter(_ctx: Context) extends Printer {
   protected def treatAsTypeParam(sym: Symbol): Boolean = false
   protected def treatAsTypeArg(sym: Symbol): Boolean = false
 
+  def toText(lp: LambdaParam): Text =
+    s"type lambda parameter ${lp.paramName}"
+
   /** String representation of symbol's kind. */
   def kindString(sym: Symbol): String = {
     val flags = sym.flagsUNSAFE
