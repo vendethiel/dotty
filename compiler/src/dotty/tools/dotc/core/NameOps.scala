@@ -143,43 +143,78 @@ object NameOps {
       }
     }
 
-    /** Is a synthetic function name
+    /** Return the function arity
      *    - N for FunctionN
      *    - N for ImplicitFunctionN
-      *   - (-1) otherwise
+     *    - N for PhantomFunctionM where N is the length of M
+     *    - N for ImplicitPhantomFunctionM where N is the length of M
+     *   - (-1) otherwise
      */
-    def functionArity: Int =
-      functionArityFor(str.Function) max functionArityFor(str.ImplicitFunction)
+    def functionArity(implicit ctx: Context): Int = phantomicity.arity
+
+    /** Checks and returns the phantomicity of the function */
+    def phantomicity(implicit ctx: Context): Phantomicity = {
+      val arity = functionArityFor(tpnme.Function) max functionArityFor(tpnme.ImplicitFunction)
+      if (arity >= 0) Phantomicity.noPhantoms(arity)
+      else {
+        val phantomicity = phantomFunctionPhantomicity(tpnme.PhantomFunction)
+        if (phantomicity.isValid) phantomicity
+        else phantomFunctionPhantomicity(tpnme.ImplicitPhantomFunction)
+      }
+    }
 
     /** Is a function name
      *    - FunctionN for N >= 0
      *    - ImplicitFunctionN for N >= 0
+     *    - PhantomFunctionM for a valid M
+     *    - ImplicitPhantomFunctionM for a valid M
      *    - false otherwise
      */
-    def isFunction: Boolean = functionArity >= 0
+    def isFunction(implicit ctx: Context): Boolean = functionArity >= 0
 
     /** Is a implicit function name
      *    - ImplicitFunctionN for N >= 0
+     *    - ImplicitPhantomFunctionM for a valid M
      *    - false otherwise
      */
-    def isImplicitFunction: Boolean = functionArityFor(str.ImplicitFunction) >= 0
+    def isImplicitFunction: Boolean = {
+      functionArityFor(tpnme.ImplicitFunction) >= 0 ||
+      phantomFunctionPhantomicity(tpnme.ImplicitPhantomFunction).isValid
+    }
+
+    /** Is a phantom function name
+     *    - PhantomFunctionM for a valid M
+     *    - ImplicitPhantomFunctionM for a valid M
+     *    - false otherwise
+     */
+    def isPhantomFunction(implicit ctx: Context): Boolean = phantomicity.hasPhantoms
 
     /** Is a synthetic function name
      *    - FunctionN for N > 22
      *    - ImplicitFunctionN for N >= 0
+     *    - PhantomFunctionM for a valid M
+     *    - ImplicitPhantomFunctionM for a valid M
      *    - false otherwise
      */
-    def isSyntheticFunction: Boolean = {
-      functionArityFor(str.Function) > MaxImplementedFunctionArity ||
-        functionArityFor(str.ImplicitFunction) >= 0
+    def isSyntheticFunction(implicit ctx: Context): Boolean = {
+      val p = phantomicity
+      if (name.startsWith(str.Function)) p.arity > MaxImplementedFunctionArity
+      else p.isValid
     }
 
     /** Parsed function arity for function with some specific prefix */
-    private def functionArityFor(prefix: String): Int = {
-      if (name.startsWith(prefix))
-        try name.toString.substring(prefix.length).toInt
+    private def functionArityFor(prefix: Name): Int = {
+      if (name.startsWith(prefix.toString))
+        try name.toString.substring(prefix.toString.length).toInt
         catch { case _: NumberFormatException => -1 }
       else -1
+    }
+
+    /** Parsed function phantomicity for function with some specific prefix */
+    private def phantomFunctionPhantomicity(prefix: Name): Phantomicity = {
+      lazy val p = Phantomicity.from(name.toString.substring(prefix.toString.length))
+      if (name.startsWith(prefix.toString) && p.isValid) p
+      else Phantomicity.invalid
     }
 
     /** The name of the generic runtime operation corresponding to an array operation */
