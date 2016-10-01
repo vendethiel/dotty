@@ -192,6 +192,8 @@ object Contexts {
     /** Number of findMember calls on stack */
     private[core] var findMemberCount: Int = 0
 
+    private[core] var checkPrefix = false
+
     /** List of names which have a findMemberCall on stack,
      *  after Config.LogPendingFindMemberThreshold is reached.
      */

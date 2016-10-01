@@ -35,6 +35,16 @@ trait ConstraintHandling {
   /** If the constraint is frozen we cannot add new bounds to the constraint. */
   protected var frozenConstraint = false
 
+  private var frozen = true
+
+  protected var fluid = false
+
+  def fluidly[T](op: => T): T = {
+    val saved = fluid
+    fluid = true
+    try op finally fluid = saved
+  }
+
   /** We are currently comparing lambdas. Used as a flag for
    *  optimization: when `false`, no need to do an expensive `pruneLambdaParams`
    */
@@ -124,16 +134,17 @@ trait ConstraintHandling {
     up.forall(addOneBound(_, lo, isUpper = false))
   }
 
+
   final def isSubTypeWhenFrozen(tp1: Type, tp2: Type): Boolean = {
     val saved = frozenConstraint
-    frozenConstraint = true
+    frozenConstraint = !fluid
     try isSubType(tp1, tp2)
     finally frozenConstraint = saved
   }
 
   final def isSameTypeWhenFrozen(tp1: Type, tp2: Type): Boolean = {
     val saved = frozenConstraint
-    frozenConstraint = true
+    frozenConstraint = !fluid
     try isSameType(tp1, tp2)
     finally frozenConstraint = saved
   }

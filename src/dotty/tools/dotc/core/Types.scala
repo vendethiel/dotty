@@ -556,7 +556,48 @@ object Types {
       def goAnd(l: Type, r: Type) = {
         go(l) & (go(r), pre, safeIntersection = ctx.pendingMemberSearches.contains(name))
       }
-      def goOr(l: Type, r: Type) = go(l) | (go(r), pre)
+
+      def adapt(pre: Type, base: Type): Type = {
+        def prefixOK = ctx.checkPrefix || {
+          ctx.checkPrefix = true
+          try pre frozen_<:< base
+          finally ctx.checkPrefix = false
+        }
+
+        //println(i"adapt $pre to $base ${pre.getClass} ${base.getClass}")
+        if (prefixOK) pre
+        else pre.dealias match {
+          case pre: SingletonType => adapt(pre.widen, base)
+          case pre: AndType => adapt(pre.tp1, base) & adapt(pre.tp2, base)
+          case pre: OrType =>
+            val adapted1 = adapt(pre.tp1, base)
+            val adapted2 = adapt(pre.tp2, base)
+            if (!adapted1.exists) adapted2
+            else if (!adapted2.exists) adapted1
+            else adapted1 | adapted2
+          case _ => NoType
+        }
+      }
+      def goOr(l: Type, r: Type) = {
+        var splitPre = false
+        def goPart(t: Type) = {
+          val pre1 = adapt(pre, t)
+          if (pre1.exists && (pre1 ne pre)) {
+            splitPre = true
+            //println(i"find member $pre -> $pre1 . $name")
+            t.findMember(name, pre1, excluded)
+          }
+          else go(t)
+        }
+        val ld = goPart(l)
+        val rd = goPart(r)
+        //if (splitPre) println(i"parts = $ld and $rd of types ${ld.info} and ${rd.info}")
+        //println(i"go or $l | $r $name --> ${ld.toString} with prefx $pre")
+        val res = ld | (rd, pre)
+        //if (splitPre) println(i"joint = $res of type ${res.info}")
+        //println(i"go or $res: ${res.info}")
+        res
+      }
 
       { val recCount = ctx.findMemberCount + 1
         ctx.findMemberCount = recCount

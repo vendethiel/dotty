@@ -243,19 +243,27 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
             case tp2: TypeProxy if !isClassRef(tp2) =>
               approximateUnion(tp1 | tp2.superType)
             case _ =>
-              val commonBaseClasses = tp.mapReduceOr(_.baseClasses)(intersect)
+              tp1 | tp2
+/*              val commonBaseClasses = tp.mapReduceOr(_.baseClasses)(intersect)
               val doms = dominators(commonBaseClasses, Nil)
               def baseTp(cls: ClassSymbol): Type =
                 if (tp1.typeParams.nonEmpty) tp.baseTypeRef(cls)
                 else tp.baseTypeWithArgs(cls)
-              doms.map(baseTp).reduceLeft(AndType.apply)
+              doms.map(baseTp).reduceLeft(AndType.apply)*/
           }
       }
     }
     if (ctx.featureEnabled(defn.LanguageModuleClass, nme.keepUnions)) tp
     else tp match {
       case tp: OrType =>
-        approximateOr(tp.tp1, tp.tp2)  // Maybe refactor using liftToRec?
+        //println(i"approximate $tp / ${tp.toString} in ${ctx.typerState.constraint}")
+        val res = ctx.typeComparer.fluidly(tp.tp1 | tp.tp2)
+        //println(i"approximated $res in ${ctx.typerState.constraint}")
+        res
+        //approximateOr(tp.tp1, tp.tp2)
+
+
+        // Maybe refactor using liftToRec?
       case tp @ AndType(tp1, tp2) =>
         tp derived_& (approximateUnion(tp1), approximateUnion(tp2))
       case tp: RefinedType =>
