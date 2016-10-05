@@ -743,6 +743,21 @@ object DottyInjectedPlugin extends AutoPlugin {
       */
     )
 
+  lazy val `dotty-language-server` = project.in(file("language-server")).
+    dependsOn(`dotty-bootstrapped`).
+    settings(commonBootstrappedSettings).
+    settings(
+      // fork so that the shutdown hook in Main is run when we ctrl+c a run
+      // (you need to have `cancelable in Global := true` in your global sbt config to ctrl+c a run)
+      fork in run := true,
+      libraryDependencies ++= Seq(
+        "io.typefox.lsapi" % "io.typefox.lsapi" % "0.3.0",
+        "io.typefox.lsapi" % "io.typefox.lsapi.services" % "0.3.0",
+        "io.typefox.lsapi" % "io.typefox.lsapi.annotations" % "0.3.0"
+      ),
+      javaOptions := (javaOptions in dotty).value
+    )
+
   /** A sandbox to play with the Scala.js back-end of dotty.
    *
    *  This sandbox is compiled with dotty with support for Scala.js. It can be
