@@ -21,6 +21,7 @@ import scala.collection._
 
 import dotty.tools.FatalError
 import dotty.tools.io._
+import scala.io.Codec
 import dotty.tools.dotc.util.SourceFile
 import java.io._
 
@@ -146,7 +147,8 @@ class ServerDriver extends Driver {
       val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))
       writer.write(sourceCode)
       writer.close()
-      run.compileSources(List(new SourceFile(virtualFile)))
+      val encoding = Codec.UTF8 // Not sure how to get the encoding from the client
+      run.compileSources(List(new SourceFile(virtualFile, encoding)))
       run.printSummary()
     }
     catch {
