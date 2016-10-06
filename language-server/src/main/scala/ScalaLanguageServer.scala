@@ -66,7 +66,6 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
       val path = Paths.get(uri)
-      println("hii: " + path)
       val change = params.getContentChanges.get(0)
       assert(change.getRange == null, "TextDocumentSyncKind.Incremental support is not implemented")
       val text = change.getText
