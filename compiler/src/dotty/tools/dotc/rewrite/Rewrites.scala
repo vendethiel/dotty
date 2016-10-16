@@ -9,17 +9,20 @@ import scala.annotation.tailrec
 
 /** Handles rewriting of Scala2 files to Dotty */
 object Rewrites {
-  private class PatchedFiles extends mutable.HashMap[SourceFile, Patches]
+  class PatchedFiles extends mutable.HashMap[SourceFile, Patches]
 
-  private case class Patch(pos: Position, replacement: String) {
+  case class Patch(pos: Position, replacement: String) {
     def delta = replacement.length - (pos.end - pos.start)
   }
 
-  private class Patches(source: SourceFile) {
-    private val pbuf = new mutable.ListBuffer[Patch]()
+  class Patches(val source: SourceFile) {
+    val pbuf = new mutable.ListBuffer[Patch]()
 
-    def addPatch(pos: Position, replacement: String): Unit =
-      pbuf += Patch(pos, replacement)
+    def addPatch(pos: Position, replacement: String): Patch = {
+      val p = Patch(pos, replacement)
+      pbuf += p
+      p
+    }
 
     def apply(cs: Array[Char]): Array[Char] = {
       val delta = pbuf.map(_.delta).sum
@@ -62,23 +65,26 @@ object Rewrites {
   /** If -rewrite is set, record a patch that replaces the range
    *  given by `pos` in `source` by `replacement`
    */
-  def patch(source: SourceFile, pos: Position, replacement: String)(implicit ctx: Context): Unit =
-    for (rewrites <- ctx.settings.rewrite.value)
+  def patch(source: SourceFile, pos: Position, replacement: String)(implicit ctx: Context): Option[Patch] = {
+    println("PATCHING: " + replacement)
+    ctx.settings.rewrite.value.map(rewrites =>
       rewrites.patched
         .getOrElseUpdate(source, new Patches(source))
         .addPatch(pos, replacement)
+    )
+  }
 
   /** Patch position in `ctx.compilationUnit.source`. */
-  def patch(pos: Position, replacement: String)(implicit ctx: Context): Unit =
+  def patch(pos: Position, replacement: String)(implicit ctx: Context): Option[Patch] =
     patch(ctx.compilationUnit.source, pos, replacement)
 
   /** If -rewrite is set, apply all patches and overwrite patched source files.
    */
-  def writeBack()(implicit ctx: Context) =
-    for (rewrites <- ctx.settings.rewrite.value; source <- rewrites.patched.keys) {
-      ctx.echo(s"[patched file ${source.file.path}]")
-      rewrites.patched(source).writeBack()
-    }
+  def writeBack()(implicit ctx: Context) = {}
+    // for (rewrites <- ctx.settings.rewrite.value; source <- rewrites.patched.keys) {
+    //   ctx.echo(s"[patched file ${source.file.path}]")
+    //   rewrites.patched(source).writeBack()
+    // }
 }
 
 /** A completely encapsulated class representing rewrite state, used
@@ -86,7 +92,7 @@ object Rewrites {
  */
 class Rewrites {
   import Rewrites._
-  private val patched = new PatchedFiles
+  val patched = new PatchedFiles
 }
 
 

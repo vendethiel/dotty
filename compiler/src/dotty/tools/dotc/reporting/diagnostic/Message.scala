@@ -5,6 +5,7 @@ package diagnostic
 
 import util.SourcePosition
 import core.Contexts.Context
+import rewrite.Rewrites.Patch
 
 import messages._
 
@@ -110,8 +111,8 @@ class ExtendMessage(_msg: () => Message)(f: String => String) { self =>
     new DeprecationWarning(toMessage, pos)
 
   /** Enclose this message in an `MigrationWarning` container */
-  def migrationWarning(pos: SourcePosition) =
-    new MigrationWarning(toMessage, pos)
+  def migrationWarning(pos: SourcePosition, patch: Option[Patch] = None) =
+    new MigrationWarning(toMessage, pos, patch)
 }
 
 /** The fallback `Message` containing no explanation and having no `kind` */

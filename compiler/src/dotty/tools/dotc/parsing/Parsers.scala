@@ -1961,10 +1961,8 @@ object Parsers {
         val toInsert =
           if (in.token == LBRACE) s"$resultTypeStr ="
           else ": Unit "  // trailing space ensures that `def f()def g()` works.
-        in.testScala2Mode(s"Procedure syntax no longer supported; `$toInsert' should be inserted here") && {
-          patch(source, Position(in.lastOffset), toInsert)
-          true
-        }
+        in.testScala2Mode(s"Procedure syntax no longer supported; `$toInsert' should be inserted here",
+          patch = patch(source, Position(in.lastOffset), toInsert))
       }
       if (in.token == THIS) {
         in.nextToken()
