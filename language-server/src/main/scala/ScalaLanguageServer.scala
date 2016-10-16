@@ -20,6 +20,7 @@ import dotty.tools.dotc.core.tasty._
 import dotty.tools.dotc.{ Main => DottyMain }
 import dotty.tools.dotc.interfaces
 import dotty.tools.dotc.reporting._
+import dotty.tools.dotc.reporting.diagnostic._
 
 import scala.collection._
 import scala.collection.JavaConverters._
@@ -272,24 +273,24 @@ class ServerDriver extends Driver {
 class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuffer[DiagnosticImpl]) extends Reporter
     with UniqueMessagePositions
     with HideNonSensicalMessages {
-  def doReport(d: reporting.Diagnostic)(implicit ctx: Context): Unit = d match {
+  def doReport(cont: MessageContainer)(implicit ctx: Context): Unit = cont match {
     case _ =>
-      println("doReport: " + d)
+      println("doReport: " + cont)
       val di = new DiagnosticImpl
 
-      di.setSeverity(severity(d.level))
-      if (d.pos.exists) di.setRange(ScalaLanguageServer.range(d.pos))
+      di.setSeverity(severity(cont.level))
+      if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
       di.setCode("0")
-      di.setMessage(d.message)
+      di.setMessage(cont.message)
 
-      if (d.pos.exists) diagnostics += di
+      if (cont.pos.exists) diagnostics += di
 
-      d.patch match {
+      cont.patch match {
         case Some(patch) =>
           val c = new CommandImpl
           c.setTitle("Rewrite")
-          val uri = d.pos.source.name
-          val r = ScalaLanguageServer.range(new SourcePosition(d.pos.source, patch.pos))
+          val uri = cont.pos.source.name
+          val r = ScalaLanguageServer.range(new SourcePosition(cont.pos.source, patch.pos))
           c.setCommand("dotty.fix")
           c.setArguments(List[Object](uri, r, patch.replacement).asJava)
           server.actions += di -> c
@@ -297,7 +298,7 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
       }
 
       // p.setDiagnostics(java.util.Arrays.asList(di))
-      // p.setUri(d.pos.source.file.name)
+      // p.setUri(cont.pos.source.file.name)
 
       //println("publish: " + p)
       // server.publishDiagnostics.accept(p)
