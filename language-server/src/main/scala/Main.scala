@@ -20,6 +20,8 @@ object Main {
         }
       }));
 
+    val server = new ScalaLanguageServer
+
     println("hi")
     val clientSocket = serverSocket.accept()
     println("accepted")
@@ -31,7 +33,6 @@ object Main {
     val handler = new MessageJsonHandler
     val reader = new StreamMessageReader(in, handler)
     val writer = new StreamMessageWriter(out, handler)
-    val server = new ScalaLanguageServer
     val endpoint = new LanguageServerEndpoint(server)
 
     endpoint.setMessageTracer(new MessageTracer() {
@@ -39,7 +40,7 @@ object Main {
         println(s"onError: $message - $err")
       }
       override def onRead(msg: Message, s: String): Unit = {
-        // println(s"onRead: $msg - $s")
+        println(s"onRead: $msg - $s")
       }
       override def onWrite(msg: Message, s: String): Unit = {
         println(s"onWrite: $msg - $s")
