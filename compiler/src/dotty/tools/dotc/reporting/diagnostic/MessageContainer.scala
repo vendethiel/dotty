@@ -5,6 +5,7 @@ package diagnostic
 
 import util.SourcePosition
 import core.Contexts.Context
+import rewrite.Rewrites.Patch
 
 import java.util.Optional
 
@@ -26,7 +27,8 @@ object MessageContainer {
 class MessageContainer(
   msgFn: => Message,
   val pos: SourcePosition,
-  val level: Int
+  val level: Int,
+  val patch: Option[Patch] = None
 ) extends Exception with interfaces.Diagnostic {
   import MessageContainer._
   private var myMsg: String = null
