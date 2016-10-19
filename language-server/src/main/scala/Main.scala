@@ -37,7 +37,8 @@ object Main {
 
     endpoint.setMessageTracer(new MessageTracer() {
       override def onError(message: String, err: Throwable) {
-        println(s"onError: $message - $err")
+        //println(s"onError: $message - $err")
+        throw err
       }
       override def onRead(msg: Message, s: String): Unit = {
         println(s"onRead: $msg - $s")
@@ -47,12 +48,16 @@ object Main {
       }
     })
     reader.setOnError(new Consumer[Throwable] {
-      def accept(err: Throwable) =
-        println(s"Reader: ${err.getMessage()}")
+      def accept(err: Throwable) = {
+        //println(s"Reader: ${err.getMessage()}")
+        throw err
+      }
     })
     writer.setOnError(new Consumer[Throwable] {
-      def accept(err: Throwable) =
-        println(s"Writer: ${err.getMessage()}")
+      def accept(err: Throwable) = {
+        //println(s"Writer: ${err.getMessage()}")
+        throw err
+      }
     })
     endpoint.connect(reader, writer)
   }

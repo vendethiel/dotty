@@ -33,14 +33,20 @@ import java.io._
 
 import core.Decorators._
 
+import ast.Trees._
+
+
 class ScalaLanguageServer extends LanguageServer { thisServer =>
   import ScalaLanguageServer._
-  val driver = new ServerDriver
+  val driver = new ServerDriver(this)
 
   var publishDiagnostics: Consumer[PublishDiagnosticsParams] = _
   var rewrites: dotty.tools.dotc.rewrite.Rewrites = _
 
   val actions = new mutable.LinkedHashMap[io.typefox.lsapi.Diagnostic, Command]
+
+  var classPath: String = _
+  var target: String = _
 
   override def exit(): Unit = {
     println("exit")
@@ -55,6 +61,19 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = {
     val result = new InitializeResultImpl
     val c = new ServerCapabilitiesImpl
+
+    val ensime = scala.io.Source.fromURL("file://" + params.getRootPath + "/.ensime").mkString
+
+    classPath = """:compile-deps (.*)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)) match {
+      case Some(deps) =>
+        """"(.*?)"""".r.unanchored.findAllMatchIn(deps).map(_.group(1)).mkString(":")
+      case None =>
+        //println("XX#: " + ensime + "###")
+        ""
+    }
+    target = """:targets \("(.*)"\)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)).get
+    println("classPath: " + classPath)
+    println("target: " + target)
 
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
 
@@ -182,7 +201,11 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     }
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def rangeFormatting(params: DocumentRangeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
-    override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = null
+    override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = {
+      val poss = driver.references
+      val locs = poss.map(location)
+      CompletableFuture.completedFuture(locs.asJava)
+    }
     override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = null
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
@@ -202,50 +225,101 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
   }
 }
 
-class ServerDriver extends Driver {
+class ServerDriver(server: ScalaLanguageServer) extends Driver {
+  import ast.tpd._
+
   override def newCompiler(implicit ctx: Context): Compiler = ???
   override def sourcesRequired = false
 
-  val ctx: Context = {
+  lazy val ctx: Context = {
     val rootCtx = initCtx.fresh
-    setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
+    // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
+    setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
   }
   val compiler: Compiler = new Compiler
 
-  {
-    implicit val ictx: Context = ctx.fresh
-    //val run = compiler.newRun
-    ictx.initialize
-    val classNames = ictx.platform.classPath.classes.map(_.name)
-    val className = classNames.head.toTypeName
-     val clsd =
-       if (className.contains('.')) ctx.base.staticRef(className)
-       else ctx.definitions.EmptyPackageClass.info.decl(className)
-    def cannotUnpickle(reason: String) = {
-      println(s"class $className cannot be unpickled because $reason")
-    }
-    clsd match {
-      case clsd: ClassDenotation =>
-        clsd.infoOrCompleter match {
-          case info: ClassfileLoader =>
-            info.load(clsd) match {
-              case Some(unpickler: DottyUnpickler) =>
-                val List(unpickled) = unpickler.body(ctx.addMode(Mode.ReadPositions))
-                println("un: " + unpickled.show)
+  def references: List[SourcePosition] = {
+    //implicit val ictx: Context = ctx.fresh
+    //ictx.initialize
+    val run = compiler.newRun(ctx.fresh.setReporter(new ConsoleReporter))
+    implicit val ictx: Context = run.runContext
+    val classNames = ictx.platform.classPath.classes.map(_.name.toTypeName)
+    classNames.flatMap({ className =>
+      val clsd =
+        if (className.contains('.')) ictx.base.staticRef(className)
+        else ictx.definitions.EmptyPackageClass.info.decl(className)
+      def cannotUnpickle(reason: String) = {
+        println(s"class $className cannot be unpickled because $reason")
+        Nil
+      }
+      clsd match {
+        case clsd: ClassDenotation =>
+          clsd.infoOrCompleter match {
+            case info: ClassfileLoader =>
+              info.load(clsd)
+            /*
+              info.load(clsd) match {
+                case Some(unpickler: DottyUnpickler) =>
+                  val List(unpickled) = unpickler.body(ictx.addMode(Mode.ReadPositions))
+                  //println("unpickled: " + unpickled.show)
+                  val PackageDef(_, cls :: _) = unpickled
+                  val sourceFile = new SourceFile(cls.symbol.sourceFile, Codec.UTF8)
+                  val ps = positions(unpickled)
+                  val sourcePoss = ps.map(p => new SourcePosition(sourceFile, p))
+                  sourcePoss
                 // val unit1 = new CompilationUnit(new SourceFile(clsd.symbol.sourceFile, Seq()))
                 // unit1.tpdTree = unpickled
                 // unit1.unpicklers += (clsd.classSymbol -> unpickler.unpickler)
                 // force.traverse(unit1.tpdTree)
                 // unit1
-              case _ =>
-                cannotUnpickle(s"its class file ${info.classfile} does not have a TASTY attribute")
+                case _ =>
+                  cannotUnpickle(s"its class file ${info.classfile} does not have a TASTY attribute")
+              }
+              */
+            case info =>
+              //cannotUnpickle(s"its info of type ${info.getClass} is not a ClassfileLoader")
+          }
+          val tree = clsd.symbol.tree
+          if (tree != null) {
+            println("Got tree: " + clsd)
+            val clsTrees = tree match {
+              case PackageDef(_, clss) => clss
+              case cls: TypeDef => List(cls)
             }
-          case info =>
-            cannotUnpickle(s"its info of type ${info.getClass} is not a ClassfileLoader")
-        }
-      case _ =>
-        println(s"class not found: $className")
+            clsTrees.flatMap({ clsTree =>
+              val sourceFile = new SourceFile(clsTree.symbol.sourceFile, Codec.UTF8)
+              val ps = positions(clsTree)
+              val sourcePoss = ps.map(p => new SourcePosition(sourceFile, p))
+              sourcePoss
+            })
+          } else {
+            println("no tree: " + clsd)
+            Nil
+          }
+        case _ =>
+          sys.error(s"class not found: $className")
+      }
+    }).toList
+  }
+
+  private def positions(tree: Tree)(implicit ctx: Context): List[Positions.Position] = {
+    val poss = new mutable.ListBuffer[Positions.Position]
+    object extract extends TreeTraverser {
+      override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+        case t: PackageDef =>
+          traverseChildren(t)
+        case t @ TypeDef(_, tmpl : Template) =>
+          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+          traverseChildren(tmpl)
+        case t: DefDef =>
+          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+        case t: ValDef =>
+          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+        case _ =>
+      }
     }
+    extract.traverse(tree)
+    poss.toList
   }
 
   def run(uri: URI, sourceCode: String, reporter: Reporter): Context = {
@@ -310,7 +384,7 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
   }
 }
 object ScalaLanguageServer {
-  def range(p: dotty.tools.dotc.util.SourcePosition): RangeImpl = {
+  def range(p: SourcePosition): RangeImpl = {
     val start = new PositionImpl
     start.setLine(p.startLine)
     start.setCharacter(p.startColumn)
@@ -322,5 +396,11 @@ object ScalaLanguageServer {
     range.setStart(start)
     range.setEnd(end)
     range
+  }
+  def location(p: SourcePosition) = {
+    val l = new LocationImpl
+    l.setUri(Paths.get(p.source.file.path).toUri.toString)
+    l.setRange(range(p))
+    l
   }
 }
