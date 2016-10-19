@@ -325,7 +325,14 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
 
   def load(root: SymDenotation)(implicit ctx: Context): Option[ClassfileParser.Embedded] = {
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
-    new ClassfileParser(classfile, classRoot, moduleRoot)(ctx).run()
+    val e = new ClassfileParser(classfile, classRoot, moduleRoot)(ctx).run()
+    e match {
+      case Some(unpickler: tasty.DottyUnpickler) =>
+        val List(unpickled) = unpickler.body(ctx.addMode(Mode.ReadPositions))
+        root.symbol.tree = unpickled
+      case _ =>
+    }
+    e
   }
 }
 
