@@ -17,6 +17,7 @@ import Decorators.{PreNamedString, StringInterpolators}
 import classfile.ClassfileParser
 import util.Stats
 import scala.util.control.NonFatal
+import ast.Trees._
 
 object SymbolLoaders {
   /** A marker trait for a completer that replaces the original
@@ -326,7 +327,13 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
     e match {
       case Some(unpickler: tasty.DottyUnpickler) =>
         val List(unpickled) = unpickler.body(ctx.addMode(Mode.ReadPositions))
-        root.symbol.tree = unpickled
+        import ast.tpd._
+        def setTrees(t: Tree): Unit = t match {
+          case PackageDef(_, stats) => stats.foreach(setTrees)
+          case cls: TypeDef => cls.symbol.tree = cls
+          case _ => None
+        }
+        setTrees(unpickled)
       case _ =>
     }
     e

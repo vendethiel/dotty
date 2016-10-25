@@ -1,6 +1,6 @@
 import java.net.URI
 import java.nio.file._
-import java.util.function.Consumer
+import java.util.function._
 import java.util.concurrent.CompletableFuture
 
 import io.typefox.lsapi._
@@ -31,12 +31,15 @@ import scala.io.Codec
 import dotty.tools.dotc.util.SourceFile
 import java.io._
 
+import Flags._, Symbols._, Names._
 import core.Decorators._
 
 import ast.Trees._
 
 
 class ScalaLanguageServer extends LanguageServer { thisServer =>
+  import ast.tpd._
+
   import ScalaLanguageServer._
   val driver = new ServerDriver(this)
 
@@ -47,6 +50,8 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
   var classPath: String = _
   var target: String = _
+
+  val openClasses = new mutable.LinkedHashMap[URI, List[TypeName]]
 
   override def exit(): Unit = {
     println("exit")
@@ -77,7 +82,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
 
-    c.setDefinitionProvider(true)
+    //c.setDefinitionProvider(true)
     // val clOptions = new CodeLensOptionsImpl
     // clOptions.setResolveProvider(true)
     // c.setCodeLensProvider(clOptions)
@@ -86,7 +91,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     c.setCodeActionProvider(true)
     c.setWorkspaceSymbolProvider(true)
     c.setReferencesProvider(true)
-    c.setDocumentSymbolProvider(true)
+    //c.setDocumentSymbolProvider(true)
     result.setCapabilities(c)
 
     CompletableFuture.completedFuture(result)
@@ -160,9 +165,9 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       val text = change.getText
 
       val diagnostics = new mutable.ArrayBuffer[DiagnosticImpl]
-      val ctx = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
+      val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
 
-      rewrites = ctx.settings.rewrite.value(ctx).get // EVIL
+      openClasses(uri) = driver.topLevelClassNames(tree)
 
       val p = new PublishDiagnosticsParamsImpl
       p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
@@ -181,9 +186,9 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       //.setReporter(new ServerReporter)
 
       val diagnostics = new mutable.ArrayBuffer[DiagnosticImpl]
-      val ctx = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
+      val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
 
-      rewrites = ctx.settings.rewrite.value(ctx).get // EVIL
+      openClasses(uri) = driver.topLevelClassNames(tree)
 
       val p = new PublishDiagnosticsParamsImpl
       p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
@@ -221,33 +226,140 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
   override def getWorkspaceService(): WorkspaceService = new WorkspaceService {
     override def didChangeConfiguraton(params: DidChangeConfigurationParams): Unit = {}
     override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = {}
-    override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
+    override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = {
+      /*
+      val trees = driver.trees
+
+      val syms = driver.symbolInfos(trees)
+
+      CompletableFuture.completedFuture(syms.asJava)
+      */
+
+      CompletableFuture.supplyAsync(new Supplier[jList[_ <: SymbolInformation]] {
+        override def get = {
+          //List().asJava
+          val trees = driver.trees
+          val syms = driver.symbolInfos(trees, params.getQuery)
+          syms.asJava
+        }
+      })
+    }
   }
 }
 
 class ServerDriver(server: ScalaLanguageServer) extends Driver {
   import ast.tpd._
+  import ScalaLanguageServer._
 
   override def newCompiler(implicit ctx: Context): Compiler = ???
   override def sourcesRequired = false
 
-  lazy val ctx: Context = {
-    val rootCtx = initCtx.fresh
-    // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
-    setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+  var myCtx: Context = _
+
+  private[this] def newCtx: Context = {
+    // val rootCtx = initCtx.fresh
+    // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+    ctx
   }
+
+  implicit def ctx: Context =
+    if (myCtx == null) {
+      val rootCtx = initCtx.fresh
+      // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
+      setup(Array("-Yplain-printer", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+    } else
+      myCtx
+
   val compiler: Compiler = new Compiler
 
-  def references: List[SourcePosition] = {
+  def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
+    val clsd =
+      if (className.contains('.')) ctx.base.staticRef(className)
+      else ctx.definitions.EmptyPackageClass.info.decl(className)
+    def cannotUnpickle(reason: String) = {
+      println(s"class $className cannot be unpickled because $reason")
+      Nil
+    }
+    clsd match {
+      case clsd: ClassDenotation =>
+        clsd.infoOrCompleter match {
+          case info: ClassfileLoader =>
+            info.load(clsd)
+          case _ =>
+        }
+        val tree = clsd.symbol.tree
+        if (tree != null) {
+          println("Got tree: " + clsd + " " + tree.show)
+          assert(tree.isInstanceOf[TypeDef])
+          List(tree).foreach(t => println(t.symbol, t.symbol.validFor))
+          val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
+          if (!fromSource && server.openClasses.contains(toUri(sourceFile)))
+            None
+          else
+            Some((sourceFile, tree))
+        } else {
+          println("no tree: " + clsd)
+          None
+        }
+      case _ =>
+        sys.error(s"class not found: $className")
+    }
+  }
+
+  def trees = {
     //implicit val ictx: Context = ctx.fresh
     //ictx.initialize
-    val run = compiler.newRun(ctx.fresh.setReporter(new ConsoleReporter))
-    implicit val ictx: Context = run.runContext
-    val classNames = ictx.platform.classPath.classes.map(_.name.toTypeName)
+
+    //val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
+    //myCtx = run.runContext
+
+    println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
+
+    val sourceClasses = server.openClasses.values.flatten
+    val tastyClasses = ctx.platform.classPath.classes.map(_.name.toTypeName)
+
+    (sourceClasses.flatMap(c => tree(c, fromSource = true)) ++
+      tastyClasses.flatMap(c => tree(c, fromSource = false))).toList
+  }
+
+  def symbolInfos(trees: List[(SourceFile, Tree)], query: String): List[SymbolInformation] = {
+    //println("#####symbolInfos: " + ctx.period)
+
+    val syms = new mutable.ListBuffer[SymbolInformation]
+
+    trees foreach { case (sourceFile, tree) =>
+      object extract extends TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+          case t @ TypeDef(_, tmpl : Template) =>
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+            traverseChildren(tmpl)
+          case t: TypeDef =>
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+          case t: DefDef =>
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+          case t: ValDef =>
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+          case _ =>
+        }
+      }
+      extract.traverse(tree)
+    }
+    syms.toList
+  }
+
+  def references: List[SourcePosition] = {
+    //println("#####references: " + ctx.period)
+
+    //implicit val ictx: Context = ctx.fresh
+    //ictx.initialize
+    val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
+    myCtx = run.runContext
+
+    val classNames = ctx.platform.classPath.classes.map(_.name.toTypeName)
     classNames.flatMap({ className =>
       val clsd =
-        if (className.contains('.')) ictx.base.staticRef(className)
-        else ictx.definitions.EmptyPackageClass.info.decl(className)
+        if (className.contains('.')) ctx.base.staticRef(className)
+        else ctx.definitions.EmptyPackageClass.info.decl(className)
       def cannotUnpickle(reason: String) = {
         println(s"class $className cannot be unpickled because $reason")
         Nil
@@ -257,27 +369,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
           clsd.infoOrCompleter match {
             case info: ClassfileLoader =>
               info.load(clsd)
-            /*
-              info.load(clsd) match {
-                case Some(unpickler: DottyUnpickler) =>
-                  val List(unpickled) = unpickler.body(ictx.addMode(Mode.ReadPositions))
-                  //println("unpickled: " + unpickled.show)
-                  val PackageDef(_, cls :: _) = unpickled
-                  val sourceFile = new SourceFile(cls.symbol.sourceFile, Codec.UTF8)
-                  val ps = positions(unpickled)
-                  val sourcePoss = ps.map(p => new SourcePosition(sourceFile, p))
-                  sourcePoss
-                // val unit1 = new CompilationUnit(new SourceFile(clsd.symbol.sourceFile, Seq()))
-                // unit1.tpdTree = unpickled
-                // unit1.unpicklers += (clsd.classSymbol -> unpickler.unpickler)
-                // force.traverse(unit1.tpdTree)
-                // unit1
-                case _ =>
-                  cannotUnpickle(s"its class file ${info.classfile} does not have a TASTY attribute")
-              }
-              */
-            case info =>
-              //cannotUnpickle(s"its info of type ${info.getClass} is not a ClassfileLoader")
+            case _ =>
           }
           val tree = clsd.symbol.tree
           if (tree != null) {
@@ -302,7 +394,24 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     }).toList
   }
 
-  private def positions(tree: Tree)(implicit ctx: Context): List[Positions.Position] = {
+  def topLevelClassNames(tree: Tree): List[TypeName] = {
+    val names = new mutable.ListBuffer[TypeName]
+    object extract extends TreeTraverser {
+      override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+        case t: PackageDef =>
+          traverseChildren(t)
+        case t @ TypeDef(_, tmpl : Template) =>
+          names += t.symbol.name.asTypeName
+        case _ =>
+      }
+    }
+    extract.traverse(tree)
+    names.toList
+  }
+
+  private def positions(tree: Tree): List[Positions.Position] = {
+    //println("#####positions: " + ctx.period)
+
     val poss = new mutable.ListBuffer[Positions.Position]
     object extract extends TreeTraverser {
       override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
@@ -322,10 +431,13 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     poss.toList
   }
 
-  def run(uri: URI, sourceCode: String, reporter: Reporter): Context = {
-    implicit val ictx: Context = ctx.fresh.setReporter(reporter)
+  def run(uri: URI, sourceCode: String, reporter: Reporter): Tree = {
     try {
-      val run = compiler.newRun
+      val run = compiler.newRun(newCtx.fresh.setReporter(reporter))
+      myCtx = run.runContext
+
+      println("#####run: " + ctx.period)
+
       val virtualFile = new VirtualFile(uri.toString, Paths.get(uri).toString)
       val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))
       writer.write(sourceCode)
@@ -333,12 +445,12 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
       val encoding = Codec.UTF8 // Not sure how to get the encoding from the client
       run.compileSources(List(new SourceFile(virtualFile, encoding)))
       run.printSummary()
-      ictx
+      run.units.head.tpdTree
     }
     catch {
       case ex: FatalError  =>
-        ictx.error(ex.getMessage) // signals that we should fail compilation.
-        ictx
+        ctx.error(ex.getMessage) // signals that we should fail compilation.
+        EmptyTree
     }
     //doCompile(compiler, fileNames)(ctx.fresh.setReporter(reporter))
   }
@@ -384,6 +496,8 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
   }
 }
 object ScalaLanguageServer {
+  import ast.tpd._
+
   def range(p: SourcePosition): RangeImpl = {
     val start = new PositionImpl
     start.setLine(p.startLine)
@@ -397,10 +511,53 @@ object ScalaLanguageServer {
     range.setEnd(end)
     range
   }
+  def toUri(source: SourceFile) = Paths.get(source.file.path).toUri
+
   def location(p: SourcePosition) = {
     val l = new LocationImpl
-    l.setUri(Paths.get(p.source.file.path).toUri.toString)
+    l.setUri(toUri(p.source).toString)
     l.setRange(range(p))
     l
+  }
+//     File = 1,
+//     Module = 2,
+//     Namespace = 3,
+//     Package = 4,
+//     Class = 5,
+//     Method = 6,
+//     Property = 7,
+//     Field = 8,
+//     Constructor = 9,
+//     Enum = 10,
+//     Interface = 11,
+//     Function = 12,
+//     Variable = 13,
+//     Constant = 14,
+//     String = 15,
+//     Number = 16,
+//     Boolean = 17,
+//     Array = 18,
+  def symbolKind(sym: Symbol)(implicit ctx: Context) =
+    if (sym.is(Package))
+      SymbolKind.Package
+    else if (sym.isConstructor)
+      SymbolKind.Constructor
+    else if (sym.isClass)
+      SymbolKind.Class
+    else if (sym.is(Mutable))
+      SymbolKind.Variable
+    else
+      SymbolKind.Field
+
+  def symbolInfo(sourceFile: SourceFile, t: Tree)(implicit ctx: Context) = {
+    assert(t.pos.exists)
+    val sym = t.symbol
+    val s = new SymbolInformationImpl
+    s.setName(sym.name.toString)
+    s.setKind(symbolKind(sym))
+    s.setLocation(location(new SourcePosition(sourceFile, t.pos)))
+    if (sym.owner.exists && !sym.owner.isEmptyPackage)
+      s.setContainerName(sym.owner.name.toString)
+    s
   }
 }
