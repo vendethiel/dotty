@@ -254,7 +254,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
         (prevPrec < prec || prevPrec == prec && (prevCtx.scope eq ctx.scope))
 
       @tailrec def loop(lastCtx: Context)(implicit ctx: Context): Type = {
-        if (ctx.scope == null) previous
+        if (ctx.scope == null || ctx.outer.runId != ctx.runId) previous
         else {
           var result: Type = NoType
 
@@ -1346,6 +1346,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     // check value class constraints
     checkDerivedValueClass(cls, body1)
 
+    //println(s"Tree for $cls [${cls.validFor}]: $cdef1")
     cls.tree = cdef1
     cdef1
 
