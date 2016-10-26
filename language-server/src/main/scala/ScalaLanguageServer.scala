@@ -3,6 +3,7 @@ import java.nio.file._
 import java.util.function._
 import java.util.concurrent.CompletableFuture
 
+import io.typefox.lsapi
 import io.typefox.lsapi._
 import io.typefox.lsapi.impl._
 import io.typefox.lsapi.services._
@@ -87,7 +88,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     // clOptions.setResolveProvider(true)
     // c.setCodeLensProvider(clOptions)
     c.setCompletionProvider(new CompletionOptionsImpl)
-    //c.setHoverProvider(true)
+    c.setHoverProvider(true)
     c.setCodeActionProvider(true)
     c.setWorkspaceSymbolProvider(true)
     c.setReferencesProvider(true)
@@ -200,7 +201,29 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[DocumentHighlight] = null
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
-    override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = null
+    override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = {
+      import ast.NavigateAST._
+
+      val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+
+      val tree = driver.trees.filter({ case (source, t) => source == pos.source && t.pos.contains(pos.pos) }).head._2
+      //println("#Tree: " + tree.show(driver.ctx))
+
+      implicit val ctx: Context = driver.ctx
+      //println("~~~XX")
+      val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
+      //println("~~~YY")
+      println("###MYPOS: " + pos.pos)
+      //println("##PATH: " + paths.map(_.show))
+
+
+      val h = new HoverImpl
+      val str = new MarkedStringImpl
+      str.setValue(paths.head.asInstanceOf[Tree].tpe.widenTermRefExpr.show.toString)
+      h.setContents(List(str).asJava)
+      //h.setRange()
+      CompletableFuture.completedFuture(h)
+    }
     override def onPublishDiagnostics(callback: Consumer[PublishDiagnosticsParams]): Unit = {
       publishDiagnostics = callback
     }
@@ -264,9 +287,9 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
 
   implicit def ctx: Context =
     if (myCtx == null) {
-      val rootCtx = initCtx.fresh
+      val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
       // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
-      setup(Array("-Yplain-printer", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+      setup(Array(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
     } else
       myCtx
 
@@ -497,6 +520,13 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
 }
 object ScalaLanguageServer {
   import ast.tpd._
+
+  def sourcePosition(uri: URI, pos: lsapi.Position): SourcePosition = {
+    val file = AbstractFile.getURL(uri.toURL) // FIXME: wrong, need version in memory
+    val source = new SourceFile(file, Codec.UTF8)
+    val p = Positions.Position(source.lineToOffset(pos.getLine) + pos.getCharacter)
+    new SourcePosition(source, p)
+  }
 
   def range(p: SourcePosition): RangeImpl = {
     val start = new PositionImpl
