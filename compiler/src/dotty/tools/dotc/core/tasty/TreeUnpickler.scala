@@ -1060,12 +1060,13 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
       if (ctx.mode.is(Mode.ReadPositions)) {
         posUnpicklerOpt match {
           case Some(posUnpickler) =>
+            //println(s"hi: $tree")
             //println(i"setPos $tree / ${tree.getClass} at $addr to ${posUnpickler.posAt(addr)}")
             val pos = posUnpickler.posAt(addr)
             if (pos.exists) tree.setPosUnchecked(pos)
             tree
           case _  =>
-            //println(i"no pos $tree")
+            println(i"no pos $tree")
             tree
         }
       }
