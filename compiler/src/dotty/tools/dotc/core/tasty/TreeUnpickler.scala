@@ -402,6 +402,8 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
         createMemberSymbol()
       case TEMPLATE =>
         val localDummy = ctx.newLocalDummy(ctx.owner)
+        println("##UNPICK" + ctx.owner + " dummy run: " + localDummy.validFor.runId)
+        println("##UNPICK ctx run: " + ctx.runId)
         registerSym(currentAddr, localDummy)
         localDummy
       case tag =>

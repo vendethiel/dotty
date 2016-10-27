@@ -17,6 +17,7 @@ import dotty.tools.dotc.util._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.SymDenotations._
 import dotty.tools.dotc.core._
+import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.core.tasty._
 import dotty.tools.dotc.{ Main => DottyMain }
 import dotty.tools.dotc.interfaces
@@ -83,7 +84,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
 
-    //c.setDefinitionProvider(true)
+    c.setDefinitionProvider(true)
     // val clOptions = new CodeLensOptionsImpl
     // clOptions.setResolveProvider(true)
     // c.setCodeLensProvider(clOptions)
@@ -100,12 +101,9 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
   override def getTextDocumentService(): TextDocumentService = new TextDocumentService {
     override def codeAction(params: CodeActionParams): CompletableFuture[jList[_ <: Command]] = {
-      println("#########params: " + params)
-      println("#########actions: " + actions)
       val l = params.getContext.getDiagnostics.asScala.flatMap{d =>
         actions.get(d)
       }
-      println("l: " + l)
       CompletableFuture.completedFuture(l.asJava)
     }
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = {
@@ -156,7 +154,21 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       null//CompletableFuture.completedFuture(java.util.Arrays.asList(cl: _*))
     }
     override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = null
-    override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = null
+    override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = {
+      val trees = driver.trees
+      val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val tp = driver.typeOf(trees, pos)
+      //println("XXPATHS: " + paths.map(_.show))
+      println("Looking for: " + tp)
+      if (tp eq NoType)
+        return CompletableFuture.completedFuture(List().asJava)
+
+      val defPos = driver.findDef(trees, tp)
+      if (defPos.pos == Positions.NoPosition)
+        return CompletableFuture.completedFuture(List().asJava)
+
+      CompletableFuture.completedFuture(List(location(defPos)).asJava)
+    }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
@@ -202,24 +214,13 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = {
-      import ast.NavigateAST._
-
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-
-      val tree = driver.trees.filter({ case (source, t) => source == pos.source && t.pos.contains(pos.pos) }).head._2
-      //println("#Tree: " + tree.show(driver.ctx))
-
-      implicit val ctx: Context = driver.ctx
-      //println("~~~XX")
-      val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
-      //println("~~~YY")
-      println("###MYPOS: " + pos.pos)
-      //println("##PATH: " + paths.map(_.show))
-
+      val tp = driver.typeOf(driver.trees, pos)
 
       val h = new HoverImpl
       val str = new MarkedStringImpl
-      str.setValue(paths.head.asInstanceOf[Tree].tpe.widenTermRefExpr.show.toString)
+      implicit val ctx: Context = driver.ctx
+      str.setValue(tp.widenTermRefExpr.show.toString)
       h.setContents(List(str).asJava)
       //h.setRange()
       CompletableFuture.completedFuture(h)
@@ -230,7 +231,13 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def rangeFormatting(params: DocumentRangeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = {
-      val poss = driver.references
+      val trees = driver.trees
+      val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+
+      val tp = driver.typeOf(trees, pos)
+
+      println("Find all references to " + tp)
+      val poss = driver.typeReferences(trees, tp, params.getContext.isIncludeDeclaration)
       val locs = poss.map(location)
       CompletableFuture.completedFuture(locs.asJava)
     }
@@ -289,13 +296,23 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     if (myCtx == null) {
       val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
       // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
-      setup(Array(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+      setup(Array(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
     } else
       myCtx
 
   val compiler: Compiler = new Compiler
 
+  def typeOf(trees: List[(SourceFile, Tree)], pos: SourcePosition): Type = {
+    import ast.NavigateAST._
+
+    val tree = trees.filter({ case (source, t) => source == pos.source && t.pos.contains(pos.pos) }).head._2
+    val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
+    val t = paths.head
+    paths.head.tpe
+  }
+
   def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
+    //println(s"tree($className, $fromSource)")
     val clsd =
       if (className.contains('.')) ctx.base.staticRef(className)
       else ctx.definitions.EmptyPackageClass.info.decl(className)
@@ -305,23 +322,19 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     }
     clsd match {
       case clsd: ClassDenotation =>
-        clsd.infoOrCompleter match {
-          case info: ClassfileLoader =>
-            info.load(clsd)
-          case _ =>
-        }
         val tree = clsd.symbol.tree
         if (tree != null) {
-          println("Got tree: " + clsd + " " + tree.show)
+          //println("Got tree: " + clsd)// + " " + tree.show)
           assert(tree.isInstanceOf[TypeDef])
-          List(tree).foreach(t => println(t.symbol, t.symbol.validFor))
+          //List(tree).foreach(t => println(t.symbol, t.symbol.validFor))
           val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
-          if (!fromSource && server.openClasses.contains(toUri(sourceFile)))
+          if (!fromSource && server.openClasses.contains(toUri(sourceFile))) {
+            //println("Skipping, already open from source")
             None
-          else
+          } else
             Some((sourceFile, tree))
         } else {
-          println("no tree: " + clsd)
+          //println("no tree: " + clsd)
           None
         }
       case _ =>
@@ -336,7 +349,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     //val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
     //myCtx = run.runContext
 
-    println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
+    //println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
 
     val sourceClasses = server.openClasses.values.flatten
     val tastyClasses = ctx.platform.classPath.classes.map(_.name.toTypeName)
@@ -370,6 +383,69 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     syms.toList
   }
 
+  def findDef(trees: List[(SourceFile, Tree)], tp: Type): SourcePosition = {
+    val sym = tp match {
+      case tp: NamedType => tp.symbol
+      case _ => return NoSourcePosition
+    }
+
+    var pos: SourcePosition = NoSourcePosition
+
+    trees foreach { case (sourceFile, tree) =>
+      object finder extends TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+          case t: MemberDef =>
+            //println("FOUND: " + t.tpe  + " " + t.symbol + " " + t.pos)
+            // if (t.tpe =:= tp) {
+            // TypeDef have fixed sym from older run
+            if (/*!t.isInstanceOf[TypeDef] &&*/ t.symbol.eq(sym)) {
+              pos = new SourcePosition(sourceFile, t.namePos)
+              return
+            } else {
+              traverseChildren(tree)
+            }
+          // case t: MemberDef =>
+          //   println("wrong: " + t.tpe + " != " + tp)
+          //   traverseChildren(tree)
+          case _ =>
+            traverseChildren(tree)
+        }
+      }
+      finder.traverse(tree)
+    }
+    pos
+  }
+
+  def typeReferences(trees: List[(SourceFile, Tree)], tp: Type, includeDeclaration: Boolean): List[SourcePosition] = {
+    val sym = tp match {
+      case tp: NamedType => tp.symbol
+      case _ => return Nil
+    }
+    //println("#####symbolInfos: " + ctx.period)
+
+    val poss = new mutable.ListBuffer[SourcePosition]
+
+    trees foreach { case (sourceFile, tree) =>
+      object extract extends TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+          case t if t.pos.exists =>
+            // Template and TypeDef have FixedSym from older run
+            // if (!t.isInstanceOf[Template] && t.tpe <:< tp) {
+            if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists && t.symbol.eq(sym)) {
+              if (!t.isInstanceOf[MemberDef] || includeDeclaration)
+                poss += new SourcePosition(sourceFile, t.pos)
+            } else {
+              traverseChildren(tree)
+            }
+          case _ =>
+            traverseChildren(tree)
+        }
+      }
+      extract.traverse(tree)
+    }
+    poss.toList
+  }
+
   def references: List[SourcePosition] = {
     //println("#####references: " + ctx.period)
 
@@ -396,7 +472,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
           }
           val tree = clsd.symbol.tree
           if (tree != null) {
-            println("Got tree: " + clsd)
+            //println("Got tree: " + clsd)
             val clsTrees = tree match {
               case PackageDef(_, clss) => clss
               case cls: TypeDef => List(cls)
@@ -408,7 +484,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
               sourcePoss
             })
           } else {
-            println("no tree: " + clsd)
+            //println("no tree: " + clsd)
             Nil
           }
         case _ =>
@@ -456,10 +532,10 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
 
   def run(uri: URI, sourceCode: String, reporter: Reporter): Tree = {
     try {
+      println("run: " + ctx.period)
+
       val run = compiler.newRun(newCtx.fresh.setReporter(reporter))
       myCtx = run.runContext
-
-      println("#####run: " + ctx.period)
 
       val virtualFile = new VirtualFile(uri.toString, Paths.get(uri).toString)
       val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))

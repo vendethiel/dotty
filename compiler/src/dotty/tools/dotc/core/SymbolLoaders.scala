@@ -333,7 +333,9 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
         import ast.tpd._
         def setTrees(t: Tree): Unit = t match {
           case PackageDef(_, stats) => stats.foreach(setTrees)
-          case cls: TypeDef => cls.symbol.tree = cls
+          case cls: TypeDef =>
+            println("Unpickling: " + cls.symbol)
+              cls.symbol.tree = cls
           case _ => None
         }
         setTrees(unpickled)
