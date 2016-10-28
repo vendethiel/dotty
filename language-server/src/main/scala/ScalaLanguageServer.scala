@@ -327,7 +327,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
   }
 
   def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
-    //println(s"tree($className, $fromSource)")
+    println(s"tree($className, $fromSource)")
     val clsd =
       if (className.contains('.')) ctx.base.staticRef(className)
       else ctx.definitions.EmptyPackageClass.info.decl(className)
@@ -337,9 +337,10 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     }
     clsd match {
       case clsd: ClassDenotation =>
+        clsd.info // force denotation
         val tree = clsd.symbol.tree
         if (tree != null) {
-          //println("Got tree: " + clsd)// + " " + tree.show)
+          println("Got tree: " + clsd)// + " " + tree.show)
           assert(tree.isInstanceOf[TypeDef])
           //List(tree).foreach(t => println(t.symbol, t.symbol.validFor))
           val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
@@ -349,7 +350,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
           } else
             Some((sourceFile, tree))
         } else {
-          //println("no tree: " + clsd)
+          println("no tree: " + clsd)
           None
         }
       case _ =>
@@ -364,7 +365,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
     //val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
     //myCtx = run.runContext
 
-    //println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
+    println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
 
     val sourceClasses = server.openClasses.values.flatten
     val tastyClasses = ctx.platform.classPath.classes.map(_.name.toTypeName)
@@ -448,8 +449,7 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
             // if (!t.isInstanceOf[Template] && t.tpe <:< tp) {
             if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists && t.symbol.eq(sym)) {
               if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
-                val pos = Positions.Position(t.pos.point, t.pos.end)
-                poss += new SourcePosition(sourceFile, pos)
+                poss += new SourcePosition(sourceFile, t.pos)
               }
             } else {
               traverseChildren(tree)
