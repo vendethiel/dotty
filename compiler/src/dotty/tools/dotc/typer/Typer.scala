@@ -1317,8 +1317,6 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     val parents1 = ensureConstrCall(cls, parentsWithClass)(superCtx)
     val self1 = typed(self)(ctx.outer).asInstanceOf[ValDef] // outer context where class members are not visible
     val dummy = localDummy(cls, impl)
-    println("#####" + cls + " dummy run: " + dummy.validFor.runId)
-    println("#####cur run: " + ctx.runId)
     val body1 = typedStats(impl.body, dummy)(inClassContext(self1.symbol))
     cls.setNoInitsFlags((NoInitsInterface /: body1)((fs, stat) => fs & defKind(stat)))
 
