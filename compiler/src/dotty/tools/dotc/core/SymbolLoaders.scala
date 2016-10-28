@@ -335,7 +335,7 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
           case PackageDef(_, stats) => stats.foreach(setTrees)
           case cls: TypeDef =>
             println("Unpickling: " + cls.symbol)
-              cls.symbol.tree = cls
+            cls.symbol.tree = cls
           case _ => None
         }
         setTrees(unpickled)
