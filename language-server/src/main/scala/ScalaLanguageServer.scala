@@ -241,7 +241,22 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       val locs = poss.map(location)
       CompletableFuture.completedFuture(locs.asJava)
     }
-    override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = null
+    override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = {
+      val trees = driver.trees
+      val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+
+      val tp = driver.typeOf(trees, pos)
+      implicit val ctx: Context = driver.ctx
+      val sym = tp.asInstanceOf[NamedType].symbol
+
+      val name = params.getNewName
+
+      val changes = new mutable.HashMap[String, jList[TextEditImpl]]
+
+      val w = new WorkspaceEditImpl
+      w.setChanges(changes.asJava)
+      CompletableFuture.completedFuture(w)
+    }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
     override def signatureHelp(params: TextDocumentPositionParams): CompletableFuture[SignatureHelp] = null
@@ -432,8 +447,10 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
             // Template and TypeDef have FixedSym from older run
             // if (!t.isInstanceOf[Template] && t.tpe <:< tp) {
             if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists && t.symbol.eq(sym)) {
-              if (!t.isInstanceOf[MemberDef] || includeDeclaration)
-                poss += new SourcePosition(sourceFile, t.pos)
+              if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
+                val pos = Positions.Position(t.pos.point, t.pos.end)
+                poss += new SourcePosition(sourceFile, pos)
+              }
             } else {
               traverseChildren(tree)
             }
