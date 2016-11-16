@@ -55,8 +55,8 @@ object Checking {
   def checkBounds(args: List[tpd.Tree], poly: PolyType)(implicit ctx: Context): Unit =
     checkBounds(args, poly.paramBounds, _.substParams(poly, _))
 
-  /** Check applied type trees for well-formedness. This means 
-   *   - all arguments are within their corresponding bounds 
+  /** Check applied type trees for well-formedness. This means
+   *   - all arguments are within their corresponding bounds
    *   - if type is a higher-kinded application with wildcard arguments,
    *     check that it or one of its supertypes can be reduced to a normal application.
    *     Unreducible applications correspond to general existentials, and we
@@ -88,12 +88,12 @@ object Checking {
             checkWildcardHKApply(tp.superType, pos)
         }
       case _ =>
-    }    
+    }
     def checkValidIfHKApply(implicit ctx: Context): Unit =
       checkWildcardHKApply(tycon.tpe.appliedTo(args.map(_.tpe)), tree.pos)
     checkValidIfHKApply(ctx.addMode(Mode.AllowLambdaWildcardApply))
   }
-  
+
   /** Check that `tp` refers to a nonAbstract class
    *  and that the instance conforms to the self type of the created class.
    */
@@ -535,10 +535,20 @@ trait Checking {
 
   /** Check that `tpt` does not refer to a singleton type */
   def checkNotSingleton(tpt: Tree, where: String)(implicit ctx: Context): Tree =
-    if (tpt.tpe.isInstanceOf[SingletonType]) {
-      errorTree(tpt, ex"Singleton type ${tpt.tpe} is not allowed $where")
-    }
+    if (tpt.tpe.isInstanceOf[SingletonType])
+      errorTree(tpt, ex"singleton type ${tpt.tpe} is not allowed $where")
     else tpt
+
+  /** Check that `tpt` is not a wildcard type */
+  def checkNotWildcard(tpt: Tree)(implicit ctx: Context): Tree = {
+    def fail = errorTree(tpt, ex"wildcard type ${tpt.tpe} is not allowed as type argument of method")
+    tpt.tpe match {
+      case _: TypeBounds => fail
+      case tref @ TypeRef(NoPrefix, tpnme.WILDCARD)
+      if tref.info.isInstanceOf[TypeBounds] => fail
+      case _ => tpt
+    }
+  }
 }
 
 trait NoChecking extends Checking {
@@ -554,4 +564,5 @@ trait NoChecking extends Checking {
   override def checkParentCall(call: Tree, caller: ClassSymbol)(implicit ctx: Context) = ()
   override def checkSimpleKinded(tpt: Tree)(implicit ctx: Context): Tree = tpt
   override def checkNotSingleton(tpt: Tree, where: String)(implicit ctx: Context): Tree = tpt
+  override def checkNotWildcard(tpt: Tree)(implicit ctx: Context): Tree = tpt
 }

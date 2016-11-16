@@ -657,13 +657,15 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
 
   def typedNamedArgs(args: List[untpd.Tree])(implicit ctx: Context) =
     for (arg @ NamedArg(id, argtpt) <- args) yield {
-      val argtpt1 = typedType(argtpt)
+      val argtpt1 = checkNotWildcard(typedType(argtpt))
       cpy.NamedArg(arg)(id, argtpt1).withType(argtpt1.tpe)
     }
 
   def typedTypeApply(tree: untpd.TypeApply, pt: Type)(implicit ctx: Context): Tree = track("typedTypeApply") {
     val isNamed = hasNamedArg(tree.args)
-    val typedArgs = if (isNamed) typedNamedArgs(tree.args) else tree.args.mapconserve(typedType(_))
+    val typedArgs =
+      if (isNamed) typedNamedArgs(tree.args)
+      else tree.args.mapconserve(arg => checkNotWildcard(typedType(arg)))
     val typedFn = typedExpr(tree.fun, PolyProto(typedArgs.tpes, pt))
     typedFn.tpe.widen match {
       case pt: PolyType =>
