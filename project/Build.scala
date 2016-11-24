@@ -176,11 +176,13 @@ object DottyBuild extends Build {
       com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys.withSource := true,
 
       // get libraries onboard
-      partestDeps := Seq(scalaCompiler,
+      partestDeps := Seq(//scalaCompiler,
                          "org.scala-lang" % "scala-reflect" % scalaVersion.value,
                          "org.scala-lang" % "scala-library" % scalaVersion.value % "test"),
       libraryDependencies ++= partestDeps.value,
       libraryDependencies ++= Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1",
+                                  "org.scala-lang.modules" % "scala-asm" % "5.1.0-scala-1",
+                                  "org.apache.ant"         % "ant" % "1.9.4",
                                   "org.scala-lang.modules" %% "scala-partest" % "1.0.11" % "test",
                                   "ch.epfl.lamp" % "dottydoc-client" % "0.1.0",
                                   "com.novocode" % "junit-interface" % "0.11" % "test",
