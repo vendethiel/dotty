@@ -310,8 +310,9 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
   implicit def ctx: Context =
     if (myCtx == null) {
       val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
+      val toolcp = "../library/target/scala-2.11/classes"
       // setup(Array("-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", "/home/smarter/opt/dotty-example-project/target/scala-2.11/classes/"), rootCtx)._2
-      setup(Array(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", server.target + ":" + server.classPath), rootCtx)._2
+      setup(Array(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", toolcp + ":" + server.target + ":" + server.classPath), rootCtx)._2
     } else
       myCtx
 
