@@ -2446,19 +2446,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     }
 
     // match has been typed -- virtualize it during type checking so the full context is available
-    def virtualizedMatch(match_ : Match, mode: Mode, pt: Type) = {
-      import patmat.{ vpmName, PureMatchTranslator }
-
-      // TODO: add fallback __match sentinel to predef
-      val matchStrategy: Tree =
-        if (!(settings.Xexperimental && context.isNameInScope(vpmName._match))) null    // fast path, avoiding the next line if there's no __match to be seen
-        else newTyper(context.makeImplicit(reportAmbiguousErrors = false)).silent(_.typed(Ident(vpmName._match)), reportAmbiguousErrors = false) orElse (_ => null)
-
-      if (matchStrategy ne null) // virtualize
-        typed((new PureMatchTranslator(this.asInstanceOf[patmat.global.analyzer.Typer] /*TODO*/, matchStrategy)).translateMatch(match_), mode, pt)
-      else
-        match_ // will be translated in phase `patmat`
-    }
+    def virtualizedMatch(match_ : Match, mode: Mode, pt: Type) = null
 
     /** synthesize and type check a PartialFunction implementation based on the match in `tree`
      *
@@ -2625,38 +2613,10 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       }
 
       // `def isDefinedAt(x: $argTp): Boolean = ${`$selector match { $casesTrue; case default$ => false } }`
-      def isDefinedAtMethod = {
-        val methodSym = anonClass.newMethod(nme.isDefinedAt, tree.pos.makeTransparent, FINAL)
-        val paramSym = mkParam(methodSym)
-
-        val methodBodyTyper = newTyper(context.makeNewScope(context.tree, methodSym)) // should use the DefDef for the context's tree, but it doesn't exist yet (we need the typer we're creating to create it)
-        if (!paramSynthetic) methodBodyTyper.context.scope enter paramSym
-        methodSym setInfo MethodType(List(paramSym), BooleanTpe)
-
-        val defaultCase = mkDefaultCase(FALSE)
-        val match_ = methodBodyTyper.typedMatch(selector(paramSym), casesTrue :+ defaultCase, mode, BooleanTpe)
-
-        DefDef(methodSym, methodBodyTyper.virtualizedMatch(match_, mode, BooleanTpe))
-      }
-
+      def isDefinedAtMethod = null
       // only used for @cps annotated partial functions
       // `def apply(x: $argTp): $matchResTp = $selector match { $cases }`
-      def applyMethod = {
-        val methodSym = anonClass.newMethod(nme.apply, tree.pos, FINAL | OVERRIDE)
-        val paramSym = mkParam(methodSym)
-
-        methodSym setInfo MethodType(List(paramSym), AnyTpe)
-
-        val methodBodyTyper = newTyper(context.makeNewScope(context.tree, methodSym))
-        if (!paramSynthetic) methodBodyTyper.context.scope enter paramSym
-
-        val match_ = methodBodyTyper.typedMatch(selector(paramSym), cases, mode, resTp)
-
-        val matchResTp = match_.tpe
-        methodSym setInfo MethodType(List(paramSym), matchResTp) // patch info
-
-        (DefDef(methodSym, methodBodyTyper.virtualizedMatch(match_, mode, matchResTp)), matchResTp)
-      }
+      def applyMethod = null
 
       def parents(resTp: Type) = addSerializable(appliedType(AbstractPartialFunctionClass.typeConstructor, List(argTp, resTp)))
 
@@ -4105,56 +4065,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         }
       }
 
-      def typedBind(tree: Bind) = {
-        val name = tree.name
-        val body = tree.body
-        name match {
-          case name: TypeName  => assert(body == EmptyTree, context.unit + " typedBind: " + name.debugString + " " + body + " " + body.getClass)
-            val sym =
-              if (tree.symbol != NoSymbol) tree.symbol
-              else {
-                if (isFullyDefined(pt))
-                  context.owner.newAliasType(name, tree.pos) setInfo pt
-                else
-                  context.owner.newAbstractType(name, tree.pos) setInfo TypeBounds.empty
-              }
-
-            if (name != tpnme.WILDCARD) namer.enterInScope(sym)
-            else context.scope.enter(sym)
-
-            tree setSymbol sym setType sym.tpeHK
-
-          case name: TermName  =>
-            val sym =
-              if (tree.symbol != NoSymbol) tree.symbol
-              else context.owner.newValue(name, tree.pos)
-
-            if (name != nme.WILDCARD) {
-              if (context.inPatAlternative)
-                VariableInPatternAlternativeError(tree)
-
-              namer.enterInScope(sym)
-            }
-
-            val body1 = typed(body, mode, pt)
-            val impliedType = patmat.binderTypeImpliedByPattern(body1, pt, sym) // SI-1503, SI-5204
-            val symTp =
-              if (treeInfo.isSequenceValued(body)) seqType(impliedType)
-              else impliedType
-            sym setInfo symTp
-
-            // have to imperatively set the symbol for this bind to keep it in sync with the symbols used in the body of a case
-            // when type checking a case we imperatively update the symbols in the body of the case
-            // those symbols are bound by the symbols in the Binds in the pattern of the case,
-            // so, if we set the symbols in the case body, but not in the patterns,
-            // then re-type check the casedef (for a second try in typedApply for example -- SI-1832),
-            // we are no longer in sync: the body has symbols set that do not appear in the patterns
-            // since body1 is not necessarily equal to body, we must return a copied tree,
-            // but we must still mutate the original bind
-            tree setSymbol sym
-            treeCopy.Bind(tree, name, body1) setSymbol sym setType body1.tpe
-        }
-      }
+      def typedBind(tree: Bind) = null
 
       def typedArrayValue(tree: ArrayValue) = {
         val elemtpt1 = typedType(tree.elemtpt, mode)

@@ -25,7 +25,7 @@ import Primitives._
  * Documentation at http://lamp.epfl.ch/~magarcia/ScalaCompilerCornerReloaded/2012Q2/GenASM.pdf
  */
 abstract class GenASM extends SubComponent with BytecodeWriters { self =>
-  import global._
+  import global.{ erasure => _, _}
   import icodes._
   import icodes.opcodes._
   import definitions._
@@ -1226,7 +1226,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
       val superInterfaces = existingSymbols(superInterfaces0 ++ c.symbol.annotations.map(newParentForAttr)).distinct
 
       if(superInterfaces.isEmpty) EMPTY_STRING_ARRAY
-      else mkArray(erasure.minimizeInterfaces(superInterfaces.map(_.info)).map(t => javaName(t.typeSymbol)))
+      else mkArray(minimizeInterfaces(superInterfaces.map(_.info)).map(t => javaName(t.typeSymbol)))
     }
 
     var clasz:    IClass = _           // this var must be assigned only by genClass()
@@ -3216,7 +3216,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
       // But for now, just like we did in mixin, we just avoid writing a wrong generic signature
       // (one that doesn't erase to the actual signature). See run/t3452b for a test case.
       val memberTpe = enteringErasure(moduleClass.thisType.memberInfo(sym))
-      val erasedMemberType = erasure.erasure(sym)(memberTpe)
+      val erasedMemberType = erasure(sym)(memberTpe)
       if (erasedMemberType =:= sym.info)
         getGenericSignature(sym, moduleClass, memberTpe)
       else null
@@ -3234,7 +3234,7 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
   def getGenericSignature(sym: Symbol, owner: Symbol, memberTpe: Type): String = {
     if (!needsGenericSignature(sym)) { return null }
 
-    val jsOpt: Option[String] = erasure.javaSig(sym, memberTpe)
+    val jsOpt: Option[String] = javaSig(sym, memberTpe)
     if (jsOpt.isEmpty) { return null }
 
     val sig = jsOpt.get
@@ -3265,22 +3265,313 @@ abstract class GenASM extends SubComponent with BytecodeWriters { self =>
       }
     }
 
-    if ((settings.check containsName phaseName)) {
-      val normalizedTpe = enteringErasure(erasure.prepareSigMap(memberTpe))
-      val bytecodeTpe = owner.thisType.memberInfo(sym)
-      if (!sym.isType && !sym.isConstructor && !(erasure.erasure(sym)(normalizedTpe) =:= bytecodeTpe)) {
-        reporter.warning(sym.pos,
-            """|compiler bug: created generic signature for %s in %s that does not conform to its erasure
-               |signature: %s
-               |original type: %s
-               |normalized type: %s
-               |erasure type: %s
-               |if this is reproducible, please report bug at http://issues.scala-lang.org/
-            """.trim.stripMargin.format(sym, sym.owner.skipPackageObject.fullName, sig, memberTpe, normalizedTpe, bytecodeTpe))
-         return null
-      }
-    }
-
     sig
   }
+
+  def javaSig(sym0: Symbol, info: Type): Option[String] = enteringErasure {
+    val isTraitSignature = sym0.enclClass.isTrait
+
+    def superSig(parents: List[Type]) = {
+      def isInterfaceOrTrait(sym: Symbol) = sym.isInterface || sym.isTrait
+
+      // a signature should always start with a class
+      def ensureClassAsFirstParent(tps: List[Type]) = tps match {
+        case Nil => ObjectTpe :: Nil
+        case head :: tail if isInterfaceOrTrait(head.typeSymbol) => ObjectTpe :: tps
+        case _ => tps
+      }
+
+      val minParents = minimizeInterfaces(parents)
+      val validParents =
+        if (isTraitSignature)
+          // java is unthrilled about seeing interfaces inherit from classes
+          minParents filter (p => isInterfaceOrTrait(p.typeSymbol))
+        else minParents
+
+      val ps = ensureClassAsFirstParent(validParents)
+
+      (ps map boxedSig).mkString
+    }
+    def boxedSig(tp: Type) = jsig(tp, primitiveOK = false)
+    def boundsSig(bounds: List[Type]) = {
+      val (isTrait, isClass) = bounds partition (_.typeSymbol.isTrait)
+      val classPart = isClass match {
+        case Nil    => ":" // + boxedSig(ObjectTpe)
+        case x :: _ => ":" + boxedSig(x)
+      }
+      classPart :: (isTrait map boxedSig) mkString ":"
+    }
+    def paramSig(tsym: Symbol) = tsym.name + boundsSig(hiBounds(tsym.info.bounds))
+    def polyParamSig(tparams: List[Symbol]) = (
+      if (tparams.isEmpty) ""
+      else tparams map paramSig mkString ("<", "", ">")
+    )
+
+    // Anything which could conceivably be a module (i.e. isn't known to be
+    // a type parameter or similar) must go through here or the signature is
+    // likely to end up with Foo<T>.Empty where it needs Foo<T>.Empty$.
+    def fullNameInSig(sym: Symbol) = "L" + enteringIcode(sym.javaBinaryName)
+
+    def jsig(tp0: Type, existentiallyBound: List[Symbol] = Nil, toplevel: Boolean = false, primitiveOK: Boolean = true): String = {
+      import scala.reflect.internal.ClassfileConstants._
+      val tp = tp0.dealias
+      tp match {
+        case st: SubType =>
+          jsig(st.supertype, existentiallyBound, toplevel, primitiveOK)
+        case ExistentialType(tparams, tpe) =>
+          jsig(tpe, tparams, toplevel, primitiveOK)
+        case TypeRef(pre, sym, args) =>
+          def argSig(tp: Type) =
+            if (existentiallyBound contains tp.typeSymbol) {
+              val bounds = tp.typeSymbol.info.bounds
+              if (!(AnyRefTpe <:< bounds.hi)) "+" + boxedSig(bounds.hi)
+              else if (!(bounds.lo <:< NullTpe)) "-" + boxedSig(bounds.lo)
+              else "*"
+            } else tp match {
+              case PolyType(_, res) =>
+                "*" // SI-7932
+              case _ =>
+                boxedSig(tp)
+            }
+          def classSig = {
+            val preRebound = pre.baseType(sym.owner) // #2585
+            dotCleanup(
+              (
+                if (needsJavaSig(preRebound)) {
+                  val s = jsig(preRebound, existentiallyBound)
+                  if (s.charAt(0) == 'L') s.substring(0, s.length - 1) + "." + sym.javaSimpleName
+                  else fullNameInSig(sym)
+                }
+                else fullNameInSig(sym)
+              ) + (
+                if (args.isEmpty) "" else
+                "<"+(args map argSig).mkString+">"
+              ) + (
+                ";"
+              )
+            )
+          }
+
+          // If args isEmpty, Array is being used as a type constructor
+          if (sym == ArrayClass && args.nonEmpty) {
+            if (unboundedGenericArrayLevel(tp) == 1) jsig(ObjectTpe)
+            else ARRAY_TAG.toString+(args map (jsig(_))).mkString
+          }
+          else if (isTypeParameterInSig(sym, sym0)) {
+            assert(!sym.isAliasType, "Unexpected alias type: " + sym)
+            "" + TVAR_TAG + sym.name + ";"
+          }
+          else if (sym == AnyClass || sym == AnyValClass || sym == SingletonClass)
+            jsig(ObjectTpe)
+          else if (sym == UnitClass)
+            jsig(BoxedUnitTpe)
+          else if (sym == NothingClass)
+            jsig(RuntimeNothingClass.tpe)
+          else if (sym == NullClass)
+            jsig(RuntimeNullClass.tpe)
+          else if (isPrimitiveValueClass(sym)) {
+            if (!primitiveOK) jsig(ObjectTpe)
+            else if (sym == UnitClass) jsig(BoxedUnitTpe)
+            else abbrvTag(sym).toString
+          }
+          else if (sym.isDerivedValueClass) {
+            val unboxed     = sym.derivedValueClassUnbox.tpe_*.finalResultType
+            val unboxedSeen = (tp memberType sym.derivedValueClassUnbox).finalResultType
+            def unboxedMsg  = if (unboxed == unboxedSeen) "" else s", seen within ${sym.simpleName} as $unboxedSeen"
+            logResult(s"Erasure of value class $sym (underlying type $unboxed$unboxedMsg) is") {
+              if (isPrimitiveValueType(unboxedSeen) && !primitiveOK)
+                classSig
+              else
+                jsig(unboxedSeen, existentiallyBound, toplevel, primitiveOK)
+            }
+          }
+          else if (sym.isClass)
+            classSig
+          else
+            jsig(erasure(sym0)(tp), existentiallyBound, toplevel, primitiveOK)
+        case PolyType(tparams, restpe) =>
+          assert(tparams.nonEmpty)
+          val poly = if (toplevel) polyParamSig(tparams) else ""
+          poly + jsig(restpe)
+
+        case MethodType(params, restpe) =>
+          val buf = new StringBuffer("(")
+          params foreach (p => buf append jsig(p.tpe))
+          buf append ")"
+          buf append (if (restpe.typeSymbol == UnitClass || sym0.isConstructor) VOID_TAG.toString else jsig(restpe))
+          buf.toString
+
+        case RefinedType(parent :: _, decls) =>
+          boxedSig(parent)
+        case ClassInfoType(parents, _, _) =>
+          superSig(parents)
+        case AnnotatedType(_, atp) =>
+          jsig(atp, existentiallyBound, toplevel, primitiveOK)
+        case BoundedWildcardType(bounds) =>
+          println("something's wrong: "+sym0+":"+sym0.tpe+" has a bounded wildcard type")
+          jsig(bounds.hi, existentiallyBound, toplevel, primitiveOK)
+        case _ =>
+          val etp = erasure(sym0)(tp)
+          if (etp eq tp) throw new UnknownSig
+          else jsig(etp)
+      }
+    }
+    if (needsJavaSig(info)) {
+      try Some(jsig(info, toplevel = true))
+      catch { case ex: UnknownSig => None }
+    }
+    else None
+  }
+
+  class UnknownSig extends Exception
+
+  /* Drop redundant interfaces (ones which are implemented by some other parent) from the immediate parents.
+   * This is important on Android because there is otherwise an interface explosion.
+   */
+  def minimizeInterfaces(lstIfaces: List[Type]): List[Type] = {
+    var rest   = lstIfaces
+    var leaves = List.empty[Type]
+    while(!rest.isEmpty) {
+      val candidate = rest.head
+      val nonLeaf = leaves exists { t => t.typeSymbol isSubClass candidate.typeSymbol }
+      if(!nonLeaf) {
+        leaves = candidate :: (leaves filterNot { t => candidate.typeSymbol isSubClass t.typeSymbol })
+      }
+      rest = rest.tail
+    }
+
+    leaves.reverse
+  }
+
+  // Ensure every '.' in the generated signature immediately follows
+  // a close angle bracket '>'.  Any which do not are replaced with '$'.
+  // This arises due to multiply nested classes in the face of the
+  // rewriting explained at rebindInnerClass.   This should be done in a
+  // more rigorous way up front rather than catching it after the fact,
+  // but that will be more involved.
+  private def dotCleanup(sig: String): String = {
+    // OPT 50% of time in generic signatures (~1% of compile time) was in this method, hence the imperative rewrite.
+    var last: Char = '\u0000'
+    var i = 0
+    val len = sig.length
+    val copy: Array[Char] = sig.toCharArray
+    var changed = false
+    while (i < len) {
+      val ch = copy(i)
+      if (ch == '.' && last != '>') {
+         copy(i) = '$'
+         changed = true
+      }
+      last = ch
+      i += 1
+    }
+    if (changed) new String(copy) else sig
+  }
+
+  private def hiBounds(bounds: TypeBounds): List[Type] = bounds.hi.dealiasWiden match {
+    case RefinedType(parents, _) => parents map (_.dealiasWiden)
+    case tp                      => tp :: Nil
+  }
+
+  private object NeedsSigCollector extends TypeCollector(false) {
+    def traverse(tp: Type) {
+      if (!result) {
+        tp match {
+          case st: SubType =>
+            traverse(st.supertype)
+          case TypeRef(pre, sym, args) =>
+            if (sym == ArrayClass) args foreach traverse
+            else if (sym.isTypeParameterOrSkolem || sym.isExistentiallyBound || !args.isEmpty) result = true
+            else if (sym.isClass) traverse(rebindInnerClass(pre, sym)) // #2585
+            else if (!sym.isTopLevel) traverse(pre)
+          case PolyType(_, _) | ExistentialType(_, _) =>
+            result = true
+          case RefinedType(parents, _) =>
+            parents foreach traverse
+          case ClassInfoType(parents, _, _) =>
+            parents foreach traverse
+          case AnnotatedType(_, atp) =>
+            traverse(atp)
+          case _ =>
+            mapOver(tp)
+        }
+      }
+    }
+  }
+  def needsJavaSig(tp: Type) = !settings.Ynogenericsig && NeedsSigCollector.collect(tp)
+
+  protected def unboundedGenericArrayLevel(tp: Type): Int =
+  tp match {
+    case GenericArray(level, core) if !(core <:< AnyRefTpe) => level
+    case RefinedType(ps, _) if ps.nonEmpty                  => logResult(s"Unbounded generic level for $tp is")((ps map unboundedGenericArrayLevel).max)
+    case _                                                  => 0
+  }
+
+  // only refer to type params that will actually make it into the sig, this excludes:
+  // * higher-order type parameters
+  // * type parameters appearing in method parameters
+  // * type members not visible in an enclosing template
+  private def isTypeParameterInSig(sym: Symbol, initialSymbol: Symbol) = (
+    !sym.isHigherOrderTypeParameter &&
+    sym.isTypeParameterOrSkolem && (
+      (initialSymbol.enclClassChain.exists(sym isNestedIn _)) ||
+      (initialSymbol.isMethod && initialSymbol.typeParams.contains(sym))
+    )
+  )
+
+  /** An extractor object for generic arrays */
+  object GenericArray {
+
+    /** Is `tp` an unbounded generic type (i.e. which could be instantiated
+     *  with primitive as well as class types)?.
+     */
+    private def genericCore(tp: Type): Type = tp.dealiasWiden match {
+      /* A Java Array<T> is erased to Array[Object] (T can only be a reference type), where as a Scala Array[T] is
+       * erased to Object. However, there is only symbol for the Array class. So to make the distinction between
+       * a Java and a Scala array, we check if the owner of T comes from a Java class.
+       * This however caused issue SI-5654. The additional test for EXSITENTIAL fixes it, see the ticket comments.
+       * In short, members of an existential type (e.g. `T` in `forSome { type T }`) can have pretty arbitrary
+       * owners (e.g. when computing lubs, <root> is used). All packageClass symbols have `isJavaDefined == true`.
+       */
+      case TypeRef(_, sym, _) if sym.isAbstractType && (!sym.owner.isJavaDefined || sym.hasFlag(Flags.EXISTENTIAL)) =>
+        tp
+      case ExistentialType(tparams, restp) =>
+        genericCore(restp)
+      case _ =>
+        NoType
+    }
+
+    /** If `tp` is of the form Array[...Array[T]...] where `T` is an abstract type
+     *  then Some((N, T)) where N is the number of Array constructors enclosing `T`,
+     *  otherwise None. Existentials on any level are ignored.
+     */
+    def unapply(tp: Type): Option[(Int, Type)] = tp.dealiasWiden match {
+      case TypeRef(_, ArrayClass, List(arg)) =>
+        genericCore(arg) match {
+          case NoType =>
+            unapply(arg) match {
+              case Some((level, core)) => Some((level + 1, core))
+              case None => None
+            }
+          case core =>
+            Some((1, core))
+        }
+      case ExistentialType(tparams, restp) =>
+        unapply(restp)
+      case _ =>
+        None
+    }
+  }
+
+  // @M #2585 when generating a java generic signature that includes
+  // a selection of an inner class p.I, (p = `pre`, I = `cls`) must
+  // rewrite to p'.I, where p' refers to the class that directly defines
+  // the nested class I.
+  //
+  // See also #2585 marker in javaSig: there, type arguments must be
+  // included (use pre.baseType(cls.owner)).
+  //
+  // This requires that cls.isClass.
+  protected def rebindInnerClass(pre: Type, cls: Symbol): Type =
+    if (cls.isTopLevel || cls.isLocalToBlock) pre else cls.owner.tpe_*
 }
