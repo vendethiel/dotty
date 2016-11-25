@@ -9,7 +9,7 @@ import dotty.tools.dotc.core.Names.TypeName
 import scala.collection.mutable
 import scala.tools.asm.{CustomAttr, ClassVisitor, MethodVisitor, FieldVisitor}
 import scala.tools.nsc.Settings
-import scala.tools.nsc.backend.jvm._
+//import scala.tools.nsc.backend.jvm._
 import dotty.tools.dotc
 import dotty.tools.dotc.backend.jvm.DottyPrimitives
 import dotty.tools.dotc.transform.Erasure
@@ -430,4 +430,12 @@ class GenBCodePipeline(val entryPoints: List[Symbol], val int: DottyBackendInter
 
     }
   //} // end of class BCodePhase
+}
+
+/** Stolen from scalac GenBCode */
+object GenBCode {
+  def mkFlags(args: Int*) = args.foldLeft(0)(_ | _)
+
+  final val PublicStatic      = asm.Opcodes.ACC_PUBLIC | asm.Opcodes.ACC_STATIC
+  final val PublicStaticFinal = asm.Opcodes.ACC_PUBLIC | asm.Opcodes.ACC_STATIC | asm.Opcodes.ACC_FINAL
 }

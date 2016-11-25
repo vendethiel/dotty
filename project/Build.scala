@@ -178,6 +178,7 @@ object DottyBuild extends Build {
       // get libraries onboard
       partestDeps := Seq(scalaCompiler,
                          "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+                         "org.scala-lang.modules" % "scala-asm" % "5.1.0-scala-1",
                          "org.scala-lang" % "scala-library" % scalaVersion.value % "test"),
       libraryDependencies ++= partestDeps.value,
       libraryDependencies ++= Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1",

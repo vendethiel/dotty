@@ -14,7 +14,7 @@ import scala.reflect.ClassTag
 import scala.reflect.internal.util.WeakHashSet
 import scala.reflect.io.{AbstractFile, Directory, PlainDirectory}
 import scala.tools.asm.{AnnotationVisitor, ClassVisitor, FieldVisitor, MethodVisitor}
-import scala.tools.nsc.backend.jvm.{BCodeHelpers, BackendInterface}
+//import scala.tools.nsc.backend.jvm.{BCodeHelpers, BackendInterface}
 import dotty.tools.dotc.core._
 import Periods._
 import SymDenotations._
