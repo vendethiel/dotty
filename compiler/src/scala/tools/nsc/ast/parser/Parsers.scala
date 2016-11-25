@@ -402,9 +402,6 @@ self =>
         Some(makeEmptyPackage(0, newStmts))
       }
 
-      if (mainModuleName == newTermName(ScriptRunner.defaultScriptMain))
-        searchForMain() foreach { return _ }
-
       /*  Here we are building an AST representing the following source fiction,
        *  where `moduleName` is from -Xscript (defaults to "Main") and <stmts> are
        *  the result of parsing the script file.
@@ -433,9 +430,8 @@ self =>
       def mainDef       = DefDef(NoMods, nme.main, Nil, List(mainParameter), scalaDot(tpnme.Unit), gen.mkAnonymousNew(stmts))
 
       // object Main
-      def moduleName  = newTermName(ScriptRunner scriptMain settings)
       def moduleBody  = Template(atInPos(scalaAnyRefConstr) :: Nil, noSelfType, List(emptyInit, mainDef))
-      def moduleDef   = ModuleDef(NoMods, moduleName, moduleBody)
+      def moduleDef   = ModuleDef(NoMods, null, moduleBody)
 
       // package <empty> { ... }
       makeEmptyPackage(0, moduleDef :: Nil)

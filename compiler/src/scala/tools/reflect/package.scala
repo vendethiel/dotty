@@ -14,14 +14,6 @@ import scala.tools.nsc.Settings
 package object reflect {
   // [todo: can we generalize this?
   import scala.reflect.runtime.{universe => ru}
-  implicit def ToolBox(mirror0: ru.Mirror): ToolBoxFactory[ru.type] =
-    new ToolBoxFactory[ru.type](mirror0.universe) {
-      lazy val mirror = mirror0
-    }
-
-  // todo. replace this with an implicit class, once the pesky warning is gone
-  // we don't provide `Eval` for trees, because it's unclear where to get an evaluation mirror from
-  implicit def Eval[T](expr: JavaUniverse # Expr[T]): Eval[T] = new Eval[T](expr)
 
   /** Creates a UI-less reporter that simply accumulates all the messages
    */
@@ -103,16 +95,6 @@ package object reflect {
     override def reset(): Unit = {
       super.reset()
       frontEnd.reset()
-    }
-  }
-}
-
-package reflect {
-  class Eval[T](expr: JavaUniverse # Expr[T]) {
-    def eval: T = {
-      val factory = new ToolBoxFactory[JavaUniverse](expr.mirror.universe) { val mirror = expr.mirror.asInstanceOf[this.u.Mirror] }
-      val toolBox = factory.mkToolBox()
-      toolBox.eval(expr.tree.asInstanceOf[toolBox.u.Tree]).asInstanceOf[T]
     }
   }
 }

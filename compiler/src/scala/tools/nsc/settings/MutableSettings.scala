@@ -83,7 +83,6 @@ class MutableSettings(val errorFn: String => Unit)
     }
     loop(arguments, Nil)
   }
-  def processArgumentString(params: String) = processArguments(splitParams(params), processAll = true)
 
   /** Create a new Settings object, copying all user-set values.
    */
@@ -106,9 +105,6 @@ class MutableSettings(val errorFn: String => Unit)
    */
   lazy val prefixSettings = allSettings collect { case x: PrefixSetting => x }
 
-  /** Split the given line into parameters.
-   */
-  def splitParams(line: String) = cmd.CommandLineParser.tokenize(line, errorFn)
 
   /** Returns any unprocessed arguments.
    */
