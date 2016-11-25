@@ -43,8 +43,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     with Printers
     with DocComments
     with Positions
-    with Reporting
-    with Parsing { self =>
+    with Reporting { self =>
 
   // the mirror --------------------------------------------------
 
@@ -426,17 +425,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     final def applyPhase(unit: CompilationUnit) = withCurrentUnit(unit)(apply(unit))
   }
 
-  // phaseName = "parser"
-  lazy val syntaxAnalyzer = new {
-    val global: Global.this.type = Global.this
-  } with SyntaxAnalyzer {
-    val runsAfter = List[String]()
-    val runsRightAfter = None
-    override val initial = true
-  }
-
-  import syntaxAnalyzer.{ UnitScanner, UnitParser }
-
   // !!! I think we're overdue for all these phase objects being lazy vals.
   // There's no way for a Global subclass to provide a custom typer
   // despite the existence of a "def newTyper(context: Context): Typer"
@@ -448,15 +436,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   lazy val analyzer = new {
     val global: Global.this.type = Global.this
   } with Analyzer
-
-  // phaseName = "patmat"
-  object patmat extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("typer")
-    val runsRightAfter = None
-    // patmat doesn't need to be right after typer, as long as we run before superaccessors
-    // (sbt does need to run right after typer, so don't conflict)
-  } with PatternMatching
 
   // phaseName = "superaccessors"
   object superAccessors extends {
@@ -485,13 +464,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val runsAfter = List("pickler")
     val runsRightAfter = None
   } with RefChecks
-
-  // phaseName = "uncurry"
-  override object uncurry extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("refchecks")
-    val runsRightAfter = None
-  } with UnCurry
 
   // phaseName = "tailcalls"
   object tailCalls extends {
@@ -569,13 +541,6 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val runsAfter = List("mixin")
     val runsRightAfter = None
   } with CleanUp
-
-  // phaseName = "delambdafy"
-  object delambdafy extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("cleanup")
-    val runsRightAfter = None
-  } with Delambdafy
 
   // phaseName = "icode"
   object genicode extends {
@@ -676,42 +641,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Add the internal compiler phases to the phases set.
    *  This implementation creates a description map at the same time.
    */
-  protected def computeInternalPhases(): Unit = {
-    // Note: this fits -Xshow-phases into 80 column width, which it is
-    // desirable to preserve.
-    val phs = List(
-      syntaxAnalyzer          -> "parse source into ASTs, perform simple desugaring",
-      analyzer.namerFactory   -> "resolve names, attach symbols to named trees",
-      analyzer.packageObjects -> "load package objects",
-      analyzer.typerFactory   -> "the meat and potatoes: type the trees",
-      patmat                  -> "translate match expressions",
-      superAccessors          -> "add super accessors in traits and nested classes",
-      extensionMethods        -> "add extension methods for inline classes",
-      pickler                 -> "serialize symbol tables",
-      refChecks               -> "reference/override checking, translate nested objects",
-      uncurry                 -> "uncurry, translate function values to anonymous classes",
-      tailCalls               -> "replace tail calls by jumps",
-      specializeTypes         -> "@specialized-driven class and method specialization",
-      explicitOuter           -> "this refs to outer pointers",
-      erasure                 -> "erase types, add interfaces for traits",
-      postErasure             -> "clean up erased inline classes",
-      lazyVals                -> "allocate bitmaps, translate lazy vals into lazified defs",
-      lambdaLift              -> "move nested functions to top level",
-      constructors            -> "move field definitions into constructors",
-      mixer                   -> "mixin composition",
-      delambdafy              -> "remove lambdas",
-      cleanup                 -> "platform-specific cleanups, generate reflective calls",
-      genicode                -> "generate portable intermediate code",
-      inliner                 -> "optimization: do inlining",
-      inlineExceptionHandlers -> "optimization: inline exception handlers",
-      closureElimination      -> "optimization: eliminate uncalled closures",
-      constantOptimization    -> "optimization: optimize null and other constants",
-      deadCode                -> "optimization: eliminate dead code",
-      terminal                -> "the last phase during a compilation run"
-    )
+  protected def computeInternalPhases(): Unit = {}
 
-    phs foreach (addToPhasesSet _).tupled
-  }
   // This is slightly inelegant but it avoids adding a new member to SubComponent,
   // and attractive -Xshow-phases output is unlikely if the descs span 20 files anyway.
   private val otherPhaseDescriptions = Map(
@@ -968,18 +899,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def newCompilationUnit(code: String, filename: String = "<console>") =
     new CompilationUnit(newSourceFile(code, filename))
 
-  def newUnitScanner(unit: CompilationUnit): UnitScanner =
-    new UnitScanner(unit)
-
-  def newUnitParser(unit: CompilationUnit): UnitParser =
-    new UnitParser(unit)
-
-  def newUnitParser(code: String, filename: String = "<console>"): UnitParser =
-    newUnitParser(newCompilationUnit(code, filename))
-
   /** A Run is a single execution of the compiler on a set of units.
    */
-  class Run extends RunContextApi with RunReporting with RunParsing {
+  class Run extends RunContextApi with RunReporting {
     /** Have been running into too many init order issues with Run
      *  during erroneous conditions.  Moved all these vals up to the
      *  top of the file so at least they're not trivially null.

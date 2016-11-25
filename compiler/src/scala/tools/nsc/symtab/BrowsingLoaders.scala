@@ -16,7 +16,6 @@ abstract class BrowsingLoaders extends GlobalSymbolLoaders {
   val global: Global
 
   import global._
-  import syntaxAnalyzer.{OutlineParser, MalformedInput}
 
   /** In browse mode, it can happen that an encountered symbol is already
    *  present. For instance, if the source file has a name different from
@@ -69,7 +68,7 @@ abstract class BrowsingLoaders extends GlobalSymbolLoaders {
             packagePrefix += name
           }
         case _ =>
-          throw new MalformedInput(pkg.pos.point, "illegal tree node in package prefix: "+pkg)
+          throw new Exception("illegal tree node in package prefix: "+pkg)
       }
 
       private def inPackagePrefix(pkg: Tree)(op: => Unit): Unit = {
@@ -103,7 +102,7 @@ abstract class BrowsingLoaders extends GlobalSymbolLoaders {
 
 //    System.out.println("Browsing "+src)
     val source = getSourceFile(src) // this uses the current encoding
-    val body = new OutlineParser(source).parse()
+    val body = null
 //    System.out.println(body)
     val browser = new BrowserTraverser
     browser.traverse(body)
@@ -117,11 +116,10 @@ abstract class BrowsingLoaders extends GlobalSymbolLoaders {
     try {
       if (root.isEffectiveRoot || !src.name.endsWith(".scala")) // RootClass or EmptyPackageClass
         super.enterToplevelsFromSource(root, name, src)
-      else
-        browseTopLevel(root, src)
+      else ???
     } catch {
-      case ex: syntaxAnalyzer.MalformedInput =>
-        println("[%s] caught malformed input exception at offset %d: %s".format(src, ex.offset, ex.msg))
+      case ex: Throwable =>
+        println("[%s] caught malformed input exception at offset: %s".format(src, ex.getMessage))
         super.enterToplevelsFromSource(root, name, src)
     }
   }
