@@ -755,7 +755,7 @@ object DottyInjectedPlugin extends AutoPlugin {
         "io.typefox.lsapi" % "io.typefox.lsapi.services" % "0.3.0",
         "io.typefox.lsapi" % "io.typefox.lsapi.annotations" % "0.3.0"
       ),
-      javaOptions := (javaOptions in dotty).value
+      javaOptions := (javaOptions in `dotty-compiler`).value
     )
 
   /** A sandbox to play with the Scala.js back-end of dotty.
