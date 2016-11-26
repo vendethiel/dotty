@@ -217,7 +217,7 @@ object Contexts {
               NoContext.implicits
             else if (isImportContext && importInfo.unimported.exists)
               outer.implicits exclude importInfo.unimported
-<            else
+            else
               outer.implicits
           if (implicitRefs.isEmpty) outerImplicits
           else new ContextualImplicits(implicitRefs, outerImplicits)(this)
