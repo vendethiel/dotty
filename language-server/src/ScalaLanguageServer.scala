@@ -214,12 +214,14 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = {
+      implicit val ctx: Context = driver.ctx
+
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val tp = driver.typeOf(driver.trees, pos)
+      println("hover: " + tp.show)
 
       val h = new HoverImpl
       val str = new MarkedStringImpl
-      implicit val ctx: Context = driver.ctx
       str.setValue(tp.widenTermRefExpr.show.toString)
       h.setContents(List(str).asJava)
       //h.setRange()
@@ -321,8 +323,14 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
   def typeOf(trees: List[(SourceFile, Tree)], pos: SourcePosition): Type = {
     import ast.NavigateAST._
 
-    val tree = trees.filter({ case (source, t) => source == pos.source && t.pos.contains(pos.pos) }).head._2
+    val tree = trees.filter({ case (source, t) =>
+      source == pos.source && {
+        //println("###pos: " + pos.pos)
+        //println("###tree: " + t.show(ctx.fresh.setSetting(ctx.settings.Yprintpos, true).setSetting(ctx.settings.YplainPrinter, true)))
+        t.pos.contains(pos.pos)
+      }}).head._2
     val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
+    //println("###paths: " + paths.map(x => (x.show, x.tpe.show)))
     val t = paths.head
     paths.head.tpe
   }
