@@ -16,7 +16,7 @@ object DottyTypeStealer {
     var tp: List[Type] = null
     new DottyTest().checkCompile("frontend",gatheredSource) {
       (tree, context) =>
-        implicit val ctx = context
+        implicit val ctx: Context = context
         val findValDef: (List[ValDef], tpd.Tree) => List[ValDef] =
           (acc , tree) =>  { tree match {
           case t: ValDef if t.name.startsWith(dummyName.toTermName) => t :: acc

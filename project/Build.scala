@@ -470,6 +470,47 @@ object DottyInjectedPlugin extends AutoPlugin {
     ).
     settings(publishing)
 
+  lazy val `dotty-library-bootstrapped` = project.in(file("library")).
+    settings(sourceStructure).
+    settings(
+      target := baseDirectory.value / ".." / "out" / "dotty-library-bootstrapped",
+      scalaVersion := "0.1-SNAPSHOT",
+      scalaOrganization := "ch.epfl.lamp",
+      scalaBinaryVersion := "2.11",
+      autoScalaLibrary := false,
+      libraryDependencies ++= Seq(
+        "org.scala-lang" % "scala-reflect" % "2.11.5"
+      ),
+      scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % "0.1.1-SNAPSHOT" % "component").sources()
+    )
+
+  lazy val `dotty-compiler-bootstrapped` = project.in(file("compiler")).
+    dependsOn(`dotty-library-bootstrapped`).
+    settings(sourceStructure).
+    settings(
+      target := baseDirectory.value / ".." / "out" / "dotty-compiler-bootstrapped",
+      scalaVersion := "0.1-SNAPSHOT",
+      scalaOrganization := "ch.epfl.lamp",
+      scalaBinaryVersion := "2.11",
+      autoScalaLibrary := false,
+      libraryDependencies ++= Seq(
+        // Used instead of "dependsOn(`dotty-interfaces`)" because the latter breaks sbt somehow
+        scalaOrganization.value % "dotty-interfaces" % version.value,
+
+        "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
+        scalaCompiler,
+
+        "org.scala-lang.modules" %% "scala-partest" % "1.0.11" % "test",
+        "com.novocode" % "junit-interface" % "0.11" % "test"
+      ),
+      scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % "0.1.1-SNAPSHOT" % "component").sources(),
+
+      fork in run := true,
+      fork in Test := true
+    )
+  
+
+
   /** A sandbox to play with the Scala.js back-end of dotty.
    *
    *  This sandbox is compiled with dotty with support for Scala.js. It can be

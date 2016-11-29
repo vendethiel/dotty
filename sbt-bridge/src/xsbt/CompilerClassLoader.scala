@@ -84,6 +84,8 @@ object CompilerClassLoader {
       val sbtLoader = parentBField.get(dualLoader).asInstanceOf[URLClassLoader]
 
       val bridgeURLs = bridgeLoader.getURLs
+      println("bridgeURLs: " + bridgeURLs.toList)
+      println("scalaLoader: " + scalaLoader.getURLs.toList)
       new URLClassLoader(bridgeURLs,
         new CompilerClassLoader(scalaLoader.getURLs, sbtLoader))
   }

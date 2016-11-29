@@ -160,7 +160,7 @@ extends SuiteRunner(testSourcePath, fileManager, updateCheck, failed, javaCmdPat
         case t: Throwable => throw new RuntimeException(s"Error running $testFile", t)
       }
     reportTest(state)
-    runner.cleanup()
+    runner.cleanup // !! Dotty deviation: "runner.cleanup()" does not work
 
     onFinishTest(testFile, state)
   }
@@ -202,7 +202,7 @@ class DPTestRunner(testFile: File, suiteRunner: DPSuiteRunner) extends nest.Runn
     import FileManager.joinPaths
     // compile using command-line javac compiler
     val args = Seq(
-      javacCmdPath,
+      suiteRunner.javacCmdPath, // !! Dotty deviation "javacCmdPath" doesn't work
       "-d",
       outDir.getAbsolutePath,
       "-classpath",

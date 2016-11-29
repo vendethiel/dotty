@@ -67,9 +67,9 @@ class ExtractDependencies extends Phase {
         } finally pw.close()
       }
 
-      if (ctx.sbtCallback != null) {
-        extractDeps.usedNames.foreach(name =>
-          ctx.sbtCallback.usedName(sourceFile, name.toString))
+      if (ctx.sbtCallback != null || true) {
+        // extractDeps.usedNames.foreach(name =>
+        //   ctx.sbtCallback.usedName(sourceFile, name.toString))
         extractDeps.topLevelDependencies.foreach(dep =>
           recordDependency(sourceFile, dep, DependencyContext.DependencyByMemberRef))
         extractDeps.topLevelInheritanceDependencies.foreach(dep =>
@@ -92,12 +92,15 @@ class ExtractDependencies extends Phase {
         /** Transform `List(java, lang, String.class)` into `java.lang.String` */
         def className(classSegments: List[String]) =
           classSegments.mkString(".").stripSuffix(".class")
-        def binaryDependency(file: File, className: String) =
-          ctx.sbtCallback.binaryDependency(file, className, currentSourceFile, context)
+        def binaryDependency(file: File, className: String) = {}
+          // ctx.sbtCallback.binaryDependency(file, className, currentSourceFile, context)
 
         depFile match {
           case ze: ZipArchive#Entry =>
             for (zip <- ze.underlyingSource; zipFile <- Option(zip.file)) {
+              if (zipFile.toString.contains("dotty")) {
+                println("##BINDEP in " + currentSourceFile + " is : " + zipFile + " sym: " + dep + " " + dep.id)
+              }
               val classSegments = Path(ze.path).segments
               binaryDependency(zipFile, className(classSegments))
             }
@@ -111,7 +114,7 @@ class ExtractDependencies extends Phase {
           case _ =>
         }
       } else if (depFile.file != currentSourceFile) {
-        ctx.sbtCallback.sourceDependency(depFile.file, currentSourceFile, context)
+        // ctx.sbtCallback.sourceDependency(depFile.file, currentSourceFile, context)
       }
     }
   }
