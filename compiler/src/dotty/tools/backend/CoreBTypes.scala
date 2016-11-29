@@ -163,7 +163,7 @@ class CoreBTypes[BTFS <: BTypesFromSymbols[_ <: BackendInterface]](val bTypes: B
   )
 
   lazy val typeOfArrayOp: Map[Int, BType] = {
-    import scala.tools.nsc.backend.ScalaPrimitives._
+    import dotty.tools.backend.ScalaPrimitives._
     Map(
         (List(ZARRAY_LENGTH, ZARRAY_GET, ZARRAY_SET) map (_ -> BOOL))   ++
         (List(BARRAY_LENGTH, BARRAY_GET, BARRAY_SET) map (_ -> BYTE))   ++

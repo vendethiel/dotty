@@ -14,7 +14,6 @@ import scala.reflect.ClassTag
 import scala.reflect.internal.util.WeakHashSet
 import scala.reflect.io.{AbstractFile, Directory, PlainDirectory}
 import scala.tools.asm.{AnnotationVisitor, ClassVisitor, FieldVisitor, MethodVisitor}
-//import scala.tools.nsc.backend.jvm.{BCodeHelpers, BackendInterface}
 import dotty.tools.dotc.core._
 import Periods._
 import SymDenotations._
@@ -38,7 +37,7 @@ import dotty.tools.dotc.core.Names.TypeName
 
 import scala.annotation.tailrec
 
-class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Map[Symbol, Set[ClassSymbol]])(implicit ctx: Context) extends BackendInterface{
+class DottyBackendInterface(outputDirectory: AbstractFile, val superCallsMap: Map[Symbol, Set[ClassSymbol]])(implicit ctx: Context) extends BackendInterface {
   type Symbol          = Symbols.Symbol
   type Type            = Types.Type
   type Tree            = tpd.Tree

@@ -105,7 +105,7 @@ trait BCodeSyncAndTry extends BCodeBodyBuilder {
      *  Useful to avoid emitting an empty try-block being protected by exception handlers,
      *  which results in "java.lang.ClassFormatError: Illegal exception table range". See SI-6102.
      */
-    def nopIfNeeded(lbl: asm.Label) {
+    def nopIfNeeded(lbl: asm.Label) = {
       val noInstructionEmitted = isAtProgramPoint(lbl)
       if (noInstructionEmitted) { emit(asm.Opcodes.NOP) }
     }
@@ -335,7 +335,7 @@ trait BCodeSyncAndTry extends BCodeBodyBuilder {
     } // end of genLoadTry()
 
     /* if no more pending cleanups, all that remains to do is return. Otherwise jump to the next (outer) pending cleanup. */
-    private def pendingCleanups() {
+    private def pendingCleanups() = {
       cleanups match {
         case Nil =>
           if (earlyReturnVar != null) {
@@ -351,7 +351,7 @@ trait BCodeSyncAndTry extends BCodeBodyBuilder {
       }
     }
 
-    def protect(start: asm.Label, end: asm.Label, handler: asm.Label, excType: ClassBType) {
+    def protect(start: asm.Label, end: asm.Label, handler: asm.Label, excType: ClassBType) = {
       val excInternalName: String =
         if (excType == null) null
         else excType.internalName
@@ -360,7 +360,7 @@ trait BCodeSyncAndTry extends BCodeBodyBuilder {
     }
 
     /* `tmp` (if non-null) is the symbol of the local-var used to preserve the result of the try-body, see `guardResult` */
-    def emitFinalizer(finalizer: Tree, tmp: Symbol, isDuplicate: Boolean) {
+    def emitFinalizer(finalizer: Tree, tmp: Symbol, isDuplicate: Boolean) = {
       var saved: immutable.Map[ /* LabelDef */ Symbol, asm.Label ] = null
       if (isDuplicate) {
         saved = jumpDest

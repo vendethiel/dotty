@@ -280,7 +280,7 @@ class tests extends CompilerTest {
   //TODO: issue with ./src/dotty/tools/backend/jvm/DottyBackendInterface.scala
   @Test def tasty_backend_jvm = compileList("tasty_backend_jvm", List(
     "CollectEntryPoints.scala", "GenBCode.scala", "LabelDefs.scala",
-    "scalaPrimitives.scala"
+    "DottyPrimitives.scala"
   ) map (s"${backendDir}jvm/" + _), testPickling)
 
   //@Test def tasty_backend_sjs = compileDir(s"${backendDir}", "sjs", testPickling)

@@ -19,7 +19,7 @@ object DottyBuild extends Build {
   val JENKINS_BUILD = "dotty.jenkins.build"
   val DRONE_MEM = "dotty.drone.mem"
 
-  val scalaCompiler = "me.d-d" % "scala-compiler" % "2.11.5-20160322-171045-e19b30b3cd"
+  //val scalaCompiler = "me.d-d" % "scala-compiler" % "2.11.5-20160322-171045-e19b30b3cd"
 
   val agentOptions = List(
     // "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"
@@ -176,7 +176,8 @@ object DottyBuild extends Build {
       com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys.withSource := true,
 
       // get libraries onboard
-      partestDeps := Seq(scalaCompiler,
+      partestDeps := Seq(//scalaCompiler,
+                         "org.scala-lang" % "scala-compiler" % scalaVersion.value,
                          "org.scala-lang" % "scala-reflect" % scalaVersion.value,
                          "org.scala-lang.modules" % "scala-asm" % "5.1.0-scala-1",
                          "org.scala-lang" % "scala-library" % scalaVersion.value % "test"),
@@ -339,6 +340,7 @@ object DottyBuild extends Build {
             path.contains("scala-compile") ||
             // FIXME: should go away when xml literal parsing is removed
             path.contains("scala-xml") ||
+            path.contains("scala-asm") ||
             // needed for the xsbti interface
             path.contains("sbt-interface")
         } yield "-Xbootclasspath/p:" + path
@@ -523,7 +525,8 @@ object DottyInjectedPlugin extends AutoPlugin {
       baseDirectory in (Test,run) := (baseDirectory in `dotty-compiler`).value,
 
       libraryDependencies ++= Seq(
-        scalaCompiler % Test,
+        "org.scala-lang" % "scala-compiler" % scalaVersion.value % Test,
+        //scalaCompiler % Test,
         "com.storm-enroute" %% "scalameter" % "0.6" % Test
       ),
 
@@ -628,13 +631,18 @@ object DottyInjectedPlugin extends AutoPlugin {
   lazy val partestDeps = SettingKey[Seq[ModuleID]]("partestDeps", "Finds jars for partest dependencies")
   def getJarPaths(modules: Seq[ModuleID], ivyHome: Option[File]): Seq[String] = ivyHome match {
     case Some(home) =>
-      modules.map({ module =>
-        val file = Path(home) / Path("cache") /
-          Path(module.organization) / Path(module.name) / Path("jars") /
-          Path(module.name + "-" + module.revision + ".jar")
+      modules.map { module =>
+        val file = {
+          val basePath = Path(home) / Path("cache") / Path(module.organization) / Path(module.name)
+          val jars = basePath / Path("jars")
+          val bundles = basePath / Path("bundles")
+          val jarName = Path(module.name + "-" + module.revision + ".jar")
+          if (jars.jfile.exists) jars / jarName
+          else bundles / jarName
+        }
         if (!file.isFile) throw new RuntimeException("ERROR: sbt getJarPaths: dependency jar not found: " + file)
         else file.jfile.getAbsolutePath
-      })
+      }
     case None => throw new RuntimeException("ERROR: sbt getJarPaths: ivyHome not defined")
   }
 
