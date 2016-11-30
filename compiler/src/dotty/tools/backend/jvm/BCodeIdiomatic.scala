@@ -20,7 +20,7 @@ import icode.Primitives.{NE, EQ, TestOp, ArithmeticOp}
  */
 trait BCodeIdiomatic {
   val int: BackendInterface
-  lazy val bTypes = new BTypesFromSymbols[int.type](int)
+  final lazy val bTypes = new BTypesFromSymbols[int.type](int)
 
   import int._
   import bTypes._
