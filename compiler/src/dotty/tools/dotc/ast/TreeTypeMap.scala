@@ -83,7 +83,7 @@ final class TreeTypeMap(
     // }
     val z = treeMap(tree) match {
     case impl @ Template(constr, parents, self, _) =>
-      val tmap = withMappedSyms(localSyms(impl :: self :: Nil))
+      val tmap = withMappedSyms(localSyms(impl :: self :: impl.body/*Nil*/))
       cpy.Template(impl)(
           constr = tmap.transformSub(constr),
           parents = parents mapconserve transform,
