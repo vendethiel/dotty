@@ -75,7 +75,13 @@ final class TreeTypeMap(
       updateDecls(prevStats.tail, newStats.tail)
     }
 
-  override def transform(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = treeMap(tree) match {
+  override def transform(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = {
+    // tree match {
+    //   case This(_) =>
+    //     assert(tree.symbol.id != 37162)
+    //   case _ =>
+    // }
+    val z = treeMap(tree) match {
     case impl @ Template(constr, parents, self, _) =>
       val tmap = withMappedSyms(localSyms(impl :: self :: Nil))
       cpy.Template(impl)(
@@ -93,6 +99,7 @@ final class TreeTypeMap(
           val (tmap1, tparams1) = transformDefs(ddef.tparams)
           val (tmap2, vparamss1) = tmap1.transformVParamss(vparamss)
           val res = cpy.DefDef(ddef)(name, tparams1, vparamss1, tmap2.transform(tpt), tmap2.transform(ddef.rhs))
+          // assert(res.symbol.enclosingClass.id != 37161)
           res.symbol.transformAnnotations {
             case ann: BodyAnnotation => ann.derivedAnnotation(res.rhs)
             case ann => ann
@@ -115,6 +122,14 @@ final class TreeTypeMap(
         case tree1 =>
           super.transform(tree1)
       }
+  }
+    // z match {
+    //   case z @ This(_) =>
+    //     assert(z.symbol.id != 37160)
+    //   case _ =>
+    // }
+    // assert(z.symbol.id != 37161)
+    z
   }
 
   override def transformStats(trees: List[tpd.Tree])(implicit ctx: Context) =

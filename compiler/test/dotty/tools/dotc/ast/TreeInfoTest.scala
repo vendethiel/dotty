@@ -3,6 +3,7 @@ package dotc
 package ast
 
 import org.junit.Test
+import core.Contexts._
 import core.Names._
 import core.Types._
 import core.Symbols._
@@ -15,7 +16,7 @@ class TreeInfoTest extends DottyTest {
   @Test
   def testDefPath = checkCompile("frontend", "class A { def bar = { val x = { val z = 0; 0} }} ") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       val xTree = tree.find(tree => tree.symbol.name == termName("x")).get
       val path = defPath(xTree.symbol, tree)
       assertEquals(List(

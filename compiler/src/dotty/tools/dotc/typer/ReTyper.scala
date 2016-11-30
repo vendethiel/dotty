@@ -92,12 +92,16 @@ class ReTyper extends Typer {
       super.handleUnexpectedFunType(tree, fun)
   }
 
+  var off: Boolean = false
+
   override def typedUnadapted(tree: untpd.Tree, pt: Type)(implicit ctx: Context) =
     try super.typedUnadapted(tree, pt)
     catch {
       case NonFatal(ex) =>
-        if (ctx.isAfterTyper)
+        if (ctx.isAfterTyper && !off) {
           println(i"exception while typing $tree of class ${tree.getClass} # ${tree.uniqueId}")
+          off = true
+        }
         throw ex
     }
 

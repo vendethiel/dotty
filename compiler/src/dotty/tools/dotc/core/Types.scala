@@ -1466,6 +1466,9 @@ object Types {
           // is undefined after erasure.) We need to be able to do time travel back and
           // forth also in these cases.
 
+          if (lastSymbol != null && lastSymbol.id == 42178 && d.symbol.id != 42178) {
+            assert(false)
+          }
           // Don't use setDenot here; double binding checks can give spurious failures after erasure
           lastDenotation = d
           checkDenot()
@@ -1541,6 +1544,9 @@ object Types {
 
       lastDenotation = denot
       checkDenot()
+      if (lastSymbol != null && lastSymbol.id == 42178 && denot.symbol.id != 42178) {
+        assert(false)
+      }
       lastSymbol = denot.symbol
       checkedPeriod = Nowhere
     }
@@ -1562,6 +1568,9 @@ object Types {
 
     private[dotc] final def uncheckedSetSym(sym: Symbol): Unit = {
       lastDenotation = null
+      if (lastSymbol != null && lastSymbol.id == 42178 && sym.id != 42178) {
+        assert(false)
+      }
       lastSymbol = sym
       checkedPeriod = Nowhere
     }
@@ -1608,9 +1617,16 @@ object Types {
      *  Assumes that symbols do not change between periods in the same run.
      *  Used to get the class underlying a ThisType.
      */
-    private[Types] def stableInRunSymbol(implicit ctx: Context): Symbol =
-      if (checkedPeriod.runId == ctx.runId) lastSymbol
-      else symbol
+    private[Types] def stableInRunSymbol(implicit ctx: Context): Symbol = this match {
+      case tp: WithFixedSym =>
+        if (checkedPeriod.runId == ctx.runId) {
+          assert(tp.fixedSym == lastSymbol)
+        }
+        tp.fixedSym
+      case _ =>
+        if (checkedPeriod.runId == ctx.runId) lastSymbol
+        else symbol
+    }
 
     def info(implicit ctx: Context): Type = denot.info
 

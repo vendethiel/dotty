@@ -54,6 +54,7 @@ class ResolveSuper extends MiniPhaseTransform with IdentityDenotTransformer { th
 
   override def transformTemplate(impl: Template)(implicit ctx: Context, info: TransformerInfo) = {
     val cls = impl.symbol.owner.asClass
+    // assert(cls.id != 37161)
     val ops = new MixinOps(cls, thisTransform)
     import ops._
 

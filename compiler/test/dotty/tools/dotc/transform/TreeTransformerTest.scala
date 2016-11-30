@@ -13,7 +13,7 @@ class TreeTransformerTest extends DottyTest {
   @Test
   def shouldReturnSameTreeIfUnchanged = checkCompile("frontend", "class A{ val d = 1}") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       class EmptyTransform extends MiniPhaseTransform {
         override def phaseName: String = "empty"
         init(ctx, ctx.period.firstPhaseId, ctx.period.lastPhaseId)
@@ -33,7 +33,7 @@ class TreeTransformerTest extends DottyTest {
   // Disabled, awaiting resolution. @Test
   def canReplaceConstant = checkCompile("frontend", "class A{ val d = 1}") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       class ConstantTransform extends MiniPhaseTransform {
 
         override def transformLiteral(tree: tpd.Literal)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = tpd.Literal(Constant(2))
@@ -55,7 +55,7 @@ class TreeTransformerTest extends DottyTest {
   @Test
   def canOverwrite = checkCompile("frontend", "class A{ val d = 1}") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       class Transformation extends MiniPhaseTransform {
 
         override def transformLiteral(tree: tpd.Literal)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = tpd.Literal(Constant(-1))
@@ -86,7 +86,7 @@ class TreeTransformerTest extends DottyTest {
   @Test
   def transformationOrder = checkCompile("frontend", "class A{ val d = 1}") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       class Transformation1 extends MiniPhaseTransform {
         override def phaseName: String = "transformationOrder1"
 
@@ -132,7 +132,7 @@ class TreeTransformerTest extends DottyTest {
   @Test
   def invocationCount = checkCompile("frontend", "class A{ val d = 1}") {
     (tree, context) =>
-      implicit val ctx = context
+      implicit val ctx: Context = context
       var transformed1 = 0
       class Transformation1 extends MiniPhaseTransform {
         override def phaseName: String = "invocationCount1"

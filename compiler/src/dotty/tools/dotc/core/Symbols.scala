@@ -384,14 +384,31 @@ object Symbols {
 
     type ThisName <: Name
 
-    //assert(id != 4285)
+    // if (id == 37161) {
+    //   println("1111111111##")
+    //   Thread.dumpStack
+    //   println("####")
+    // }
+
+    // if (id == 42177) {
+    //   println("222222##")
+    //   Thread.dumpStack
+    //   println("####")
+    // }
 
     /** The last denotation of this symbol */
     private[this] var lastDenot: SymDenotation = _
+    private[this] var foo: Boolean = false
 
     /** Set the denotation of this symbol */
-    private[core] def denot_=(d: SymDenotation) =
+    private[core] def denot_=(d: SymDenotation) = {
+      if (!foo && id == 42177 && d.symbol.id != 42177) {
+        foo = true
+      } else if (foo && d.symbol.id != 42177) {
+        assert(false)
+      }
       lastDenot = d
+    }
 
     /** The current denotation of this symbol */
     final def denot(implicit ctx: Context): SymDenotation = {
@@ -522,7 +539,7 @@ object Symbols {
 
     override def toString: String =
       if (lastDenot == null) s"Naked$prefixString#$id"
-      else lastDenot.toString// + "#" + id // !!! DEBUG
+      else lastDenot.toString + "#" + id // !!! DEBUG
 
     def toText(printer: Printer): Text = printer.toText(this)
 

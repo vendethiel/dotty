@@ -1187,7 +1187,7 @@ object TreeTransforms {
         case NonFatal(ex) =>
           if (tree ne crashingTree) {
             crashingTree = tree
-            println(i"exception while transforming $tree of class ${tree.getClass} # ${tree.uniqueId}")
+            println(i"exception while transforming  of class ${tree.getClass} # ${tree.uniqueId}")
           }
           throw ex
       }

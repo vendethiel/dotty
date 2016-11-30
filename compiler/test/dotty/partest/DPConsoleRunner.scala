@@ -43,7 +43,7 @@ object DPConsoleRunner {
 // console runner has a suite runner which creates a test runner for each test
 class DPConsoleRunner(args: String, extraJars: List[String]) extends ConsoleRunner(args) {
   override val suiteRunner = new DPSuiteRunner (
-    testSourcePath = optSourcePath getOrElse DPConfig.testRoot,
+    testSourcePath = optSourcePath getOrElse dotty.partest.DPConfig.testRoot,
     fileManager = new DottyFileManager(extraJars),
     updateCheck = optUpdateCheck,
     failed = optFailed,
@@ -399,7 +399,7 @@ class DPTestRunner(testFile: File, suiteRunner: DPSuiteRunner) extends nest.Runn
     suiteRunner.fileManager.asInstanceOf[DottyFileManager].extraJarList ::: super.extraClasspath
 
   // override to keep class files if failed and delete clog if ok
-  override def cleanup = if (lastState.isOk) {
+  override def cleanup: Unit /*dotty deviation*/ = if (lastState.isOk) {
     logFile.delete
     cLogFile.delete
     Directory(outDir).deleteRecursively
