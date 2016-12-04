@@ -497,16 +497,37 @@ object DottyInjectedPlugin extends AutoPlugin {
         // Used instead of "dependsOn(`dotty-interfaces`)" because the latter breaks sbt somehow
         scalaOrganization.value % "dotty-interfaces" % version.value,
 
+        "org.scala-lang" % "scala-library" % "2.11.5",
         "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
         scalaCompiler,
-
         "org.scala-lang.modules" %% "scala-partest" % "1.0.11" % "test",
         "com.novocode" % "junit-interface" % "0.11" % "test"
       ),
       scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % "0.1.1-SNAPSHOT" % "component").sources(),
 
       fork in run := true,
-      fork in Test := true
+      fork in Test := true,
+      javaOptions := {
+        (javaOptions in `dotty-compiler`).value
+      },
+      run := Def.inputTaskDyn {
+        val dottyLib = (packageAll in `dotty-compiler`).value("dotty-library")
+        val args: Seq[String] = spaceDelimited("<arg>").parsed
+
+        val fullArgs = args.span(_ != "-classpath") match {
+          case (beforeCp, Nil) => beforeCp ++ ("-classpath" :: dottyLib :: Nil)
+          case (beforeCp, rest) => beforeCp ++ rest
+        }
+
+        (runMain in Compile).toTask(
+          s" dotty.tools.dotc.Main " + fullArgs.mkString(" ")
+        )
+      }.evaluated,
+
+      // For convenience, change the baseDirectory when running the compiler
+      baseDirectory in (Compile, run) := baseDirectory.value / "..",
+      // .. but not when running partest
+      baseDirectory in (Test, run) := baseDirectory.value
     )
   
 
