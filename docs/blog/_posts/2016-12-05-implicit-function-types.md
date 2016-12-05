@@ -18,7 +18,7 @@ Let me try to explain the words in this sentence from right to left.
 
 *Abstraction*: The ability to name a concept and use just the name afterwards.
 
-*Comonadic*: In category theory, a _comonad_ is the dual of a
+**Comonadic**: In category theory, a _comonad_ is the dual of a
 _monad_. Roughly speaking, a monad is a way to wrap the result (or:
 outputs) of a computation in some other type. For instance
 `Future[T]` means that the result of type `T` will be produced at
@@ -40,7 +40,7 @@ Implicit function types are a suprisingly simple and general way to
 make coding patterns solving these tasks abstractable, reducing
 boilerplate code and increasing applicability.
 
-*First Step* My pull request is first implementation. In solves the
+**First Step**: My pull request is first implementation. In solves the
  problem in principle, but it introduces some run-time overhead. The
  next step will be to eliminate the run-time overhead through some
  simple optimizations.
