@@ -343,18 +343,18 @@ and the `Transaction` lambda in `main`; both will be added by the compiler.
         }
       }
 
+## Categorically Speaking
 
-## Comparison with Monads
+There are many interesting connections with category theory to explore
+here. On the one hand, implicit functions are used for tasks that are
+sometimes covered with monads such as the reader monad. There's an
+argument to be made that implicits have better composability than
+monads and why that is.
 
-One can use monads for these tasks, and some people do. For instance
-the `Reader` monad is used to abstract over accessing one entry in the
-environment.  But the code for doing so quickly becomes complex and
-inefficient, in particular when combining several contextual
-accesses. Monads don't compose in general, and therefore even simple
-combinations need to be expressed on the level of monad transformers,
-at the price of much boilerplate and complexity. Recognizing this,
-people have recently experimented with free monads, which alleviate
-the composibility problem, but at the price of introducing a whole new
-level of interpretation.
+On the other hand, it turns out that implicit functions can also be
+given a coonadic interpretation, and the interplay between monads and
+comonads is very interesting in its own right.
 
+But these discussions will have to wait for another time, as
+this blog post is already too long.
 
