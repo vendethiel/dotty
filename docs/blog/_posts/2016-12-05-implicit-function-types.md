@@ -7,8 +7,8 @@ authorImg: /images/martin.jpg
 
 I just made the first pull request to add _implicit function types_ to
 Scala. I am pretty excited about it, because, citing the explanation
-of the pull request "This is the first step to bring contextual
-abstraction to Scala". That's quite a mouthful, so I better explain what I
+of the pull request "_This is the first step to bring contextual
+abstraction to Scala_". That's quite a mouthful, so I better explain what I
 mean by it.
 
 Let me try to explain the words in this sentence from right to left.
@@ -211,18 +211,18 @@ inserted, so `t` becomes `t.apply`. We have already seen that the
 definition of `t.apply` is an implicit method as given in the
 corresponding implicit function trait. Hence, it will in turn be
 applied to a matching sequence of implicit arguments. The end effect is
-that implicit function values get applied to implicit arguments in the
+that efinerences to implicit functions get applied to implicit arguments in the
 same way as references to implicit methods.
 
 The second rule is the dual of the first. If the expected type
 of an expression `t` is an implicit function type
 
-   implicit (T1, ..., Tn) => R
+    implicit (T1, ..., Tn) => R
 
 then `t` is converted to an implicit closure, unless it is already one.
 More precisely, `t` is mapped to the implicit closure
 
-   implicit ($ev1: T1, ..., $evn: Tn) => t
+    implicit ($ev1: T1, ..., $evn: Tn) => t
 
 The parameter names of this closure are compiler-generated identifiers
 which should not be accessed from user code. That is, the only way to
@@ -244,7 +244,7 @@ following fragment:
       ...
     }
 
-If we had named the inner parameter of `d` instead of `c` we would
+If we had named the inner parameter `d` instead of `c` we would
 have gotten an implicit ambiguity at the call of `implicitly` because
 both `c` and `d` would be eligible:
 
@@ -257,8 +257,8 @@ The problem is that parameters in implicit closures now have
 compiler-generated names, so the programmer cannot enforce the proper
 naming scheme to avoid all ambiguities. We fix the problem by
 introducing a new disambiguation rule which makes nested occurrences
-of an implicit take precenence over outer one. This rule, which
-applies to all implicit parameters and implicit locals is conceptually
+of an implicit take precedence over outer ones. This rule, which
+applies to all implicit parameters and implicit locals, is conceptually
 analogous to the rule that prefers implicits defined in companion
 objects of subclasses over those defined in companion objects of
 superclasss. With that new disambiguation rule the example code above
@@ -301,14 +301,14 @@ global definition:
 
       def thisTransaction: Transactional[Transaction] = implicitly[Transaction]
 
-A `Transactional[Transaction]`, is that not circular? To see clearer, let's expand
+You might ask: a `Transactional[Transaction]`, is that not circular? To see more clearly, let's expand
 the definition according to the rules given in the last section. `thisTransaction`
 is of implicit function type, so the right hand side is expanded to the
 implicit closure
 
       implicit ($ev0: Transaction) => implicitly[Transaction]
 
-`implicitly[Transaction]`, the right hand side of this closure, needs
+The right hand side of this closure, `implicitly[Transaction]`, needs
 an implicit parameter of type `Transaction`, so the closure is further
 expanded to
 
@@ -328,7 +328,7 @@ pick up and return the unnamed implicit parameter that's in scope.
 
 Finally, here are the `transaction` and `main` method that complete
 the example.  Since `transactional`'s parameter `op` is now a
-`Transactional`, we can eliminate `Transaction` argument to `op`
+`Transactional`, we can eliminate the `Transaction` argument to `op`
 and the `Transaction` lambda in `main`; both will be added by the compiler.
 
       def transaction[T](op: Transactional[T]) = {
