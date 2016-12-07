@@ -211,7 +211,7 @@ inserted, so `t` becomes `t.apply`. We have already seen that the
 definition of `t.apply` is an implicit method as given in the
 corresponding implicit function trait. Hence, it will in turn be
 applied to a matching sequence of implicit arguments. The end effect is
-that efinerences to implicit functions get applied to implicit arguments in the
+that references to implicit functions get applied to implicit arguments in the
 same way as references to implicit methods.
 
 The second rule is the dual of the first. If the expected type
@@ -261,7 +261,7 @@ of an implicit take precedence over outer ones. This rule, which
 applies to all implicit parameters and implicit locals, is conceptually
 analogous to the rule that prefers implicits defined in companion
 objects of subclasses over those defined in companion objects of
-superclasss. With that new disambiguation rule the example code above
+superclass. With that new disambiguation rule the example code above
 now compiles.
 
 That's the complete set of rules needed to deal with implicit function types.
@@ -352,7 +352,7 @@ argument to be made that implicits have better composability than
 monads and why that is.
 
 On the other hand, it turns out that implicit functions can also be
-given a coonadic interpretation, and the interplay between monads and
+given a co-monadic interpretation, and the interplay between monads and
 comonads is very interesting in its own right.
 
 But these discussions will have to wait for another time, as
