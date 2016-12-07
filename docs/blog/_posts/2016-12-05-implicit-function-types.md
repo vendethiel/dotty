@@ -186,7 +186,7 @@ type of `f1` is:
 
 Just like the normal function type syntax `A => B`, desugars to `scala.Function1[A, B]`
 the implicit function type syntax `implicit A => B` desugars to `scala.ImplicitFunction1[A, B]`.
-The same holds at other function arities. With dotty's (pull request #1758)[https://github.com/lampepfl/dotty/pull/1758]
+The same holds at other function arities. With dotty's [pull request #1758](https://github.com/lampepfl/dotty/pull/1758)
 merged there is no longer an upper limit of 22 for such functions.
 
 The type `ImplicitFunction1` can be thought of being defined as follows:
