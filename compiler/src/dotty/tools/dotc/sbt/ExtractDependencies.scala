@@ -99,7 +99,7 @@ class ExtractDependencies extends Phase {
           case ze: ZipArchive#Entry =>
             for (zip <- ze.underlyingSource; zipFile <- Option(zip.file)) {
               if (zipFile.toString.contains("dotty")) {
-                println("##BINDEP in " + currentSourceFile + " is : " + zipFile + " sym: " + dep + " " + dep.id)
+                // println("##BINDEP in " + currentSourceFile + " is : " + zipFile + " sym: " + dep + " " + dep.id)
               }
               val classSegments = Path(ze.path).segments
               binaryDependency(zipFile, className(classSegments))
