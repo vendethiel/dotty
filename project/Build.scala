@@ -517,7 +517,7 @@ object DottyInjectedPlugin extends AutoPlugin {
         (javaOptions in `dotty-compiler`).value
       },
       run := Def.inputTaskDyn {
-        val dottyLib = (packageAll in `dotty-compiler`).value("dotty-library")
+        val dottyLib = packageAll.value("dotty-library")
         val args: Seq[String] = spaceDelimited("<arg>").parsed
 
         val fullArgs = args.span(_ != "-classpath") match {
