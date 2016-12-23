@@ -45,9 +45,11 @@ trait SymDenotations { this: Context =>
     else {
       val initial = denot.initial
       val firstPhaseId = initial.validFor.firstPhaseId.max(ctx.typerPhase.id)
-      if ((initial ne denot) || ctx.phaseId != firstPhaseId)
-        ctx.withPhase(firstPhaseId).stillValidInOwner(initial)
-      else
+     if ((initial ne denot) || ctx.phaseId != firstPhaseId) {
+       ctx.withPhase(firstPhaseId).stillValidInOwner(initial) ||
+         (denot.validFor.containsPhaseId(firstPhaseId + 1)) &&
+           ctx.withPhase(firstPhaseId + 1).stillValidInOwner(initial)
+      } else
         stillValidInOwner(denot)
     }
 

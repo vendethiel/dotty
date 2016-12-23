@@ -63,8 +63,11 @@ class ExtensionMethods extends MiniPhaseTransform with DenotTransformer with Ful
             // not generate them again.
             if (!(valueClass is Scala2x)) ctx.atPhase(thisTransformer) { implicit ctx =>
               for (decl <- valueClass.classInfo.decls) {
-                if (isMethodWithExtension(decl))
-                  decls1.enter(createExtensionMethod(decl, moduleClassSym.symbol))
+                if (isMethodWithExtension(decl)) {
+                  val meth = createExtensionMethod(decl, moduleClassSym.symbol)
+                  decls1.enter(meth)
+                  meth.denot(ctx.withPhase(thisTransformer.next))
+                }
               }
             }
 
