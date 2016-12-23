@@ -290,7 +290,8 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
               if (curImport.unimported.exists) unimported += curImport.unimported
             if (ctx.owner.is(Package) && curImport != null && curImport.isRootImport && previous.exists)
               previous // no more conflicts possible in this case
-            else if (isPossibleImport(namedImport) && (curImport ne outer.importInfo)) {
+            else if (isPossibleImport(namedImport) && (curImport ne outer.importInfo) &&
+                     curImport.sym != null) { // dotty deviation: recursively calling a lazy val returns null, see #1856
               val namedImp = namedImportRef(curImport)
               if (namedImp.exists)
                 findRef(checkNewOrShadowed(namedImp, namedImport), namedImport, ctx)(outer)
