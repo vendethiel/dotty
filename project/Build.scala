@@ -103,19 +103,19 @@ object DottyBuild extends Build {
       addCommandAlias("run", "dotty-compiler/run") ++
       addCommandAlias(
         "partest",
-        ";packageAll" +
-        ";dotty-compiler/test:runMain dotc.build" +
-        ";dotty-compiler/lockPartestFile" +
-        ";dotty-compiler/test:test" +
-        ";dotty-compiler/runPartestRunner"
+        ";dotty-compiler-bootstrapped/packageAll" +
+        ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
+        ";dotty-compiler-bootstrapped/lockPartestFile" +
+        ";dotty-compiler-bootstrapped/test:test" +
+        ";dotty-compiler-bootstrapped/runPartestRunner"
       ) ++
       addCommandAlias(
         "partest-only",
-        ";packageAll" +
-        ";dotty-compiler/test:runMain dotc.build" +
-        ";dotty-compiler/lockPartestFile" +
-        ";dotty-compiler/test:test-only dotc.tests" +
-        ";dotty-compiler/runPartestRunner"
+        ";dotty-compiler-bootstrapped/packageAll" +
+        ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
+        ";dotty-compiler-bootstrapped/lockPartestFile" +
+        ";dotty-compiler-bootstrapped/test:test-only dotc.tests" +
+        ";dotty-compiler-bootstrapped/runPartestRunner"
       ) ++
       addCommandAlias(
         "partest-only-no-bootstrap",
@@ -505,8 +505,14 @@ object DottyInjectedPlugin extends AutoPlugin {
       ),
       scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % "0.1.1-SNAPSHOT" % "component").sources(),
 
+      partestDeps := Seq(scalaCompiler,
+                         "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+                         "org.scala-lang" % "scala-library" % scalaVersion.value % "test"),
+
       fork in run := true,
       fork in Test := true,
+      parallelExecution in Test := false,
+
       javaOptions := {
         (javaOptions in `dotty-compiler`).value
       },
@@ -520,14 +526,61 @@ object DottyInjectedPlugin extends AutoPlugin {
         }
 
         (runMain in Compile).toTask(
-          s" dotty.tools.dotc.Main " + fullArgs.mkString(" ")
+          s" dotty.tools.dotc.Bench " + fullArgs.mkString(" ")
+        )
+      }.evaluated,
+
+      // set system in/out for repl
+      connectInput in run := true,
+      outputStrategy := Some(StdoutOutput),
+      repl := Def.inputTaskDyn {
+        val args: Seq[String] = spaceDelimited("<arg>").parsed
+        val dottyLib = packageAll.value("dotty-library")
+        (runMain in Compile).toTask(
+          s" dotty.tools.dotc.repl.Main -classpath $dottyLib " + args.mkString(" ")
         )
       }.evaluated,
 
       // For convenience, change the baseDirectory when running the compiler
       baseDirectory in (Compile, run) := baseDirectory.value / "..",
       // .. but not when running partest
-      baseDirectory in (Test, run) := baseDirectory.value
+      baseDirectory in (Test, run) := baseDirectory.value,
+
+      packageAll := {
+        Map(
+          "dotty-interfaces" -> (packageBin in (`dotty-interfaces`, Compile)).value,
+          "dotty-compiler" -> (packageBin in Compile).value,
+          "dotty-library" -> (packageBin in (`dotty-library-bootstrapped`, Compile)).value,
+          "dotty-compiler-test" -> (packageBin in Test).value
+        ) map { case (k, v) => (k, v.getAbsolutePath) }
+      },
+
+      lockPartestFile := {
+        // When this file is present, running `test` generates the files for
+        // partest. Otherwise it just executes the tests directly.
+        val lockDir = partestLockFile.getParentFile
+        lockDir.mkdirs
+        // Cannot have concurrent partests as they write to the same directory.
+        if (lockDir.list.size > 0)
+          throw new RuntimeException("ERROR: sbt partest: another partest is already running, pid in lock file: " + lockDir.list.toList.mkString(" "))
+        partestLockFile.createNewFile
+        partestLockFile.deleteOnExit
+      },
+      runPartestRunner <<= Def.inputTaskDyn {
+        // Magic! This is both an input task and a dynamic task. Apparently
+        // command line arguments get passed to the last task in an aliased
+        // sequence (see partest alias below), so this works.
+        val args = Def.spaceDelimited("<arg>").parsed
+        val jars = List(
+          (packageBin in Compile).value.getAbsolutePath,
+          (packageBin in (`dotty-library-bootstrapped`, Compile)).value.getAbsolutePath,
+          (packageBin in (`dotty-interfaces`, Compile)).value.getAbsolutePath
+        ) ++ getJarPaths(partestDeps.value, ivyPaths.value.ivyHome)
+        val dottyJars  =
+          s"""-dottyJars ${jars.length + 2} dotty.jar dotty-lib.jar ${jars.mkString(" ")}"""
+        // Provide the jars required on the classpath of run tests
+        runTask(Test, "dotty.partest.DPConsoleRunner", dottyJars + " " + args.mkString(" "))
+      }
     )
   
 
