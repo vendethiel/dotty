@@ -529,7 +529,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
       else toPrefix(sym.owner) + sym.name + "."
     def featureName = toPrefix(owner) + feature
     def hasImport(implicit ctx: Context): Boolean = {
-      if (ctx.importInfo == null || (ctx.importInfo.site.widen.typeSymbol ne owner)) false
+      if (ctx.importInfo == null || ctx.importInfo.sym == null || (ctx.importInfo.site.widen.typeSymbol ne owner)) false
       else if (ctx.importInfo.excluded.contains(feature)) false
       else if (ctx.importInfo.originals.contains(feature)) true
       else {

@@ -275,6 +275,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
   }
 
   protected def isOmittablePrefix(sym: Symbol): Boolean =
+    defn.DottyPredefModuleRef != null &&
     defn.UnqualifiedOwnerTypes.exists(_.symbol == sym) || isEmptyPrefix(sym)
 
   protected def isEmptyPrefix(sym: Symbol): Boolean =
