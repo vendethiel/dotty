@@ -104,7 +104,7 @@ object DottyBuild extends Build {
       addCommandAlias(
         "partest",
         ";dotty-compiler-bootstrapped/packageAll" +
-        ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
+        // ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
         ";dotty-compiler-bootstrapped/lockPartestFile" +
         ";dotty-compiler-bootstrapped/test:test" +
         ";dotty-compiler-bootstrapped/runPartestRunner"
@@ -112,7 +112,7 @@ object DottyBuild extends Build {
       addCommandAlias(
         "partest-only",
         ";dotty-compiler-bootstrapped/packageAll" +
-        ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
+        // ";dotty-compiler-bootstrapped/test:runMain dotc.build" +
         ";dotty-compiler-bootstrapped/lockPartestFile" +
         ";dotty-compiler-bootstrapped/test:test-only dotc.tests" +
         ";dotty-compiler-bootstrapped/runPartestRunner"
@@ -506,8 +506,8 @@ object DottyInjectedPlugin extends AutoPlugin {
       scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % "0.1.1-SNAPSHOT" % "component").sources(),
 
       partestDeps := Seq(scalaCompiler,
-                         "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-                         "org.scala-lang" % "scala-library" % scalaVersion.value % "test"),
+                         "org.scala-lang" % "scala-reflect" % "2.11.5",
+                         "org.scala-lang" % "scala-library" % "2.11.5" % "test"),
 
       fork in run := true,
       fork in Test := true,
