@@ -55,6 +55,14 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
   val openClasses = new mutable.LinkedHashMap[URI, List[TypeName]]
 
+  val openFiles = new mutable.LinkedHashMap[URI, SourceFile]
+
+  def sourcePosition(uri: URI, pos: lsapi.Position): SourcePosition = {
+    val source = openFiles(uri) // might throw exception
+    val p = Positions.Position(source.lineToOffset(pos.getLine) + pos.getCharacter)
+    new SourcePosition(source, p)
+  }
+
   override def exit(): Unit = {
     println("exit")
     System.exit(0)
@@ -180,6 +188,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       val diagnostics = new mutable.ArrayBuffer[DiagnosticImpl]
       val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
 
+      // TODO: Do this for didOpen too ? (So move to driver.run like openFiles)
       openClasses(uri) = driver.topLevelClassNames(tree)
 
       val p = new PublishDiagnosticsParamsImpl
@@ -188,7 +197,13 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
       publishDiagnostics.accept(p)
     }
-    override def didClose(params: DidCloseTextDocumentParams): Unit = {}
+    override def didClose(params: DidCloseTextDocumentParams): Unit = {
+      val document = params.getTextDocument
+      val uri = URI.create(document.getUri)
+
+      openClasses.remove(uri)
+      openFiles.remove(uri)
+    }
     override def didOpen(params: DidOpenTextDocumentParams): Unit = {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
@@ -568,7 +583,9 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
       writer.write(sourceCode)
       writer.close()
       val encoding = Codec.UTF8 // Not sure how to get the encoding from the client
-      run.compileSources(List(new SourceFile(virtualFile, encoding)))
+      val sourceFile = new SourceFile(virtualFile, encoding)
+      server.openFiles(uri) = sourceFile
+      run.compileSources(List(sourceFile))
       run.printSummary()
       run.units.head.tpdTree
     }
@@ -622,13 +639,6 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
 }
 object ScalaLanguageServer {
   import ast.tpd._
-
-  def sourcePosition(uri: URI, pos: lsapi.Position): SourcePosition = {
-    val file = AbstractFile.getURL(uri.toURL) // FIXME: wrong, need version in memory
-    val source = new SourceFile(file, Codec.UTF8)
-    val p = Positions.Position(source.lineToOffset(pos.getLine) + pos.getCharacter)
-    new SourcePosition(source, p)
-  }
 
   def range(p: SourcePosition): RangeImpl = {
     val start = new PositionImpl
