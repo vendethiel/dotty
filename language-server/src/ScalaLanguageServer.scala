@@ -75,7 +75,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   }
   override def shutdown(): CompletableFuture[Object] = {
     println("shutdown")
-    CompletableFuture.completedFuture(null)
+    CompletableFuture.completedFuture(new Object)
   }
 
   def computeAsync[R](code: CancelChecker => R): CompletableFuture[R] =
