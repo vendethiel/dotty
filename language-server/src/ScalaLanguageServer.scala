@@ -4,6 +4,7 @@ import java.util.function._
 import java.util.concurrent.CompletableFuture
 
 import org.eclipse.lsp4j
+import org.eclipse.lsp4j.jsonrpc.{CancelChecker, CompletableFutures}
 import org.eclipse.lsp4j._
 import org.eclipse.lsp4j.services._
 
@@ -24,6 +25,9 @@ import dotty.tools.dotc.reporting.diagnostic._
 
 import scala.collection._
 import scala.collection.JavaConverters._
+
+// Not needed with Scala 2.12
+import scala.compat.java8.FunctionConverters._
 
 import dotty.tools.FatalError
 import dotty.tools.io._
@@ -74,7 +78,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     CompletableFuture.completedFuture(null)
   }
 
-  override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = {
+  def computeAsync[R](code: CancelChecker => R): CompletableFuture[R] =
+    CompletableFutures.computeAsync(code.asJava)
+
+  override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
+    cancelToken.checkCanceled()
+
     val result = new InitializeResult
     val c = new ServerCapabilities
 
@@ -106,78 +115,37 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     //c.setDocumentSymbolProvider(true)
     result.setCapabilities(c)
 
-    CompletableFuture.completedFuture(result)
+    result
   }
 
   override def getTextDocumentService(): TextDocumentService = new TextDocumentService {
-    override def codeAction(params: CodeActionParams): CompletableFuture[jList[_ <: Command]] = {
+    override def codeAction(params: CodeActionParams): CompletableFuture[jList[_ <: Command]] = computeAsync { cancelToken =>
+      cancelToken.checkCanceled()
+
       val l = params.getContext.getDiagnostics.asScala.flatMap{d =>
         actions.get(d)
       }
-      CompletableFuture.completedFuture(l.asJava)
+      l.asJava
     }
-    override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = {
-      // val cl = new mutable.ArrayBuffer[CodeLens]
-
-
-      // println("rewrites " + rewrites.patched)
-      // rewrites.patched.values.toList match {
-      //   case List(value) =>
-      //     val patches = value.pbuf.toList.sortBy(_.pos.start)
-      //     println("patches: " + patches)
-      //     for (patch <- patches) {
-      //       val c = new CodeLens
-      //       val r = range(new SourcePosition(value.source, patch.pos))
-      //       c.setRange(r)
-      //       val command = new Command
-      //       command.setTitle("Rewrite")
-      //       //command.setCommand(s"Replace ${patch.replacement}")
-      //       command.setCommand("ext")
-      //       c.setCommand(command)
-      //       cl += c
-      //     }
-      //   case _ =>
-      // }
-      /*
-      {
-        val start = new Position
-        start.setLine(2)
-        start.setCharacter(1)
-        val end = new Position
-        end.setLine(2)
-        end.setCharacter(10)
-
-        val range = new Range
-        range.setStart(start)
-        range.setEnd(end)
-        c.setRange(range)
-      }
-
-      {
-        val command = new Command
-        command.setTitle("Hello")
-        command.setCommand("Actual command")
-        c.setCommand(command)
-      }*/
-
-      //CompletableFuture.completedFuture(java.util.Arrays.asList(c))
-      null//CompletableFuture.completedFuture(java.util.Arrays.asList(cl: _*))
-    }
+    override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = null
     override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = null
-    override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = {
+    override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+      cancelToken.checkCanceled()
+
       val trees = driver.trees
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val tp = driver.typeOf(trees, pos)
       //println("XXPATHS: " + paths.map(_.show))
       println("Looking for: " + tp)
       if (tp eq NoType)
-        return CompletableFuture.completedFuture(List().asJava)
-
-      val defPos = driver.findDef(trees, tp)
-      if (defPos.pos == Positions.NoPosition)
-        return CompletableFuture.completedFuture(List().asJava)
-
-      CompletableFuture.completedFuture(List(location(defPos)).asJava)
+        List[Location]().asJava
+      else {
+        val defPos = driver.findDef(trees, tp)
+        if (defPos.pos == Positions.NoPosition)
+          List[Location]().asJava
+        else
+          List(location(defPos)).asJava
+      }
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -246,7 +214,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def rangeFormatting(params: DocumentRangeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
-    override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = {
+    override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+      cancelToken.checkCanceled()
+
       val trees = driver.trees
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
@@ -255,9 +225,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       println("Find all references to " + tp)
       val poss = driver.typeReferences(trees, tp, params.getContext.isIncludeDeclaration)
       val locs = poss.map(location)
-      CompletableFuture.completedFuture(locs.asJava)
+      locs.asJava
     }
-    override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = {
+    override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = computeAsync { cancelToken =>
+      cancelToken.checkCanceled()
+
       val trees = driver.trees
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
@@ -271,7 +243,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val w = new WorkspaceEdit
       w.setChanges(changes.asJava)
-      CompletableFuture.completedFuture(w)
+      w
     }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
@@ -281,23 +253,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   override def getWorkspaceService(): WorkspaceService = new WorkspaceService {
     override def didChangeConfiguration(params: DidChangeConfigurationParams): Unit = {}
     override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = {}
-    override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = {
-      /*
+    override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
+      cancelToken.checkCanceled()
+
       val trees = driver.trees
-
-      val syms = driver.symbolInfos(trees)
-
-      CompletableFuture.completedFuture(syms.asJava)
-      */
-
-      CompletableFuture.supplyAsync(new Supplier[jList[_ <: SymbolInformation]] {
-        override def get = {
-          //List().asJava
-          val trees = driver.trees
-          val syms = driver.symbolInfos(trees, params.getQuery)
-          syms.asJava
-        }
-      })
+      val syms = driver.symbolInfos(trees, params.getQuery)
+      syms.asJava
     }
   }
 }
