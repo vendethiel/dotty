@@ -750,10 +750,10 @@ object DottyInjectedPlugin extends AutoPlugin {
       // fork so that the shutdown hook in Main is run when we ctrl+c a run
       // (you need to have `cancelable in Global := true` in your global sbt config to ctrl+c a run)
       fork in run := true,
+      resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
-        "io.typefox.lsapi" % "io.typefox.lsapi" % "0.3.0",
-        "io.typefox.lsapi" % "io.typefox.lsapi.services" % "0.3.0",
-        "io.typefox.lsapi" % "io.typefox.lsapi.annotations" % "0.3.0"
+        "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.1.0-SNAPSHOT",
+        "org.eclipse.lsp4j" % "org.eclipse.lsp4j.annotations" % "0.1.0-SNAPSHOT"
       ),
       javaOptions := (javaOptions in `dotty-compiler`).value
     )
