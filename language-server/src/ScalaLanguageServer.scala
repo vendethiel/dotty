@@ -3,11 +3,9 @@ import java.nio.file._
 import java.util.function._
 import java.util.concurrent.CompletableFuture
 
-import io.typefox.lsapi
-import io.typefox.lsapi._
-import io.typefox.lsapi.impl._
-import io.typefox.lsapi.services._
-import io.typefox.lsapi.annotations._
+import org.eclipse.lsp4j
+import org.eclipse.lsp4j._
+import org.eclipse.lsp4j.services._
 
 import java.util.{List => jList}
 import java.util.ArrayList
@@ -39,16 +37,16 @@ import core.Decorators._
 import ast.Trees._
 
 
-class ScalaLanguageServer extends LanguageServer { thisServer =>
+class ScalaLanguageServer extends LanguageServer with LanguageClientAware { thisServer =>
   import ast.tpd._
 
   import ScalaLanguageServer._
   val driver = new ServerDriver(this)
 
-  var publishDiagnostics: Consumer[PublishDiagnosticsParams] = _
+  var publishDiagnostics: PublishDiagnosticsParams => Unit = _
   var rewrites: dotty.tools.dotc.rewrite.Rewrites = _
 
-  val actions = new mutable.LinkedHashMap[io.typefox.lsapi.Diagnostic, Command]
+  val actions = new mutable.LinkedHashMap[org.eclipse.lsp4j.Diagnostic, Command]
 
   var classPath: String = _
   var target: String = _
@@ -57,25 +55,28 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
   val openFiles = new mutable.LinkedHashMap[URI, SourceFile]
 
-  def sourcePosition(uri: URI, pos: lsapi.Position): SourcePosition = {
+  def sourcePosition(uri: URI, pos: lsp4j.Position): SourcePosition = {
     val source = openFiles(uri) // might throw exception
     val p = Positions.Position(source.lineToOffset(pos.getLine) + pos.getCharacter)
     new SourcePosition(source, p)
+  }
+
+  override def connect(client: LanguageClient): Unit = {
+    publishDiagnostics = client.publishDiagnostics _
   }
 
   override def exit(): Unit = {
     println("exit")
     System.exit(0)
   }
-  override def shutdown(): Unit = {
+  override def shutdown(): CompletableFuture[Object] = {
     println("shutdown")
+    CompletableFuture.completedFuture(null)
   }
 
-  override def onTelemetryEvent(consumer: Consumer[Object]): Unit = {}
-
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = {
-    val result = new InitializeResultImpl
-    val c = new ServerCapabilitiesImpl
+    val result = new InitializeResult
+    val c = new ServerCapabilities
 
     val ensime = scala.io.Source.fromURL("file://" + params.getRootPath + "/.ensime").mkString
 
@@ -93,10 +94,11 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
 
     c.setDefinitionProvider(true)
-    // val clOptions = new CodeLensOptionsImpl
+    // val clOptions = new CodeLensOptions
     // clOptions.setResolveProvider(true)
     // c.setCodeLensProvider(clOptions)
-    c.setCompletionProvider(new CompletionOptionsImpl)
+    c.setCompletionProvider(new CompletionOptions)
+    c.setRenameProvider(true)
     c.setHoverProvider(true)
     c.setCodeActionProvider(true)
     c.setWorkspaceSymbolProvider(true)
@@ -115,7 +117,7 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       CompletableFuture.completedFuture(l.asJava)
     }
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = {
-      // val cl = new mutable.ArrayBuffer[CodeLensImpl]
+      // val cl = new mutable.ArrayBuffer[CodeLens]
 
 
       // println("rewrites " + rewrites.patched)
@@ -124,10 +126,10 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       //     val patches = value.pbuf.toList.sortBy(_.pos.start)
       //     println("patches: " + patches)
       //     for (patch <- patches) {
-      //       val c = new CodeLensImpl
+      //       val c = new CodeLens
       //       val r = range(new SourcePosition(value.source, patch.pos))
       //       c.setRange(r)
-      //       val command = new CommandImpl
+      //       val command = new Command
       //       command.setTitle("Rewrite")
       //       //command.setCommand(s"Replace ${patch.replacement}")
       //       command.setCommand("ext")
@@ -138,21 +140,21 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       // }
       /*
       {
-        val start = new PositionImpl
+        val start = new Position
         start.setLine(2)
         start.setCharacter(1)
-        val end = new PositionImpl
+        val end = new Position
         end.setLine(2)
         end.setCharacter(10)
 
-        val range = new RangeImpl
+        val range = new Range
         range.setStart(start)
         range.setEnd(end)
         c.setRange(range)
       }
 
       {
-        val command = new CommandImpl
+        val command = new Command
         command.setTitle("Hello")
         command.setCommand("Actual command")
         c.setCommand(command)
@@ -185,17 +187,17 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       assert(change.getRange == null, "TextDocumentSyncKind.Incremental support is not implemented")
       val text = change.getText
 
-      val diagnostics = new mutable.ArrayBuffer[DiagnosticImpl]
+      val diagnostics = new mutable.ArrayBuffer[lsp4j.Diagnostic]
       val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
 
       // TODO: Do this for didOpen too ? (So move to driver.run like openFiles)
       openClasses(uri) = driver.topLevelClassNames(tree)
 
-      val p = new PublishDiagnosticsParamsImpl
+      val p = new PublishDiagnosticsParams
       p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
       p.setUri(document.getUri)
 
-      publishDiagnostics.accept(p)
+      publishDiagnostics(p)
     }
     override def didClose(params: DidCloseTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -213,19 +215,19 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
       //.setReporter(new ServerReporter)
 
-      val diagnostics = new mutable.ArrayBuffer[DiagnosticImpl]
+      val diagnostics = new mutable.ArrayBuffer[lsp4j.Diagnostic]
       val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
 
       openClasses(uri) = driver.topLevelClassNames(tree)
 
-      val p = new PublishDiagnosticsParamsImpl
+      val p = new PublishDiagnosticsParams
       p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
       p.setUri(document.getUri)
 
-      publishDiagnostics.accept(p)
+      publishDiagnostics(p)
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
-    override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[DocumentHighlight] = null
+    override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = {
@@ -235,16 +237,13 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
       val tp = driver.typeOf(driver.trees, pos)
       println("hover: " + tp.show)
 
-      val h = new HoverImpl
-      val str = new MarkedStringImpl
-      str.setValue(tp.widenTermRefExpr.show.toString)
+      val h = new Hover
+      val str = tp.widenTermRefExpr.show.toString
       h.setContents(List(str).asJava)
       //h.setRange()
       CompletableFuture.completedFuture(h)
     }
-    override def onPublishDiagnostics(callback: Consumer[PublishDiagnosticsParams]): Unit = {
-      publishDiagnostics = callback
-    }
+
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def rangeFormatting(params: DocumentRangeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = {
@@ -268,9 +267,9 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
 
       val name = params.getNewName
 
-      val changes = new mutable.HashMap[String, jList[TextEditImpl]]
+      val changes = new mutable.HashMap[String, jList[TextEdit]]
 
-      val w = new WorkspaceEditImpl
+      val w = new WorkspaceEdit
       w.setChanges(changes.asJava)
       CompletableFuture.completedFuture(w)
     }
@@ -279,14 +278,8 @@ class ScalaLanguageServer extends LanguageServer { thisServer =>
     override def signatureHelp(params: TextDocumentPositionParams): CompletableFuture[SignatureHelp] = null
   }
 
-  override def getWindowService(): WindowService = new WindowService {
-    override def onLogMessage(callback: Consumer[MessageParams]): Unit = {}
-    override def onShowMessage(callback: Consumer[MessageParams]): Unit = {}
-    override def onShowMessageRequest(callback: Consumer[ShowMessageRequestParams]): Unit = {}
-  }
-
   override def getWorkspaceService(): WorkspaceService = new WorkspaceService {
-    override def didChangeConfiguraton(params: DidChangeConfigurationParams): Unit = {}
+    override def didChangeConfiguration(params: DidChangeConfigurationParams): Unit = {}
     override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = {}
     override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = {
       /*
@@ -598,13 +591,13 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
   }
 }
 
-class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuffer[DiagnosticImpl]) extends Reporter
+class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuffer[lsp4j.Diagnostic]) extends Reporter
     with UniqueMessagePositions
     with HideNonSensicalMessages {
   def doReport(cont: MessageContainer)(implicit ctx: Context): Unit = cont match {
     case _ =>
       println("doReport: " + cont)
-      val di = new DiagnosticImpl
+      val di = new lsp4j.Diagnostic
 
       di.setSeverity(severity(cont.level))
       if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
@@ -615,7 +608,7 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
 
       cont.patch match {
         case Some(patch) =>
-          val c = new CommandImpl
+          val c = new Command
           c.setTitle("Rewrite")
           val uri = cont.pos.source.name
           val r = ScalaLanguageServer.range(new SourcePosition(cont.pos.source, patch.pos))
@@ -629,7 +622,7 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
       // p.setUri(cont.pos.source.file.name)
 
       //println("publish: " + p)
-      // server.publishDiagnostics.accept(p)
+      // server.publishDiagnostics(p)
   }
   private def severity(level: Int): DiagnosticSeverity = level match {
     case interfaces.Diagnostic.INFO => DiagnosticSeverity.Information
@@ -640,15 +633,15 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
 object ScalaLanguageServer {
   import ast.tpd._
 
-  def range(p: SourcePosition): RangeImpl = {
-    val start = new PositionImpl
+  def range(p: SourcePosition): Range = {
+    val start = new Position
     start.setLine(p.startLine)
     start.setCharacter(p.startColumn)
-    val end = new PositionImpl
+    val end = new Position
     end.setLine(p.endLine)
     end.setCharacter(p.endColumn)
 
-    val range = new RangeImpl
+    val range = new Range
     range.setStart(start)
     range.setEnd(end)
     range
@@ -656,7 +649,7 @@ object ScalaLanguageServer {
   def toUri(source: SourceFile) = Paths.get(source.file.path).toUri
 
   def location(p: SourcePosition) = {
-    val l = new LocationImpl
+    val l = new Location
     l.setUri(toUri(p.source).toString)
     l.setRange(range(p))
     l
@@ -694,7 +687,7 @@ object ScalaLanguageServer {
   def symbolInfo(sourceFile: SourceFile, t: Tree)(implicit ctx: Context) = {
     assert(t.pos.exists)
     val sym = t.symbol
-    val s = new SymbolInformationImpl
+    val s = new SymbolInformation
     s.setName(sym.name.toString)
     s.setKind(symbolKind(sym))
     s.setLocation(location(new SourcePosition(sourceFile, t.pos)))
