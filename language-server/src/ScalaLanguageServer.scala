@@ -228,16 +228,22 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val tp = driver.typeOf(trees, pos)
       implicit val ctx: Context = driver.ctx
-      val sym = tp.asInstanceOf[NamedType].symbol
+      val sym = tp match {
+        case tp: NamedType => tp.symbol
+        case _ => NoSymbol
+      }
 
-      val newName = params.getNewName
+      if (sym eq NoSymbol)
+        new WorkspaceEdit()
+      else {
+        val newName = params.getNewName
 
-      val poss = driver.typeReferences(trees, tp, includeDeclaration = true)
+        val poss = driver.typeReferences(trees, tp, includeDeclaration = true)
 
-      val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos =>  new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
-      println("changes: " + changes)
+        val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
 
-      new WorkspaceEdit(changes.asJava)
+        new WorkspaceEdit(changes.asJava)
+      }
     }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
@@ -587,8 +593,11 @@ object ScalaLanguageServer {
   import ast.tpd._
 
   def nameRange(p: SourcePosition, nameLength: Int): Range = {
-    val beginName = p.pos.point
-    val endName = beginName + nameLength
+    val (beginName, endName) =
+      if (p.pos.isSynthetic)
+        (p.pos.end - nameLength, p.pos.end)
+      else
+        (p.pos.point, p.pos.point + nameLength)
 
     val start = new Position
     start.setLine(p.source.offsetToLine(beginName))
