@@ -85,8 +85,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     }.asJava)
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
-    val result = new InitializeResult
-    val c = new ServerCapabilities
 
     val ensime = scala.io.Source.fromURL("file://" + params.getRootPath + "/.ensime").mkString
 
@@ -101,22 +99,16 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     println("classPath: " + classPath)
     println("target: " + target)
 
+    val c = new ServerCapabilities
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
-
     c.setDefinitionProvider(true)
-    // val clOptions = new CodeLensOptions
-    // clOptions.setResolveProvider(true)
-    // c.setCodeLensProvider(clOptions)
-    // c.setCompletionProvider(new CompletionOptions)
     c.setRenameProvider(true)
     c.setHoverProvider(true)
     c.setCodeActionProvider(true)
     c.setWorkspaceSymbolProvider(true)
     c.setReferencesProvider(true)
-    //c.setDocumentSymbolProvider(true)
-    result.setCapabilities(c)
 
-    result
+    new InitializeResult(c)
   }
 
   override def getTextDocumentService(): TextDocumentService = new TextDocumentService {
@@ -158,11 +150,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       // TODO: Do this for didOpen too ? (So move to driver.run like openFiles)
       openClasses(uri) = driver.topLevelClassNames(tree)
 
-      val p = new PublishDiagnosticsParams
-      p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
-      p.setUri(document.getUri)
-
-      publishDiagnostics(p)
+      publishDiagnostics(new PublishDiagnosticsParams(
+        document.getUri,
+        java.util.Arrays.asList(diagnostics.toSeq: _*)))
     }
     override def didClose(params: DidCloseTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -185,28 +175,23 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       openClasses(uri) = driver.topLevelClassNames(tree)
 
-      val p = new PublishDiagnosticsParams
-      p.setDiagnostics(java.util.Arrays.asList(diagnostics.toSeq: _*))
-      p.setUri(document.getUri)
-
-      publishDiagnostics(p)
+      publishDiagnostics(new PublishDiagnosticsParams(
+        document.getUri,
+        java.util.Arrays.asList(diagnostics.toSeq: _*)))
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
-    override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = {
+    override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
       implicit val ctx: Context = driver.ctx
 
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val tp = driver.typeOf(driver.trees, pos)
       println("hover: " + tp.show)
 
-      val h = new Hover
       val str = tp.widenTermRefExpr.show.toString
-      h.setContents(List(str).asJava)
-      //h.setRange()
-      CompletableFuture.completedFuture(h)
+      new Hover(List(str).asJava, null)
     }
 
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
@@ -216,8 +201,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
       val tp = driver.typeOf(trees, pos)
-
       println("Find all references to " + tp)
+
       val poss = driver.typeReferences(trees, tp, params.getContext.isIncludeDeclaration)
       val locs = poss.map(location)
       locs.asJava
@@ -555,9 +540,7 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
     with HideNonSensicalMessages {
   def doReport(cont: MessageContainer)(implicit ctx: Context): Unit = cont match {
     case _ =>
-      println("doReport: " + cont)
       val di = new lsp4j.Diagnostic
-
       di.setSeverity(severity(cont.level))
       if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
       di.setCode("0")
@@ -599,39 +582,22 @@ object ScalaLanguageServer {
       else
         (p.pos.point, p.pos.point + nameLength)
 
-    val start = new Position
-    start.setLine(p.source.offsetToLine(beginName))
-    start.setCharacter(p.source.column(beginName))
-    val end = new Position
-    end.setLine(p.source.offsetToLine(endName))
-    end.setCharacter(p.source.column(endName))
-
-    val range = new Range
-    range.setStart(start)
-    range.setEnd(end)
-    range
+    new Range(
+      new Position(p.source.offsetToLine(beginName), p.source.column(beginName)),
+      new Position(p.source.offsetToLine(endName), p.source.column(endName))
+    )
   }
-  def range(p: SourcePosition): Range = {
-    val start = new Position
-    start.setLine(p.startLine)
-    start.setCharacter(p.startColumn)
-    val end = new Position
-    end.setLine(p.endLine)
-    end.setCharacter(p.endColumn)
 
-    val range = new Range
-    range.setStart(start)
-    range.setEnd(end)
-    range
-  }
+  def range(p: SourcePosition): Range =
+    new Range(
+      new Position(p.startLine, p.startColumn),
+      new Position(p.endLine, p.endColumn)
+    )
+
   def toUri(source: SourceFile) = Paths.get(source.file.path).toUri
 
-  def location(p: SourcePosition) = {
-    val l = new Location
-    l.setUri(toUri(p.source).toString)
-    l.setRange(range(p))
-    l
-  }
+  def location(p: SourcePosition) =
+    new Location(toUri(p.source).toString, range(p))
 //     File = 1,
 //     Module = 2,
 //     Namespace = 3,
