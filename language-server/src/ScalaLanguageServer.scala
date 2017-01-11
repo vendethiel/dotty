@@ -107,7 +107,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     // val clOptions = new CodeLensOptions
     // clOptions.setResolveProvider(true)
     // c.setCodeLensProvider(clOptions)
-    c.setCompletionProvider(new CompletionOptions)
+    // c.setCompletionProvider(new CompletionOptions)
     c.setRenameProvider(true)
     c.setHoverProvider(true)
     c.setCodeActionProvider(true)
