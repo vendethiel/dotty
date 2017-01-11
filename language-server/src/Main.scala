@@ -1,5 +1,6 @@
 import java.util.function.Consumer
 
+import java.io._
 import java.net._
 
 import org.eclipse.lsp4j._
@@ -27,6 +28,7 @@ object Main {
     //val in = System.in
     //val out = System.out
 
+    // val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new PrintWriter(System.err, true))
     val launcher = LSPLauncher.createServerLauncher(server, in, out)
     val client = launcher.getRemoteProxy()
     server.connect(client)
