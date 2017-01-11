@@ -230,13 +230,14 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       implicit val ctx: Context = driver.ctx
       val sym = tp.asInstanceOf[NamedType].symbol
 
-      val name = params.getNewName
+      val newName = params.getNewName
 
-      val changes = new mutable.HashMap[String, jList[TextEdit]]
+      val poss = driver.typeReferences(trees, tp, includeDeclaration = true)
 
-      val w = new WorkspaceEdit
-      w.setChanges(changes.asJava)
-      w
+      val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos =>  new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
+      println("changes: " + changes)
+
+      new WorkspaceEdit(changes.asJava)
     }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
@@ -585,6 +586,22 @@ class ServerReporter(server: ScalaLanguageServer, diagnostics: mutable.ArrayBuff
 object ScalaLanguageServer {
   import ast.tpd._
 
+  def nameRange(p: SourcePosition, nameLength: Int): Range = {
+    val beginName = p.pos.point
+    val endName = beginName + nameLength
+
+    val start = new Position
+    start.setLine(p.source.offsetToLine(beginName))
+    start.setCharacter(p.source.column(beginName))
+    val end = new Position
+    end.setLine(p.source.offsetToLine(endName))
+    end.setCharacter(p.source.column(endName))
+
+    val range = new Range
+    range.setStart(start)
+    range.setEnd(end)
+    range
+  }
   def range(p: SourcePosition): Range = {
     val start = new Position
     start.setLine(p.startLine)
