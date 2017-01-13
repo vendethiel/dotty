@@ -270,15 +270,13 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
 
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
-      val trees = driver.trees
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
-      val tp = driver.typeOf(trees, pos)
-      println("Find all references to " + tp)
+      val trees = driver.trees
+      val sym = driver.symbolOf(trees, pos) 
+      val refs = Interactive.references(sym, params.getContext.isIncludeDeclaration, trees)(driver.ctx)
 
-      val poss = driver.typeReferences(trees, tp, params.getContext.isIncludeDeclaration)
-      val locs = poss.map(location)
-      locs.asJava
+      refs.map(location).asJava
     }
     override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = computeAsync { cancelToken =>
       val trees = driver.trees
