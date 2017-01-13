@@ -107,6 +107,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     c.setCodeActionProvider(true)
     c.setWorkspaceSymbolProvider(true)
     c.setReferencesProvider(true)
+    c.setCompletionProvider(new CompletionOptions(
+      /* resolveProvider = */ false,
+      /* triggerCharacters = */ List(".").asJava))
 
     new InitializeResult(c)
   }
@@ -119,7 +122,50 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       l.asJava
     }
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = null
-    override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = null
+    // FIXME: share code with messages.NotAMember
+    override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = computeAsync { cancelToken =>
+      val trees = driver.trees
+      val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      implicit val ctx: Context = driver.ctx
+
+      // Dup with typeOf
+      val tree = trees.filter({ case (source, t) =>
+        source == pos.source && {
+          t.pos.contains(pos.pos)
+        }}).head._2
+      val paths = ast.NavigateAST.pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
+
+      val boundary = driver.enclosingSym(paths)
+
+      println("paths: " + paths.map(x => (x.show, x.tpe.show)))
+      val decls = paths.head match {
+        case Select(qual, _) =>
+          qual.tpe.accessibleMembers(boundary).filter(!_.symbol.isConstructor)
+        case _ =>
+          // FIXME: Get all decls in current scope
+          boundary.enclosingClass match {
+            case csym: ClassSymbol =>
+              val classRef = csym.classInfo.typeRef
+              println("##boundary: " + boundary)
+              val sb = new StringBuffer
+              val d = classRef.accessibleMembers(boundary, whyNot = sb).filter(!_.symbol.isConstructor)
+              println("WHY NOT: " + sb)
+              d
+            case _ =>
+              Seq()
+          }
+      }
+
+      val items = decls.map({ decl =>
+        val item = new CompletionItem
+        item.setLabel(decl.symbol.name.show.toString)
+        item.setDetail(decl.info.widenTermRefExpr.show.toString)
+        item.setKind(completionItemKind(decl.symbol))
+        item
+      }).toList
+
+      new CompletionList(/*isIncomplete = */ false, items.asJava)
+    }
     override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
       val trees = driver.trees
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
@@ -182,7 +228,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
-    override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
       implicit val ctx: Context = driver.ctx
 
@@ -194,8 +239,10 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       new Hover(List(str).asJava, null)
     }
 
-    override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
+    override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
     override def rangeFormatting(params: DocumentRangeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
+    override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
+
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
       val trees = driver.trees
       val pos = sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
@@ -358,6 +405,12 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
       extract.traverse(tree)
     }
     syms.toList
+  }
+
+  def enclosingSym(paths: List[Tree]): Symbol = {
+    val sym = paths.dropWhile(!_.symbol.exists).head.symbol
+    if (sym.isLocalDummy) sym.owner
+    else sym
   }
 
   def findDef(trees: List[(SourceFile, Tree)], tp: Type): SourcePosition = {
@@ -598,24 +651,7 @@ object ScalaLanguageServer {
 
   def location(p: SourcePosition) =
     new Location(toUri(p.source).toString, range(p))
-//     File = 1,
-//     Module = 2,
-//     Namespace = 3,
-//     Package = 4,
-//     Class = 5,
-//     Method = 6,
-//     Property = 7,
-//     Field = 8,
-//     Constructor = 9,
-//     Enum = 10,
-//     Interface = 11,
-//     Function = 12,
-//     Variable = 13,
-//     Constant = 14,
-//     String = 15,
-//     Number = 16,
-//     Boolean = 17,
-//     Array = 18,
+
   def symbolKind(sym: Symbol)(implicit ctx: Context) =
     if (sym.is(Package))
       SymbolKind.Package
@@ -625,18 +661,34 @@ object ScalaLanguageServer {
       SymbolKind.Class
     else if (sym.is(Mutable))
       SymbolKind.Variable
+    else if (sym.is(Method))
+      SymbolKind.Method
     else
       SymbolKind.Field
+
+  def completionItemKind(sym: Symbol)(implicit ctx: Context) =
+    if (sym.is(Package))
+      CompletionItemKind.Module // No CompletionItemKind.Package
+    else if (sym.isConstructor)
+      CompletionItemKind.Constructor
+    else if (sym.isClass)
+      CompletionItemKind.Class
+    else if (sym.is(Mutable))
+      CompletionItemKind.Variable
+    else if (sym.is(Method))
+      CompletionItemKind.Method
+    else
+      CompletionItemKind.Field
 
   def symbolInfo(sourceFile: SourceFile, t: Tree)(implicit ctx: Context) = {
     assert(t.pos.exists)
     val sym = t.symbol
     val s = new SymbolInformation
-    s.setName(sym.name.toString)
+    s.setName(sym.name.show.toString)
     s.setKind(symbolKind(sym))
     s.setLocation(location(new SourcePosition(sourceFile, t.pos)))
     if (sym.owner.exists && !sym.owner.isEmptyPackage)
-      s.setContainerName(sym.owner.name.toString)
+      s.setContainerName(sym.owner.name.show.toString)
     s
   }
 }
