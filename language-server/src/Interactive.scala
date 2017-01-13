@@ -53,47 +53,75 @@ object Interactive {
       !name.isConstructorName
   }
 
-  def typeOf(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Type = {
-    val tree = trees.filter({ case SourceTree(source, t) =>
+  /** The reverse path to the node that closest encloses position `spos`,
+   *  or `Nil` if no such path exists. If a non-empty path is returned it starts with
+   *  the tree closest enclosing `pos` and ends with an element of `trees`.
+   */
+  def pathTo(spos: SourcePosition, trees: List[SourceTree](implicit ctx: Context): List[Tree] =
+    trees.find({ case SourceTree(source, t) =>
       source == spos.source && t.pos.contains(spos.pos)
-      }).head.tree
-    val paths = pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
-    val t = paths.head
-    paths.head.tpe
+    }) match {
+      case Some(tree) =>
+        // FIXME: We shouldn't need a cast. Change NavigateAST.pathTo to return a List of Tree.
+        // We assume that typed trees only contain typed trees but this is incorrect in two
+        // cases currently: `Super` and `This` have `untpd.Ident` members, if we could
+        // replace those by typed members it would avoid complicating the Interactive API.
+        pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
+      case _ =>
+        Nil
+    }
+
+   /** The type of the closest enclosing tree containing position `spos`.
+    *
+    *  If that type is `NoType` we return `None`, except if `keepGoing` is true,
+    *  then we return the type of the closest enclosing tree which does have a
+    *  type.
+    */
+  def enclosingType(spos: SourcePosition, trees: List[SourceTree], keepGoing: Boolean = false)(implicit ctx: Context): Option[Type] = {
+    val path0 = pathTo(spos, trees)
+    val path =
+      if (keepGoing)
+        path.dropWhile(_.tpe eq NoType)
+      else
+        path
+    path.headOption.flatMap(tree =>
+      if (tree.tpe ne NoType)
+        Some(tree.tpe)
+      else
+        None
+    )
   }
 
-  def symbolOf(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Symbol = {
-    val tree = trees.filter({ case SourceTree(source, t) =>
-      source == spos.source && t.pos.contains(spos.pos)
-      }).head.tree
-    val paths = pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
-    val t = paths.head
-    paths.head.symbol
-  }
-
-  def enclosingSym(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Symbol = {
-    val tree = trees.filter({ case SourceTree(source, t) =>
-      source == spos.source && {
-        t.pos.contains(spos.pos)
-      }}).head.tree
-    val paths = pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
-
-    val sym = paths.dropWhile(!_.symbol.exists).head.symbol
-    if (sym.isLocalDummy) sym.owner
-    else sym
+  /** The symbol of the closest enclosing tree containing position `spos`.
+    *
+    *  If that symbol is `NoSymbol` we return `None`, except if `keepGoing` is true,
+    *  then we return the symbol of the closest enclosing tree which does have a
+    *  type.
+    */
+  def enclosingSymbol(spos: SourcePosition, trees: List[SourceTree], keepGoing: Boolean = false)(implicit ctx: Context): Option[Type] = {
+    val path0 = pathTo(spos, trees)
+    val path =
+      if (keepGoing)
+        path.dropWhile(_.tpe eq NoSymbol)
+      else
+        path
+    path.headOption.flatMap(tree =>
+      if (tree.tpe ne NoSymbol)
+        Some(tree.tpe)
+      else
+        None
+    )
   }
 
   def completions(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): List[Symbol] = {
-    val tree = trees.filter({ case SourceTree(source, t) =>
-      source == spos.source && {
-        t.pos.contains(spos.pos)
-      }}).head.tree
-    val paths = ast.NavigateAST.pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
+    val paths = pathTo(spos, trees)
 
-    val boundary = enclosingSym(spos, trees)
+    val sourceTree = paths.last
+    val boundary = enclosingSymbol(spos, List(paths.last), keepGoing = true)
 
     paths.head match {
       case Select(qual, _) =>
+        val boundary = enclosingSymbol(spos, sourceTree)
         completions(qual.tpe, boundary)
       case _ =>
         // FIXME: Get all decls in current scope
