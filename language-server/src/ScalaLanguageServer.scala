@@ -154,9 +154,10 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = null
     // FIXME: share code with messages.NotAMember
     override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = computeAsync { cancelToken =>
+      implicit val ctx = driver.ctx
+
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      implicit val ctx: Context = driver.ctx
 
       val decls = Interactive.completions(spos, trees)
 
@@ -171,7 +172,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       new CompletionList(/*isIncomplete = */ false, items.asJava)
     }
     override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
-      implicit val ctx: Context = driver.ctx
+      implicit val ctx = driver.ctx
 
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
@@ -218,7 +219,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
-      implicit val ctx: Context = driver.ctx
+      implicit val ctx = driver.ctx
 
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val tp = Interactive.typeOf(pos, driver.trees)
@@ -233,20 +234,22 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
 
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+      implicit val ctx = driver.ctx
+
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
       val trees = driver.trees
-      implicit val ctx = driver.ctx
       val sym = Interactive.symbolOf(pos, trees) 
       val refs = Interactive.references(sym, params.getContext.isIncludeDeclaration, trees)(driver.ctx)
 
       refs.map(location).asJava
     }
     override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = computeAsync { cancelToken =>
+      implicit val ctx = driver.ctx
+
       val trees = driver.trees
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
-      implicit val ctx = driver.ctx
 
       val sym = Interactive.symbolOf(pos, trees)
       val newName = params.getNewName
