@@ -128,6 +128,7 @@ object Interactive {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
             case t: MemberDef if t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym) =>
               poss += new SourcePosition(sourceFile, t.namePos)
+              traverseChildren(tree)
             case _ =>
               traverseChildren(tree)
           }
@@ -146,6 +147,7 @@ object Interactive {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case tree: MemberDef if tree.symbol.name.show.toString.contains(query) =>
             poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
+            traverseChildren(tree)
           case _ =>
             traverseChildren(tree)
         }
@@ -164,12 +166,12 @@ object Interactive {
     if (sym.exists) {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object extract extends TreeTraverser {
-          override def traverse(tree: Tree)(implicit ctx: Context): Unit =
+          override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
             if ((tree.symbol.eq(sym) || tree.symbol.allOverriddenSymbols.contains(sym)) &&
               (includeDeclarations || !tree.isInstanceOf[MemberDef]))
               poss += new SourcePosition(sourceFile, tree.pos)
-            else
-              traverseChildren(tree)
+            traverseChildren(tree)
+          }
         }
         extract.traverse(tree)
       }
@@ -183,11 +185,11 @@ object Interactive {
 
     trees foreach { case SourceTree(sourceFile, tree) =>
       object extract extends TreeTraverser {
-        override def traverse(t: Tree)(implicit ctx: Context): Unit =
+        override def traverse(t: Tree)(implicit ctx: Context): Unit = {
           if (tree.symbol.name.show.toString.contains(query))
             poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
-          else
-            traverseChildren(tree)
+          traverseChildren(tree)
+        }
       }
       extract.traverse(tree)
     }
