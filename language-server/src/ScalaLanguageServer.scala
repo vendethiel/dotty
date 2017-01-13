@@ -159,10 +159,10 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       implicit val ctx: Context = driver.ctx
 
       // Dup with typeOf
-      val tree = trees.filter({ case (source, t) =>
+      val tree = trees.filter({ case SourceTree(source, t) =>
         source == pos.source && {
           t.pos.contains(pos.pos)
-        }}).head._2
+        }}).head.tree
       val paths = ast.NavigateAST.pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
 
       val boundary = driver.enclosingSym(paths)
