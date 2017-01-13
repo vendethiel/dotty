@@ -55,34 +55,41 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   var classPath: String = _
   var target: String = _
 
-  def diagnostic(cont: MessageContainer): lsp4j.Diagnostic = {
-    def severity(level: Int): DiagnosticSeverity = level match {
-      case interfaces.Diagnostic.INFO => DiagnosticSeverity.Information
-      case interfaces.Diagnostic.WARNING => DiagnosticSeverity.Warning
-      case interfaces.Diagnostic.ERROR => DiagnosticSeverity.Error
+  def diagnostic(cont: MessageContainer): Option[lsp4j.Diagnostic] =
+    if (!cont.pos.exists)
+      None
+    else {
+      def severity(level: Int): DiagnosticSeverity = level match {
+        case interfaces.Diagnostic.INFO => DiagnosticSeverity.Information
+        case interfaces.Diagnostic.WARNING => DiagnosticSeverity.Warning
+        case interfaces.Diagnostic.ERROR => DiagnosticSeverity.Error
+      }
+
+      val di = new lsp4j.Diagnostic
+      di.setSeverity(severity(cont.level))
+      if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
+      di.setCode("0")
+      di.setMessage(cont.message)
+
+      if (!cont.pos.exists) {
+        println("cont: " + cont)
+      }
+
+      // if (cont.pos.exists) diagnostics += di
+
+      cont.patch match {
+        case Some(patch) =>
+          val c = new Command
+          c.setTitle("Rewrite")
+          val uri = cont.pos.source.name
+          val r = ScalaLanguageServer.range(new SourcePosition(cont.pos.source, patch.pos))
+          c.setCommand("dotty.fix")
+          c.setArguments(List[Object](uri, r, patch.replacement).asJava)
+          actions += di -> c
+        case _ =>
+      }
+      Some(di)
     }
-
-    val di = new lsp4j.Diagnostic
-    di.setSeverity(severity(cont.level))
-    if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
-    di.setCode("0")
-    di.setMessage(cont.message)
-
-    // if (cont.pos.exists) diagnostics += di
-
-    cont.patch match {
-      case Some(patch) =>
-        val c = new Command
-        c.setTitle("Rewrite")
-        val uri = cont.pos.source.name
-        val r = ScalaLanguageServer.range(new SourcePosition(cont.pos.source, patch.pos))
-        c.setCommand("dotty.fix")
-        c.setArguments(List[Object](uri, r, patch.replacement).asJava)
-        actions += di -> c
-      case _ =>
-    }
-    di
-  }
 
   override def connect(client: LanguageClient): Unit = {
     publishDiagnostics = client.publishDiagnostics _
@@ -192,20 +199,19 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      val tp = driver.typeOf(trees, pos)
-
-      val defs = definitions(spos).head
+      val tp = driver.typeOf(trees, spos)
 
       //println("XXPATHS: " + paths.map(_.show))
       println("Looking for: " + tp)
-      if (tp eq NoType)
-        List[Location]().asJava
-      else {
-        val defPos = driver.findDef(trees, tp)
-        if (defPos.pos == Positions.NoPosition)
+      tp match {
+        case tp: NamedType =>
+          val defPos = driver.findDef(trees, tp)
+          if (defPos.pos == Positions.NoPosition)
+            List[Location]().asJava
+          else
+            List(location(defPos)).asJava
+        case _ =>
           List[Location]().asJava
-        else
-          List(location(defPos)).asJava
       }
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
@@ -223,7 +229,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
-        diags.map(diagnostic).asJava))
+        diags.flatMap(diagnostic).asJava))
     }
     override def didClose(params: DidCloseTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -243,7 +249,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
-        diags.map(diagnostic).asJava))
+        diags.flatMap(diagnostic).asJava))
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
