@@ -39,6 +39,9 @@ import Flags._, Symbols._, Names._
 import core.Decorators._
 
 import ast.Trees._
+
+case class SourceTree(source: SourceFile, tree: ast.tpd.Tree)
+
 class ServerDriver(settings: List[String]) extends Driver {
   import ast.tpd._
   import ScalaLanguageServer._
@@ -69,26 +72,22 @@ class ServerDriver(settings: List[String]) extends Driver {
 
   val compiler: Compiler = new Compiler
 
-  def typeOf(trees: List[(SourceFile, Tree)], pos: SourcePosition): Type = {
+  def typeOf(trees: List[SourceTree], pos: SourcePosition): Type = {
     import ast.NavigateAST._
 
-    val tree = trees.filter({ case (source, t) =>
+    val tree = trees.filter({ case SourceTree(source, t) =>
       source == pos.source && t.pos.contains(pos.pos)
-      }).head._2
+      }).head.tree
     val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
     val t = paths.head
     paths.head.tpe
   }
 
-  private def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
+  private def tree(className: TypeName, fromSource: Boolean): Option[SourceTree] = {
     println(s"tree($className, $fromSource)")
     val clsd =
       if (className.contains('.')) ctx.base.staticRef(className)
       else ctx.definitions.EmptyPackageClass.info.decl(className)
-    def cannotUnpickle(reason: String) = {
-      println(s"class $className cannot be unpickled because $reason")
-      Nil
-    }
     clsd match {
       case clsd: ClassDenotation =>
         clsd.info // force denotation
@@ -101,7 +100,7 @@ class ServerDriver(settings: List[String]) extends Driver {
             //println("Skipping, already open from source")
             None
           } else
-            Some((sourceFile, tree))
+            Some(SourceTree(sourceFile, tree))
         } else {
           println("no tree: " + clsd)
           None
@@ -119,10 +118,10 @@ class ServerDriver(settings: List[String]) extends Driver {
       tastyClasses.flatMap(c => tree(c, fromSource = false))).toList
   }
 
-  def symbolInfos(trees: List[(SourceFile, Tree)], query: String): List[SymbolInformation] = {
+  def symbolInfos(trees: List[SourceTree], query: String): List[SymbolInformation] = {
     val syms = new mutable.ListBuffer[SymbolInformation]
 
-    trees foreach { case (sourceFile, tree) =>
+    trees foreach { case SourceTree(sourceFile, tree) =>
       object extract extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t @ TypeDef(_, tmpl : Template) =>
@@ -148,12 +147,12 @@ class ServerDriver(settings: List[String]) extends Driver {
     else sym
   }
 
-  def findDef(trees: List[(SourceFile, Tree)], tp: NamedType): SourcePosition = {
+  def findDef(trees: List[SourceTree], tp: NamedType): SourcePosition = {
     val sym = tp.symbol
 
     var pos: SourcePosition = NoSourcePosition
 
-    trees foreach { case (sourceFile, tree) =>
+    trees foreach { case SourceTree(sourceFile, tree) =>
       object finder extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t: MemberDef =>
@@ -172,7 +171,7 @@ class ServerDriver(settings: List[String]) extends Driver {
     pos
   }
 
-  def typeReferences(trees: List[(SourceFile, Tree)], tp: Type, includeDeclaration: Boolean): List[SourcePosition] = {
+  def typeReferences(trees: List[SourceTree], tp: Type, includeDeclaration: Boolean): List[SourcePosition] = {
     val sym = tp match {
       case tp: NamedType => tp.symbol
       case _ => return Nil
@@ -180,7 +179,7 @@ class ServerDriver(settings: List[String]) extends Driver {
 
     val poss = new mutable.ListBuffer[SourcePosition]
 
-    trees foreach { case (sourceFile, tree) =>
+    trees foreach { case SourceTree(sourceFile, tree) =>
       object extract extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t if t.pos.exists =>
@@ -199,49 +198,6 @@ class ServerDriver(settings: List[String]) extends Driver {
       extract.traverse(tree)
     }
     poss.toList
-  }
-
-  def references: List[SourcePosition] = {
-    val run = compiler.newRun(ctx.fresh.setReporter(new ConsoleReporter))
-    myCtx = run.runContext
-
-    val classNames = ctx.platform.classPath.classes.map(_.name.toTypeName)
-    classNames.flatMap({ className =>
-      val clsd =
-        if (className.contains('.')) ctx.base.staticRef(className)
-        else ctx.definitions.EmptyPackageClass.info.decl(className)
-      def cannotUnpickle(reason: String) = {
-        println(s"class $className cannot be unpickled because $reason")
-        Nil
-      }
-      clsd match {
-        case clsd: ClassDenotation =>
-          clsd.infoOrCompleter match {
-            case info: ClassfileLoader =>
-              info.load(clsd)
-            case _ =>
-          }
-          val tree = clsd.symbol.tree
-          if (tree != null) {
-            //println("Got tree: " + clsd)
-            val clsTrees = tree match {
-              case PackageDef(_, clss) => clss
-              case cls: TypeDef => List(cls)
-            }
-            clsTrees.flatMap({ clsTree =>
-              val sourceFile = new SourceFile(clsTree.symbol.sourceFile, Codec.UTF8)
-              val ps = positions(clsTree)
-              val sourcePoss = ps.map(p => new SourcePosition(sourceFile, p))
-              sourcePoss
-            })
-          } else {
-            //println("no tree: " + clsd)
-            Nil
-          }
-        case _ =>
-          sys.error(s"class not found: $className")
-      }
-    }).toList
   }
 
   def topLevelClassNames(tree: Tree): List[TypeName] = {
