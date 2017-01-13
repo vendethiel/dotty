@@ -57,12 +57,15 @@ class ServerDriver(settings: List[String]) extends Driver {
     new SourcePosition(source, p)
   }
 
-  var myCtx: Context = {
+  implicit def ctx: Context = myCtx
+
+  private[this] var myCtx: Context = {
     val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
     setup(settings.toArray, rootCtx)._2
   }
 
-  def newReporter: Reporter = new StoreReporter(null)
+  private[this] def newReporter: Reporter =
+    new StoreReporter(null) with UniqueMessagePositions with HideNonSensicalMessages
 
   val compiler: Compiler = new Compiler
 
