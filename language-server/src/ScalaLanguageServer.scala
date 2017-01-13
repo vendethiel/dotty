@@ -55,6 +55,34 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   var classPath: String = _
   var target: String = _
 
+  def diagnostic(cont: MessageContainer): lsp4j.Diagnostic = {
+    def severity(level: Int): DiagnosticSeverity = level match {
+      case interfaces.Diagnostic.INFO => DiagnosticSeverity.Information
+      case interfaces.Diagnostic.WARNING => DiagnosticSeverity.Warning
+      case interfaces.Diagnostic.ERROR => DiagnosticSeverity.Error
+    }
+
+    val di = new lsp4j.Diagnostic
+    di.setSeverity(severity(cont.level))
+    if (cont.pos.exists) di.setRange(ScalaLanguageServer.range(cont.pos))
+    di.setCode("0")
+    di.setMessage(cont.message)
+
+    // if (cont.pos.exists) diagnostics += di
+
+    cont.patch match {
+      case Some(patch) =>
+        val c = new Command
+        c.setTitle("Rewrite")
+        val uri = cont.pos.source.name
+        val r = ScalaLanguageServer.range(new SourcePosition(cont.pos.source, patch.pos))
+        c.setCommand("dotty.fix")
+        c.setArguments(List[Object](uri, r, patch.replacement).asJava)
+        actions += di -> c
+      case _ =>
+    }
+    di
+  }
 
   override def connect(client: LanguageClient): Unit = {
     publishDiagnostics = client.publishDiagnostics _
@@ -185,14 +213,14 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       assert(change.getRange == null, "TextDocumentSyncKind.Incremental support is not implemented")
       val text = change.getText
 
-      val diagnostics = new mutable.ArrayBuffer[lsp4j.Diagnostic]
-      val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
+      val diags = driver.run(uri, text)
+
 
       // TODO: Do this for didOpen too ? (So move to driver.run like openFiles)
 
       publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
-        java.util.Arrays.asList(diagnostics.toSeq: _*)))
+        diags.map(diagnostic).asJava))
     }
     override def didClose(params: DidCloseTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -208,14 +236,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       println("open: " + path)
       val text = params.getTextDocument.getText
 
-      //.setReporter(new ServerReporter)
-
-      val diagnostics = new mutable.ArrayBuffer[lsp4j.Diagnostic]
-      val tree = driver.run(uri, text, new ServerReporter(thisServer, diagnostics))
+      val diags = driver.run(uri, text)
 
       publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
-        java.util.Arrays.asList(diagnostics.toSeq: _*)))
+        diags.map(diagnostic).asJava))
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
