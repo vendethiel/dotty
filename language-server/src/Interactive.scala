@@ -45,7 +45,7 @@ import Positions._
 object Interactive {
   import ast.tpd._
 
-  def complete(implicit ctx: Context) = ???
+  def completions(pos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context) = ???
 
 
   def definitions(spos: SourcePosition)(implicit ctx: Context): List[SourcePosition] = ???

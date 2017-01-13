@@ -136,14 +136,14 @@ class ServerDriver(settings: List[String]) extends Driver {
       object extract extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t @ TypeDef(_, tmpl : Template) =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(new SourcePosition(sourceFile, t.pos), t.symbol)
             traverseChildren(tmpl)
           case t: TypeDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(new SourcePosition(sourceFile, t.pos), t.symbol)
           case t: DefDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(new SourcePosition(sourceFile, t.pos), t.symbol)
           case t: ValDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(new SourcePosition(sourceFile, t.pos), t.symbol)
           case _ =>
         }
       }

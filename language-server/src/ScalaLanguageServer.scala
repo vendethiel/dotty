@@ -280,24 +280,15 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val trees = driver.trees
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
-      val tp = driver.typeOf(trees, pos)
-      implicit val ctx: Context = driver.ctx
-      val sym = tp match {
-        case tp: NamedType => tp.symbol
-        case _ => NoSymbol
-      }
+      val sym = driver.symbolOf(trees, pos)
+      val newName = params.getNewName
 
-      if (sym eq NoSymbol)
-        new WorkspaceEdit()
-      else {
-        val newName = params.getNewName
+      implicit val ctx = driver.ctx
+      val poss = Interactive.references(sym, includeDeclaration = true, trees)
 
-        val poss = driver.typeReferences(trees, tp, includeDeclaration = true)
+      val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
 
-        val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
-
-        new WorkspaceEdit(changes.asJava)
-      }
+      new WorkspaceEdit(changes.asJava)
     }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
@@ -370,13 +361,11 @@ object ScalaLanguageServer {
     else
       CompletionItemKind.Field
 
-  def symbolInfo(sourceFile: SourceFile, t: Tree)(implicit ctx: Context) = {
-    assert(t.pos.exists)
-    val sym = t.symbol
+  def symbolInfo(spos: SourcePosition, sym: Symbol)(implicit ctx: Context) = {
     val s = new SymbolInformation
     s.setName(sym.name.show.toString)
     s.setKind(symbolKind(sym))
-    s.setLocation(location(new SourcePosition(sourceFile, t.pos)))
+    s.setLocation(location(spos))
     if (sym.owner.exists && !sym.owner.isEmptyPackage)
       s.setContainerName(sym.owner.name.show.toString)
     s
