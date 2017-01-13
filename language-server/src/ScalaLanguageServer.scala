@@ -225,8 +225,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val diags = driver.run(uri, text)
 
 
-      // TODO: Do this for didOpen too ? (So move to driver.run like openFiles)
-
       publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
         diags.flatMap(diagnostic).asJava))
