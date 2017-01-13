@@ -42,7 +42,7 @@ import ast.Trees._
 
 import Positions._
 
-import ast.NavigateAST._
+import ast.NavigateAST
 
 object Interactive {
   import ast.tpd._
@@ -57,71 +57,47 @@ object Interactive {
    *  or `Nil` if no such path exists. If a non-empty path is returned it starts with
    *  the tree closest enclosing `pos` and ends with an element of `trees`.
    */
-  def pathTo(spos: SourcePosition, trees: List[SourceTree](implicit ctx: Context): List[Tree] =
+  def pathTo(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): List[Tree] =
     trees.find({ case SourceTree(source, t) =>
       source == spos.source && t.pos.contains(spos.pos)
-    }) match {
-      case Some(tree) =>
-        // FIXME: We shouldn't need a cast. Change NavigateAST.pathTo to return a List of Tree.
-        // We assume that typed trees only contain typed trees but this is incorrect in two
-        // cases currently: `Super` and `This` have `untpd.Ident` members, if we could
-        // replace those by typed members it would avoid complicating the Interactive API.
-        pathTo(spos.pos, tree).asInstanceOf[List[Tree]]
-      case _ =>
-        Nil
-    }
-
-   /** The type of the closest enclosing tree containing position `spos`.
-    *
-    *  If that type is `NoType` we return `None`, except if `keepGoing` is true,
-    *  then we return the type of the closest enclosing tree which does have a
-    *  type.
-    */
-  def enclosingType(spos: SourcePosition, trees: List[SourceTree], keepGoing: Boolean = false)(implicit ctx: Context): Option[Type] = {
-    val path0 = pathTo(spos, trees)
-    val path =
-      if (keepGoing)
-        path.dropWhile(_.tpe eq NoType)
-      else
-        path
-    path.headOption.flatMap(tree =>
-      if (tree.tpe ne NoType)
-        Some(tree.tpe)
-      else
-        None
+    }).toList.flatMap(stree =>
+      // FIXME: We shouldn't need a cast. Change NavigateAST.pathTo to return a List of Tree.
+      // We assume that typed trees only contain typed trees but this is incorrect in two
+      // cases currently: `Super` and `This` have `untpd.Ident` members, if we could
+      // replace those by typed members it would avoid complicating the Interactive API.
+      NavigateAST.pathTo(spos.pos, stree.tree).asInstanceOf[List[Tree]]
     )
+
+  /** The type of the closest enclosing tree containing position `spos`. */
+  def enclosingType(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Type = {
+    val path = pathTo(spos, trees)
+    path.headOption.fold(NoType: Type)(_.tpe)
   }
 
   /** The symbol of the closest enclosing tree containing position `spos`.
-    *
-    *  If that symbol is `NoSymbol` we return `None`, except if `keepGoing` is true,
-    *  then we return the symbol of the closest enclosing tree which does have a
-    *  type.
-    */
-  def enclosingSymbol(spos: SourcePosition, trees: List[SourceTree], keepGoing: Boolean = false)(implicit ctx: Context): Option[Type] = {
-    val path0 = pathTo(spos, trees)
-    val path =
-      if (keepGoing)
-        path.dropWhile(_.tpe eq NoSymbol)
-      else
-        path
-    path.headOption.flatMap(tree =>
-      if (tree.tpe ne NoSymbol)
-        Some(tree.tpe)
-      else
-        None
-    )
+   *
+   *  If that symbol is a class local dummy, return the class symbol instead.
+   */
+  def enclosingSymbol(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Symbol = {
+    val path = pathTo(spos, trees)
+    path.headOption.fold(NoSymbol: Symbol)(tree => nonLocalDummy(tree.symbol))
   }
 
+  /** If `sym` is a local dummy, the corresponding class symbol, otherwise `sym` */
+  def nonLocalDummy(sym: Symbol)(implicit ctx: Context): Symbol = if (sym.isLocalDummy) sym.owner else sym
+
+  /** The first tree in the path that is a definition. */
+  def enclosingDefinitionInPath(path: List[Tree])(implicit ctx: Context): Tree =
+    path.find(_.isInstanceOf[DefTree]).getOrElse(EmptyTree)
+
+  /** Possible completions at position `spos` */
   def completions(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): List[Symbol] = {
-    val paths = pathTo(spos, trees)
+    val path = pathTo(spos, trees)
+    val boundary = enclosingDefinitionInPath(path).symbol
 
-    val sourceTree = paths.last
-    val boundary = enclosingSymbol(spos, List(paths.last), keepGoing = true)
-
-    paths.head match {
+    path.take(1).flatMap {
       case Select(qual, _) =>
-        val boundary = enclosingSymbol(spos, sourceTree)
+        // When completing "`a.foo`, return the members of `a`
         completions(qual.tpe, boundary)
       case _ =>
         // FIXME: Get all decls in current scope
@@ -135,6 +111,7 @@ object Interactive {
     }
   }
 
+  /** Possible completions of members of `prefix` which are legal when called from `boundary` */
   def completions(prefix: Type, boundary: Symbol)(implicit ctx: Context): List[Symbol] = {
     val boundaryCtx = ctx.withOwner(boundary)
     prefix.memberDenots(completionsFilter, (name, buf) =>
