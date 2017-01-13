@@ -126,12 +126,8 @@ object Interactive {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object finder extends TreeTraverser {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-            case t: MemberDef =>
-              if (t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym)) {
-                poss += new SourcePosition(sourceFile, t.namePos)
-              } else {
-                traverseChildren(tree)
-              }
+            case t: MemberDef if t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym) =>
+              poss += new SourcePosition(sourceFile, t.namePos)
             case _ =>
               traverseChildren(tree)
           }
@@ -142,28 +138,38 @@ object Interactive {
     poss.toList
   }
 
+  def definitions(query: String, trees: List[SourceTree])(implicit ctx: Context): List[(Symbol, SourcePosition)] = {
+    val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
+
+    trees foreach { case SourceTree(sourceFile, tree) =>
+      object finder extends TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+          case tree: MemberDef if tree.symbol.name.show.toString.contains(query) =>
+            poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
+          case _ =>
+            traverseChildren(tree)
+        }
+      }
+      finder.traverse(tree)
+    }
+    poss.toList
+  }
+
   /** Find all references to `sym` or to a symbol overriding `sym`
    */
-  def references(sym: Symbol, includeDeclaration: Boolean, trees: List[SourceTree])
+  def references(sym: Symbol, includeDeclarations: Boolean, trees: List[SourceTree])
       (implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
     if (sym.exists) {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object extract extends TreeTraverser {
-          override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-            case t if t.pos.exists =>
-              if (t.symbol.exists &&
-                (t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym))) {
-                if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
-                  poss += new SourcePosition(sourceFile, t.pos)
-                }
-              } else {
-                traverseChildren(tree)
-              }
-            case _ =>
+          override def traverse(tree: Tree)(implicit ctx: Context): Unit =
+            if ((tree.symbol.eq(sym) || tree.symbol.allOverriddenSymbols.contains(sym)) &&
+              (includeDeclarations || !tree.isInstanceOf[MemberDef]))
+              poss += new SourcePosition(sourceFile, tree.pos)
+            else
               traverseChildren(tree)
-          }
         }
         extract.traverse(tree)
       }
@@ -171,5 +177,20 @@ object Interactive {
     poss.toList
   }
 
-  def rename(sym: Symbol, newName: String)(implicit ctx: Context): List[SourcePosition] = ???
+  def references(query: String, includeDeclarations: Boolean, trees: List[SourceTree])
+      (implicit ctx: Context): List[(Symbol, SourcePosition)] = {
+    val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
+
+    trees foreach { case SourceTree(sourceFile, tree) =>
+      object extract extends TreeTraverser {
+        override def traverse(t: Tree)(implicit ctx: Context): Unit =
+          if (tree.symbol.name.show.toString.contains(query))
+            poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
+          else
+            traverseChildren(tree)
+      }
+      extract.traverse(tree)
+    }
+    poss.toList
+  }
 }
