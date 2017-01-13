@@ -39,7 +39,6 @@ import Flags._, Symbols._, Names._
 import core.Decorators._
 
 import ast.Trees._
-
 class ServerDriver(settings: List[String]) extends Driver {
   import ast.tpd._
   import ScalaLanguageServer._
@@ -59,6 +58,8 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   var myCtx: Context = _
+
+  def newReporter: Reporter = new StoreReporter(null)
 
   private[this] def newCtx: Context = ctx
 
@@ -314,10 +315,11 @@ class ServerDriver(settings: List[String]) extends Driver {
     poss.toList
   }
 
-  def run(uri: URI, sourceCode: String, reporter: Reporter): Tree = {
+  def run(uri: URI, sourceCode: String): List[MessageContainer] = {
     try {
       println("run: " + ctx.period)
 
+      val reporter = newReporter
       val run = compiler.newRun(newCtx.fresh.setReporter(reporter))
       myCtx = run.runContext
 
@@ -333,12 +335,13 @@ class ServerDriver(settings: List[String]) extends Driver {
       run.printSummary()
       val t = run.units.head.tpdTree
       openClasses(uri) = topLevelClassNames(t)
-      t
+
+      reporter.removeBufferedMessages
     }
     catch {
       case ex: FatalError  =>
         ctx.error(ex.getMessage) // signals that we should fail compilation.
-        EmptyTree
+        Nil
     }
     //doCompile(compiler, fileNames)(ctx.fresh.setReporter(reporter))
   }
