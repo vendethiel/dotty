@@ -155,64 +155,29 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     // FIXME: share code with messages.NotAMember
     override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = computeAsync { cancelToken =>
       val trees = driver.trees
-      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       implicit val ctx: Context = driver.ctx
 
-      // Dup with typeOf
-      val tree = trees.filter({ case SourceTree(source, t) =>
-        source == pos.source && {
-          t.pos.contains(pos.pos)
-        }}).head.tree
-      val paths = ast.NavigateAST.pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
-
-      val boundary = driver.enclosingSym(paths)
-
-      println("paths: " + paths.map(x => (x.show, x.tpe.show)))
-      val decls = paths.head match {
-        case Select(qual, _) =>
-          qual.tpe.accessibleMembers(boundary).filter(!_.symbol.isConstructor)
-        case _ =>
-          // FIXME: Get all decls in current scope
-          boundary.enclosingClass match {
-            case csym: ClassSymbol =>
-              val classRef = csym.classInfo.typeRef
-              println("##boundary: " + boundary)
-              val sb = new StringBuffer
-              val d = classRef.accessibleMembers(boundary, whyNot = sb).filter(!_.symbol.isConstructor)
-              println("WHY NOT: " + sb)
-              d
-            case _ =>
-              Seq()
-          }
-      }
+      val decls = Interactive.completions(spos, trees)
 
       val items = decls.map({ decl =>
         val item = new CompletionItem
-        item.setLabel(decl.symbol.name.show.toString)
+        item.setLabel(decl.name.show.toString)
         item.setDetail(decl.info.widenTermRefExpr.show.toString)
-        item.setKind(completionItemKind(decl.symbol))
+        item.setKind(completionItemKind(decl))
         item
-      }).toList
+      })
 
       new CompletionList(/*isIncomplete = */ false, items.asJava)
     }
     override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+      implicit val ctx: Context = driver.ctx
+
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      val tp = driver.typeOf(trees, spos)
+      val sym = Interactive.symbolOf(spos, trees)
 
-      //println("XXPATHS: " + paths.map(_.show))
-      println("Looking for: " + tp)
-      tp match {
-        case tp: NamedType =>
-          val defPos = driver.findDef(trees, tp)
-          if (defPos.pos == Positions.NoPosition)
-            List[Location]().asJava
-          else
-            List(location(defPos)).asJava
-        case _ =>
-          List[Location]().asJava
-      }
+      Interactive.definitions(sym, trees).map(location).asJava
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -256,7 +221,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       implicit val ctx: Context = driver.ctx
 
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      val tp = driver.typeOf(driver.trees, pos)
+      val tp = Interactive.typeOf(pos, driver.trees)
       println("hover: " + tp.show)
 
       val str = tp.widenTermRefExpr.show.toString
@@ -271,7 +236,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
       val trees = driver.trees
-      val sym = driver.symbolOf(trees, pos) 
+      implicit val ctx = driver.ctx
+      val sym = Interactive.symbolOf(pos, trees) 
       val refs = Interactive.references(sym, params.getContext.isIncludeDeclaration, trees)(driver.ctx)
 
       refs.map(location).asJava
@@ -280,10 +246,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val trees = driver.trees
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
-      val sym = driver.symbolOf(trees, pos)
+      implicit val ctx = driver.ctx
+
+      val sym = Interactive.symbolOf(pos, trees)
       val newName = params.getNewName
 
-      implicit val ctx = driver.ctx
       val poss = Interactive.references(sym, includeDeclaration = true, trees)
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)

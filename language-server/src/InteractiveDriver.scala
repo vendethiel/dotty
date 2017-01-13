@@ -72,28 +72,6 @@ class ServerDriver(settings: List[String]) extends Driver {
 
   val compiler: Compiler = new Compiler
 
-  def typeOf(trees: List[SourceTree], pos: SourcePosition): Type = {
-    import ast.NavigateAST._
-
-    val tree = trees.filter({ case SourceTree(source, t) =>
-      source == pos.source && t.pos.contains(pos.pos)
-      }).head.tree
-    val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
-    val t = paths.head
-    paths.head.tpe
-  }
-
-  def symbolOf(trees: List[SourceTree], pos: SourcePosition): Symbol = {
-    import ast.NavigateAST._
-
-    val tree = trees.filter({ case SourceTree(source, t) =>
-      source == pos.source && t.pos.contains(pos.pos)
-      }).head.tree
-    val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
-    val t = paths.head
-    paths.head.symbol
-  }
-
   private def tree(className: TypeName, fromSource: Boolean): Option[SourceTree] = {
     println(s"tree($className, $fromSource)")
     val clsd =
@@ -150,36 +128,6 @@ class ServerDriver(settings: List[String]) extends Driver {
       extract.traverse(tree)
     }
     syms.toList
-  }
-
-  def enclosingSym(paths: List[Tree]): Symbol = {
-    val sym = paths.dropWhile(!_.symbol.exists).head.symbol
-    if (sym.isLocalDummy) sym.owner
-    else sym
-  }
-
-  def findDef(trees: List[SourceTree], tp: NamedType): SourcePosition = {
-    val sym = tp.symbol
-
-    var pos: SourcePosition = NoSourcePosition
-
-    trees foreach { case SourceTree(sourceFile, tree) =>
-      object finder extends TreeTraverser {
-        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-          case t: MemberDef =>
-            if (t.symbol.eq(sym)) {
-              pos = new SourcePosition(sourceFile, t.namePos)
-              return
-            } else {
-              traverseChildren(tree)
-            }
-          case _ =>
-            traverseChildren(tree)
-        }
-      }
-      finder.traverse(tree)
-    }
-    pos
   }
 
   def topLevelClassNames(tree: Tree): List[TypeName] = {
