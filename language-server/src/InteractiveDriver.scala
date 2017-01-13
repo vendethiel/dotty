@@ -83,6 +83,17 @@ class ServerDriver(settings: List[String]) extends Driver {
     paths.head.tpe
   }
 
+  def symbolOf(trees: List[SourceTree], pos: SourcePosition): Symbol = {
+    import ast.NavigateAST._
+
+    val tree = trees.filter({ case SourceTree(source, t) =>
+      source == pos.source && t.pos.contains(pos.pos)
+      }).head.tree
+    val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
+    val t = paths.head
+    paths.head.symbol
+  }
+
   private def tree(className: TypeName, fromSource: Boolean): Option[SourceTree] = {
     println(s"tree($className, $fromSource)")
     val clsd =
@@ -169,35 +180,6 @@ class ServerDriver(settings: List[String]) extends Driver {
       finder.traverse(tree)
     }
     pos
-  }
-
-  def typeReferences(trees: List[SourceTree], tp: Type, includeDeclaration: Boolean): List[SourcePosition] = {
-    val sym = tp match {
-      case tp: NamedType => tp.symbol
-      case _ => return Nil
-    }
-
-    val poss = new mutable.ListBuffer[SourcePosition]
-
-    trees foreach { case SourceTree(sourceFile, tree) =>
-      object extract extends TreeTraverser {
-        override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-          case t if t.pos.exists =>
-            if (t.symbol.exists &&
-              (t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym))) {
-              if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
-                poss += new SourcePosition(sourceFile, t.pos)
-              }
-            } else {
-              traverseChildren(tree)
-            }
-          case _ =>
-            traverseChildren(tree)
-        }
-      }
-      extract.traverse(tree)
-    }
-    poss.toList
   }
 
   def topLevelClassNames(tree: Tree): List[TypeName] = {
