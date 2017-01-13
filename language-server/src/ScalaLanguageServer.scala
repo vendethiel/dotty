@@ -253,7 +253,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val sym = Interactive.enclosingSymbol(pos, trees)
       val newName = params.getNewName
 
-      val poss = Interactive.references(sym, includeDeclaration = true, trees)
+      val poss = Interactive.references(sym, includeDeclarations = true, trees)
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
 
@@ -268,9 +268,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def didChangeConfiguration(params: DidChangeConfigurationParams): Unit = {}
     override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = {}
     override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
-      val trees = driver.trees
-      val syms = driver.symbolInfos(trees, params.getQuery)
-      syms.asJava
+      val query = params.getQuery
+
+      implicit val ctx = driver.ctx
+
+      val syms = Interactive.definitions(query, driver.trees)
+      syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
   }
 }
@@ -330,7 +333,7 @@ object ScalaLanguageServer {
     else
       CompletionItemKind.Field
 
-  def symbolInfo(spos: SourcePosition, sym: Symbol)(implicit ctx: Context) = {
+  def symbolInfo(sym: Symbol, spos: SourcePosition)(implicit ctx: Context) = {
     val s = new SymbolInformation
     s.setName(sym.name.show.toString)
     s.setKind(symbolKind(sym))
