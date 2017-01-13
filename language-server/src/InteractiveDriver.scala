@@ -57,18 +57,12 @@ class ServerDriver(settings: List[String]) extends Driver {
     new SourcePosition(source, p)
   }
 
-  var myCtx: Context = _
+  var myCtx: Context = {
+    val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
+    setup(settings.toArray, rootCtx)._2
+  }
 
   def newReporter: Reporter = new StoreReporter(null)
-
-  private[this] def newCtx: Context = ctx
-
-  implicit def ctx: Context =
-    if (myCtx == null) {
-      val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
-      setup(settings.toArray, rootCtx)._2
-    } else
-      myCtx
 
   val compiler: Compiler = new Compiler
 
@@ -76,18 +70,14 @@ class ServerDriver(settings: List[String]) extends Driver {
     import ast.NavigateAST._
 
     val tree = trees.filter({ case (source, t) =>
-      source == pos.source && {
-        //println("###pos: " + pos.pos)
-        //println("###tree: " + t.show(ctx.fresh.setSetting(ctx.settings.Yprintpos, true).setSetting(ctx.settings.YplainPrinter, true)))
-        t.pos.contains(pos.pos)
-      }}).head._2
+      source == pos.source && t.pos.contains(pos.pos)
+      }).head._2
     val paths = pathTo(pos.pos, tree).asInstanceOf[List[Tree]]
-    //println("###paths: " + paths.map(x => (x.show, x.tpe.show)))
     val t = paths.head
     paths.head.tpe
   }
 
-  def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
+  private def tree(className: TypeName, fromSource: Boolean): Option[(SourceFile, Tree)] = {
     println(s"tree($className, $fromSource)")
     val clsd =
       if (className.contains('.')) ctx.base.staticRef(className)
@@ -101,9 +91,8 @@ class ServerDriver(settings: List[String]) extends Driver {
         clsd.info // force denotation
         val tree = clsd.symbol.tree
         if (tree != null) {
-          println("Got tree: " + clsd)// + " " + tree.show)
+          println("Got tree: " + clsd)
           assert(tree.isInstanceOf[TypeDef])
-          //List(tree).foreach(t => println(t.symbol, t.symbol.validFor))
           val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
           if (!fromSource && openClasses.contains(toUri(sourceFile))) {
             //println("Skipping, already open from source")
@@ -120,14 +109,6 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   def trees = {
-    //implicit val ictx: Context = ctx.fresh
-    //ictx.initialize
-
-    //val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
-    //myCtx = run.runContext
-
-    println("##ALL: " + ctx.definitions.EmptyPackageClass.info.decls)
-
     val sourceClasses = openClasses.values.flatten
     val tastyClasses = ctx.platform.classPath.classes.map(_.name.toTypeName)
 
@@ -136,22 +117,20 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   def symbolInfos(trees: List[(SourceFile, Tree)], query: String): List[SymbolInformation] = {
-    //println("#####symbolInfos: " + ctx.period)
-
     val syms = new mutable.ListBuffer[SymbolInformation]
 
     trees foreach { case (sourceFile, tree) =>
       object extract extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t @ TypeDef(_, tmpl : Template) =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
             traverseChildren(tmpl)
           case t: TypeDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
           case t: DefDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
           case t: ValDef =>
-            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query) /*&& !t.pos.isSynthetic*/) syms += symbolInfo(sourceFile, t)
+            if (t.symbol.exists && t.pos.exists && t.symbol.name.toString.contains(query)) syms += symbolInfo(sourceFile, t)
           case _ =>
         }
       }
@@ -166,11 +145,8 @@ class ServerDriver(settings: List[String]) extends Driver {
     else sym
   }
 
-  def findDef(trees: List[(SourceFile, Tree)], tp: Type): SourcePosition = {
-    val sym = tp match {
-      case tp: NamedType => tp.symbol
-      case _ => return NoSourcePosition
-    }
+  def findDef(trees: List[(SourceFile, Tree)], tp: NamedType): SourcePosition = {
+    val sym = tp.symbol
 
     var pos: SourcePosition = NoSourcePosition
 
@@ -178,18 +154,12 @@ class ServerDriver(settings: List[String]) extends Driver {
       object finder extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t: MemberDef =>
-            //println("FOUND: " + t.tpe  + " " + t.symbol + " " + t.pos)
-            // if (t.tpe =:= tp) {
-            // TypeDef have fixed sym from older run
-            if (/*!t.isInstanceOf[TypeDef] &&*/ t.symbol.eq(sym)) {
+            if (t.symbol.eq(sym)) {
               pos = new SourcePosition(sourceFile, t.namePos)
               return
             } else {
               traverseChildren(tree)
             }
-          // case t: MemberDef =>
-          //   println("wrong: " + t.tpe + " != " + tp)
-          //   traverseChildren(tree)
           case _ =>
             traverseChildren(tree)
         }
@@ -204,7 +174,6 @@ class ServerDriver(settings: List[String]) extends Driver {
       case tp: NamedType => tp.symbol
       case _ => return Nil
     }
-    //println("#####symbolInfos: " + ctx.period)
 
     val poss = new mutable.ListBuffer[SourcePosition]
 
@@ -212,9 +181,7 @@ class ServerDriver(settings: List[String]) extends Driver {
       object extract extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case t if t.pos.exists =>
-            // Template and TypeDef have FixedSym from older run
-            // if (!t.isInstanceOf[Template] && t.tpe <:< tp) {
-            if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists &&
+            if (t.symbol.exists &&
               (t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym))) {
               if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
                 poss += new SourcePosition(sourceFile, t.pos)
@@ -232,11 +199,7 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   def references: List[SourcePosition] = {
-    //println("#####references: " + ctx.period)
-
-    //implicit val ictx: Context = ctx.fresh
-    //ictx.initialize
-    val run = compiler.newRun(newCtx.fresh.setReporter(new ConsoleReporter))
+    val run = compiler.newRun(ctx.fresh.setReporter(new ConsoleReporter))
     myCtx = run.runContext
 
     val classNames = ctx.platform.classPath.classes.map(_.name.toTypeName)
@@ -294,20 +257,18 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   private def positions(tree: Tree): List[Positions.Position] = {
-    //println("#####positions: " + ctx.period)
-
     val poss = new mutable.ListBuffer[Positions.Position]
     object extract extends TreeTraverser {
       override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
         case t: PackageDef =>
           traverseChildren(t)
         case t @ TypeDef(_, tmpl : Template) =>
-          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+          if (t.pos.exists) poss += t.pos
           traverseChildren(tmpl)
         case t: DefDef =>
-          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+          if (t.pos.exists) poss += t.pos
         case t: ValDef =>
-          if (t.pos.exists /*&& !t.pos.isSynthetic*/) poss += t.pos
+          if (t.pos.exists) poss += t.pos
         case _ =>
       }
     }
@@ -320,7 +281,7 @@ class ServerDriver(settings: List[String]) extends Driver {
       println("run: " + ctx.period)
 
       val reporter = newReporter
-      val run = compiler.newRun(newCtx.fresh.setReporter(reporter))
+      val run = compiler.newRun(ctx.fresh.setReporter(reporter))
       myCtx = run.runContext
 
       val virtualFile = new VirtualFile(uri.toString, Paths.get(uri).toString)
