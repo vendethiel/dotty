@@ -191,8 +191,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     }
     override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
       val trees = driver.trees
-      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val tp = driver.typeOf(trees, pos)
+
+      val defs = definitions(spos).head
+
       //println("XXPATHS: " + paths.map(_.show))
       println("Looking for: " + tp)
       if (tp eq NoType)
