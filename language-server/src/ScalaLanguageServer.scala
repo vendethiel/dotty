@@ -199,8 +199,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
 
-      driver.openClasses.remove(uri)
-      driver.openFiles.remove(uri)
+      driver.close(uri)
     }
     override def didOpen(params: DidOpenTextDocumentParams): Unit = {
       val document = params.getTextDocument

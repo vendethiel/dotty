@@ -191,8 +191,14 @@ class ServerDriver(settings: List[String]) extends Driver {
     catch {
       case ex: FatalError  =>
         ctx.error(ex.getMessage) // signals that we should fail compilation.
+        close(uri)
         Nil
     }
     //doCompile(compiler, fileNames)(ctx.fresh.setReporter(reporter))
+  }
+
+  def close(uri: URI): Unit = {
+    openFiles.remove(uri)
+    openClasses.remove(uri)
   }
 }
