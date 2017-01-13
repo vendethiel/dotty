@@ -461,7 +461,8 @@ class ServerDriver(server: ScalaLanguageServer) extends Driver {
           case t if t.pos.exists =>
             // Template and TypeDef have FixedSym from older run
             // if (!t.isInstanceOf[Template] && t.tpe <:< tp) {
-            if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists && t.symbol.eq(sym)) {
+            if (/*!t.isInstanceOf[Template] && !t.isInstanceOf[TypeDef] && */t.symbol.exists &&
+              (t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym))) {
               if (!t.isInstanceOf[MemberDef] || includeDeclaration) {
                 poss += new SourcePosition(sourceFile, t.pos)
               }
