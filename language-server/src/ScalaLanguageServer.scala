@@ -134,11 +134,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     println("target: " + target)
 
     val toolcp = "../library/target/scala-2.11/classes"
-    driver = new ServerDriver(List(/*"-Yplain-printer",*//*"-Yprintpos",*/ "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", toolcp + ":" + target + ":" + classPath))
+    driver = new ServerDriver(List(/*"-Yplain-printer",*/"-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", toolcp + ":" + target + ":" + classPath))
 
 
     val c = new ServerCapabilities
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
+    c.setDocumentHighlightProvider(true)
     c.setDocumentSymbolProvider(true)
     c.setDefinitionProvider(true)
     c.setRenameProvider(true)
@@ -224,7 +225,22 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
         diags.flatMap(diagnostic).asJava))
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
-    override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
+    override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = computeAsync { cancelToken =>
+      val document = params.getTextDocument
+      val uri = URI.create(document.getUri)
+
+      implicit val ctx = driver.ctx
+
+      val uriTrees = driver.trees.filter(tree => toUri(tree.source) == uri)
+
+      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+
+      val trees = driver.trees
+      val sym = Interactive.enclosingSymbol(pos, trees) 
+      val refs = Interactive.references(trees, sym, includeDeclarations = true)(driver.ctx)
+
+      refs.map(ref => new DocumentHighlight(range(ref), DocumentHighlightKind.Read)).asJava
+    }
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
@@ -258,7 +274,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val trees = driver.trees
       val sym = Interactive.enclosingSymbol(pos, trees) 
-      val refs = Interactive.references(sym, params.getContext.isIncludeDeclaration, trees)(driver.ctx)
+      val refs = Interactive.references(trees, sym, params.getContext.isIncludeDeclaration)(driver.ctx)
 
       refs.map(location).asJava
     }
@@ -272,7 +288,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val sym = Interactive.enclosingSymbol(pos, trees)
       val newName = params.getNewName
 
-      val poss = Interactive.references(sym, includeDeclarations = true, trees)
+      val poss = Interactive.references(trees, sym, includeDeclarations = true)
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
 

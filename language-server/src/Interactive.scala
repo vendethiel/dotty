@@ -3,11 +3,6 @@ import java.nio.file._
 import java.util.function._
 import java.util.concurrent.CompletableFuture
 
-import org.eclipse.lsp4j
-import org.eclipse.lsp4j.jsonrpc.{CancelChecker, CompletableFutures}
-import org.eclipse.lsp4j._
-import org.eclipse.lsp4j.services._
-
 import java.util.{List => jList}
 import java.util.ArrayList
 
@@ -119,7 +114,7 @@ object Interactive {
     ).map(_.symbol).toList
   }
 
-  def definitions(sym: Symbol, trees: List[SourceTree])(implicit ctx: Context): List[SourcePosition] = {
+  def definitions(sym: Symbol, trees: List[SourceTree], fullPosition: Boolean = false)(implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
     if (sym.exists) {
@@ -127,7 +122,7 @@ object Interactive {
         object finder extends TreeTraverser {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
             case t: MemberDef if t.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && t.symbol.allOverriddenSymbols.contains(sym)) =>
-              poss += new SourcePosition(sourceFile, t.namePos)
+              if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, t.namePos)
               traverseChildren(tree)
             case _ =>
               traverseChildren(tree)
@@ -146,7 +141,7 @@ object Interactive {
       object finder extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
           case tree: MemberDef if tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.name.show.toString.contains(query) =>
-            if (!tree.pos.isSynthetic) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
+            if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
             traverseChildren(tree)
           case _ =>
             traverseChildren(tree)
@@ -159,7 +154,7 @@ object Interactive {
 
   /** Find all references to `sym` or to a symbol overriding `sym`
    */
-  def references(sym: Symbol, includeDeclarations: Boolean, trees: List[SourceTree])
+  def references(trees: List[SourceTree], sym: Symbol, includeDeclarations: Boolean, namePosition: Boolean = true)
       (implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
@@ -169,7 +164,7 @@ object Interactive {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
             if ((tree.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.allOverriddenSymbols.contains(sym))) &&
               (includeDeclarations || !tree.isInstanceOf[MemberDef]))
-              if (!tree.pos.isSynthetic) poss += new SourcePosition(sourceFile, tree.pos)
+              if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, displayedPos(tree.pos, namePosition, tree.symbol.name))
             traverseChildren(tree)
           }
         }
@@ -187,12 +182,29 @@ object Interactive {
       object extract extends TreeTraverser {
         override def traverse(t: Tree)(implicit ctx: Context): Unit = {
           if (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.name.show.toString.contains(query))
-            if (!tree.pos.isSynthetic) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
+            if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
           traverseChildren(tree)
         }
       }
       extract.traverse(tree)
     }
     poss.toList
+  }
+
+  /** Return the position to be displayed. If `namePosition` is true, this is the position of
+   *  the name inside `tree`, otherwise it's the position of `tree` itself.
+   */
+  private[this] def displayedPos(treePos: Position, namePosition: Boolean, name: Name)(implicit ctx: Context): Position = {
+    val nameLength = name.show.toString.length
+    if (namePosition) {
+      // FIXME: This is incorrect in some cases, like with backquoted identifiers,
+      //        see https://github.com/lampepfl/dotty/pull/1634#issuecomment-257079436
+      if (treePos.isSynthetic)
+        // If we don't have a point, we need to find it
+        Position(treePos.end - nameLength, treePos.end)
+      else
+        Position(treePos.point, treePos.point + nameLength)
+    } else
+      treePos
   }
 }
