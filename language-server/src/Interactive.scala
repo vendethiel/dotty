@@ -52,7 +52,7 @@ object Interactive {
    *  or `Nil` if no such path exists. If a non-empty path is returned it starts with
    *  the tree closest enclosing `pos` and ends with an element of `trees`.
    */
-  def pathTo(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): List[Tree] =
+  def pathTo(trees: List[SourceTree], spos: SourcePosition)(implicit ctx: Context): List[Tree] =
     trees.find({ case SourceTree(source, t) =>
       source == spos.source && t.pos.contains(spos.pos)
     }).toList.flatMap(stree =>
@@ -64,8 +64,8 @@ object Interactive {
     )
 
   /** The type of the closest enclosing tree containing position `spos`. */
-  def enclosingType(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Type = {
-    val path = pathTo(spos, trees)
+  def enclosingType(trees: List[SourceTree], spos: SourcePosition)(implicit ctx: Context): Type = {
+    val path = pathTo(trees, spos)
     path.headOption.fold(NoType: Type)(_.tpe)
   }
 
@@ -73,8 +73,8 @@ object Interactive {
    *
    *  If that symbol is a class local dummy, return the class symbol instead.
    */
-  def enclosingSymbol(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): Symbol = {
-    val path = pathTo(spos, trees)
+  def enclosingSymbol(trees: List[SourceTree], spos: SourcePosition)(implicit ctx: Context): Symbol = {
+    val path = pathTo(trees, spos)
     path.headOption.fold(NoSymbol: Symbol)(tree => nonLocalDummy(tree.symbol))
   }
 
@@ -86,8 +86,8 @@ object Interactive {
     path.find(_.isInstanceOf[DefTree]).getOrElse(EmptyTree)
 
   /** Possible completions at position `spos` */
-  def completions(spos: SourcePosition, trees: List[SourceTree])(implicit ctx: Context): List[Symbol] = {
-    val path = pathTo(spos, trees)
+  def completions(trees: List[SourceTree], spos: SourcePosition)(implicit ctx: Context): List[Symbol] = {
+    val path = pathTo(trees, spos)
     val boundary = enclosingDefinitionInPath(path).symbol
 
     path.take(1).flatMap {
@@ -114,7 +114,7 @@ object Interactive {
     ).map(_.symbol).toList
   }
 
-  def definitions(sym: Symbol, trees: List[SourceTree], fullPosition: Boolean = false)(implicit ctx: Context): List[SourcePosition] = {
+  def definitions(trees: List[SourceTree], sym: Symbol, fullPosition: Boolean = false)(implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
     if (sym.exists) {
@@ -134,7 +134,7 @@ object Interactive {
     poss.toList
   }
 
-  def definitions(query: String, trees: List[SourceTree])(implicit ctx: Context): List[(Symbol, SourcePosition)] = {
+  def definitions(trees: List[SourceTree], query: String)(implicit ctx: Context): List[(Symbol, SourcePosition)] = {
     val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
 
     trees foreach { case SourceTree(sourceFile, tree) =>
@@ -177,7 +177,7 @@ object Interactive {
     poss.toList
   }
 
-  def references(query: String, includeDeclarations: Boolean, trees: List[SourceTree])
+  def references(trees: List[SourceTree], query: String, includeDeclarations: Boolean)
       (implicit ctx: Context): List[(Symbol, SourcePosition)] = {
     val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
 
