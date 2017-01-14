@@ -26,6 +26,8 @@ import dotty.tools.dotc.reporting.diagnostic._
 import scala.collection._
 import scala.collection.JavaConverters._
 
+import scala.util.control.NonFatal
+
 // Not needed with Scala 2.12
 import scala.compat.java8.FunctionConverters._
 
@@ -107,7 +109,13 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   def computeAsync[R](fun: CancelChecker => R): CompletableFuture[R] =
     CompletableFutures.computeAsync({(cancelToken: CancelChecker) =>
       cancelToken.checkCanceled()
-      fun(cancelToken)
+      try {
+        fun(cancelToken)
+      } catch {
+        case NonFatal(ex) =>
+          ex.printStackTrace
+          throw ex
+      }
     }.asJava)
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
@@ -131,6 +139,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
     val c = new ServerCapabilities
     c.setTextDocumentSync(TextDocumentSyncKind.Full)
+    c.setDocumentSymbolProvider(true)
     c.setDefinitionProvider(true)
     c.setRenameProvider(true)
     c.setHoverProvider(true)
@@ -216,7 +225,17 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     }
     override def didSave(params: DidSaveTextDocumentParams): Unit = {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = null
-    override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = null
+    override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
+      val document = params.getTextDocument
+      val uri = URI.create(document.getUri)
+
+      implicit val ctx = driver.ctx
+
+      val uriTrees = driver.trees.filter(tree => toUri(tree.source) == uri)
+
+      val syms = Interactive.definitions("", uriTrees)
+      syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
+    }
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
       implicit val ctx = driver.ctx
 

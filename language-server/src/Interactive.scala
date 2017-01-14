@@ -126,7 +126,7 @@ object Interactive {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object finder extends TreeTraverser {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-            case t: MemberDef if t.symbol.eq(sym) || t.symbol.allOverriddenSymbols.contains(sym) =>
+            case t: MemberDef if t.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && t.symbol.allOverriddenSymbols.contains(sym)) =>
               poss += new SourcePosition(sourceFile, t.namePos)
               traverseChildren(tree)
             case _ =>
@@ -145,8 +145,8 @@ object Interactive {
     trees foreach { case SourceTree(sourceFile, tree) =>
       object finder extends TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
-          case tree: MemberDef if tree.symbol.name.show.toString.contains(query) =>
-            poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
+          case tree: MemberDef if tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.name.show.toString.contains(query) =>
+            if (!tree.pos.isSynthetic) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.namePos)))
             traverseChildren(tree)
           case _ =>
             traverseChildren(tree)
@@ -167,9 +167,9 @@ object Interactive {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object extract extends TreeTraverser {
           override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
-            if ((tree.symbol.eq(sym) || tree.symbol.allOverriddenSymbols.contains(sym)) &&
+            if ((tree.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.allOverriddenSymbols.contains(sym))) &&
               (includeDeclarations || !tree.isInstanceOf[MemberDef]))
-              poss += new SourcePosition(sourceFile, tree.pos)
+              if (!tree.pos.isSynthetic) poss += new SourcePosition(sourceFile, tree.pos)
             traverseChildren(tree)
           }
         }
@@ -186,8 +186,8 @@ object Interactive {
     trees foreach { case SourceTree(sourceFile, tree) =>
       object extract extends TreeTraverser {
         override def traverse(t: Tree)(implicit ctx: Context): Unit = {
-          if (tree.symbol.name.show.toString.contains(query))
-            poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
+          if (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.name.show.toString.contains(query))
+            if (!tree.pos.isSynthetic) poss += ((tree.symbol, new SourcePosition(sourceFile, tree.pos)))
           traverseChildren(tree)
         }
       }
