@@ -114,92 +114,75 @@ object Interactive {
     ).map(_.symbol).toList
   }
 
+  private[this] def positionedAccumulator[T](trees: List[SourceTree], maybeAdd: (NameTree, SourcePosition, mutable.ListBuffer[T]) => Unit, namePosition: Boolean)
+      (implicit ctx: Context): List[T] = {
+    val buf = new mutable.ListBuffer[T]
+
+    trees foreach { case SourceTree(sourceFile, tree) =>
+      (new TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context) = {
+          tree match {
+            case tree: NameTree
+                if tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.pos.exists && tree.pos.start != tree.pos.end =>
+              maybeAdd(tree, new SourcePosition(sourceFile, displayedPos(tree, namePosition)), buf)
+            case _ =>
+          }
+          traverseChildren(tree)
+        }
+      }).traverse(tree)
+    }
+
+    buf.toList
+  }
+
   def definitions(trees: List[SourceTree], sym: Symbol, namePosition: Boolean = true)(implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
-    if (sym.exists) {
-      trees foreach { case SourceTree(sourceFile, tree) =>
-        object finder extends TreeTraverser {
-          override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
-            tree match {
-              case tree: MemberDef if tree.symbol.eq(sym) || (tree.symbol.exists && tree.symbol.allOverriddenSymbols.contains(sym)) =>
-                if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, displayedPos(tree, namePosition))
-              case _ =>
-            }
-            traverseChildren(tree)
-          }
-        }
-        finder.traverse(tree)
-      }
-    }
-    poss.toList
+    if (!sym.exists)
+      Nil
+    else
+      // Type annotation not needed when compiling with dotty
+      positionedAccumulator[SourcePosition](trees,
+        (tree, spos, buf) =>
+          if (tree.isInstanceOf[MemberDef] && matchingSymbol(tree, sym))
+            buf += spos,
+        namePosition)
   }
 
-  def allDefinitions(trees: List[SourceTree], filter: String = "", namePosition: Boolean = true)(implicit ctx: Context): List[(Symbol, SourcePosition)] = {
-    val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
-
-    trees foreach { case SourceTree(sourceFile, tree) =>
-      object finder extends TreeTraverser {
-        override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
-          tree match {
-            case tree: MemberDef if tree.symbol.exists && tree.name.show.toString.contains(filter) =>
-              if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += ((tree.symbol, new SourcePosition(sourceFile, displayedPos(tree, namePosition))))
-            case _ =>
-          }
-          traverseChildren(tree)
-        }
-      }
-      finder.traverse(tree)
-    }
-    poss.toList
-  }
+  def allDefinitions(trees: List[SourceTree], filter: String = "", namePosition: Boolean = true)(implicit ctx: Context): List[(Symbol, SourcePosition)] =
+    positionedAccumulator[(Symbol, SourcePosition)](trees,
+      (tree, spos, buf) =>
+        if (tree.isInstanceOf[MemberDef] && tree.name.show.toString.contains(filter))
+          buf += ((tree.symbol, spos)),
+      namePosition)
 
   /** Find all references to `sym` or to a symbol overriding `sym`
+   *  @param includeDeclaration  If true, include the declaration of `sym` itself
    */
-  def references(trees: List[SourceTree], sym: Symbol, includeDeclarations: Boolean, namePosition: Boolean = true)
-      (implicit ctx: Context): List[SourcePosition] = {
-    val poss = new mutable.ListBuffer[SourcePosition]
-
-    if (sym.exists) {
-      trees foreach { case SourceTree(sourceFile, tree) =>
-        object extract extends TreeTraverser {
-          override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
-            tree match {
-              case tree: NameTree =>
-                if ((tree.symbol.eq(sym) || (tree.symbol.exists && tree.symbol.allOverriddenSymbols.contains(sym))) &&
-                  (includeDeclarations || !tree.isInstanceOf[MemberDef]))
-                  if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, displayedPos(tree, namePosition))
-              case _ =>
-            }
-            traverseChildren(tree)
-          }
-        }
-        extract.traverse(tree)
-      }
-    }
-    poss.toList
+  def references(trees: List[SourceTree], sym: Symbol, includeDeclaration: Boolean = true, namePosition: Boolean = true)
+    (implicit ctx: Context): List[SourcePosition] = {
+    if (!sym.exists)
+      Nil
+    else
+      positionedAccumulator[SourcePosition](trees,
+        (tree, spos, buf) =>
+          if ((includeDeclaration || !(tree.isInstanceOf[MemberDef] && (tree.symbol eq sym))) && matchingSymbol(tree, sym))
+            buf += spos,
+        namePosition)
   }
 
-  def allReferences(trees: List[SourceTree], filter: String = "", includeDeclarations: Boolean = true, namePosition: Boolean = true)
+  def allReferences(trees: List[SourceTree], filter: String = "", namePosition: Boolean = true)
       (implicit ctx: Context): List[(Symbol, SourcePosition)] = {
-    val poss = new mutable.ListBuffer[(Symbol, SourcePosition)]
-
-    trees foreach { case SourceTree(sourceFile, tree) =>
-      object extract extends TreeTraverser {
-        override def traverse(t: Tree)(implicit ctx: Context): Unit = {
-          tree match {
-            case tree: NameTree =>
-              if (tree.symbol.exists && tree.name.show.toString.contains(filter))
-                if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += ((tree.symbol, new SourcePosition(sourceFile, displayedPos(tree, namePosition))))
-            case _ =>
-          }
-          traverseChildren(tree)
-        }
-      }
-      extract.traverse(tree)
-    }
-    poss.toList
+      positionedAccumulator[(Symbol, SourcePosition)](trees,
+        (tree, spos, buf) =>
+        if (tree.name.show.toString.contains(filter))
+          buf += ((tree.symbol, spos)),
+        namePosition)
   }
+
+  /** Does `tree` refer to symbol `sym` or to a symbol that overrides `sym` ? */
+  private[this] def matchingSymbol(tree: Tree, sym: Symbol)(implicit ctx: Context): Boolean =
+    (sym eq tree.symbol) || tree.symbol.allOverriddenSymbols.contains(sym)
 
   /** Return the position to be displayed. If `namePosition` is true, this is the position of
    *  the name inside `tree`, otherwise it's the position of `tree` itself.

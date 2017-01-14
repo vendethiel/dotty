@@ -237,7 +237,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val trees = driver.trees
       val sym = Interactive.enclosingSymbol(trees, pos) 
-      val refs = Interactive.references(trees, sym, includeDeclarations = true)(driver.ctx)
+      val refs = Interactive.references(trees, sym)(driver.ctx)
 
       refs.map(ref => new DocumentHighlight(range(ref), DocumentHighlightKind.Read)).asJava
     }
@@ -288,7 +288,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val sym = Interactive.enclosingSymbol(trees, pos)
       val newName = params.getNewName
 
-      val poss = Interactive.references(trees, sym, includeDeclarations = true)
+      val poss = Interactive.references(trees, sym)
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
 
