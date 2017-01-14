@@ -161,11 +161,14 @@ object Interactive {
     if (sym.exists) {
       trees foreach { case SourceTree(sourceFile, tree) =>
         object extract extends TreeTraverser {
-          override def traverse(tree: Tree)(implicit ctx: Context): Unit = {
-            if ((tree.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.allOverriddenSymbols.contains(sym))) &&
-              (includeDeclarations || !tree.isInstanceOf[MemberDef]))
-              if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, displayedPos(tree.pos, namePosition, tree.symbol.name))
-            traverseChildren(tree)
+          override def traverse(tree: Tree)(implicit ctx: Context): Unit = tree match {
+            case tree: NameTree =>
+              if ((tree.symbol.eq(sym) || (tree.symbol.exists && !tree.symbol.is(Synthetic) && tree.symbol.allOverriddenSymbols.contains(sym))) &&
+                (includeDeclarations || !tree.isInstanceOf[MemberDef]))
+                if (tree.pos.exists && tree.pos.start != tree.pos.end) poss += new SourcePosition(sourceFile, displayedPos(tree, namePosition))
+              traverseChildren(tree)
+            case _ =>
+              traverseChildren(tree)
           }
         }
         extract.traverse(tree)
@@ -194,16 +197,20 @@ object Interactive {
   /** Return the position to be displayed. If `namePosition` is true, this is the position of
    *  the name inside `tree`, otherwise it's the position of `tree` itself.
    */
-  private[this] def displayedPos(treePos: Position, namePosition: Boolean, name: Name)(implicit ctx: Context): Position = {
-    val nameLength = name.show.toString.length
+  private[this] def displayedPos(tree: NameTree, namePosition: Boolean)(implicit ctx: Context): Position = {
+    val treePos = tree.pos
+    val nameLength = tree.name.show.toString.length
     if (namePosition) {
       // FIXME: This is incorrect in some cases, like with backquoted identifiers,
       //        see https://github.com/lampepfl/dotty/pull/1634#issuecomment-257079436
-      if (treePos.isSynthetic)
-        // If we don't have a point, we need to find it
-        Position(treePos.end - nameLength, treePos.end)
-      else
-        Position(treePos.point, treePos.point + nameLength)
+      // FIXME: Merge with NameTree#namePos ?
+      val (start, end) =
+        if (!treePos.isSynthetic)
+          (treePos.point, treePos.point + nameLength)
+        else
+          // If we don't have a point, we need to find it
+          (treePos.end - nameLength, treePos.end)
+      Position(start, end, start)
     } else
       treePos
   }
