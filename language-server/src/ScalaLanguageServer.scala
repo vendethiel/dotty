@@ -249,7 +249,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val uriTrees = driver.trees.filter(tree => toUri(tree.source) == uri)
 
-      val syms = Interactive.definitions(uriTrees, "")
+      val syms = Interactive.allDefinitions(uriTrees)
       syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
@@ -307,7 +307,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       implicit val ctx = driver.ctx
 
-      val syms = Interactive.definitions(driver.trees, query)
+      val syms = Interactive.allDefinitions(driver.trees, filter = query)
       syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
   }
