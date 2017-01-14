@@ -169,7 +169,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
-      val decls = Interactive.completions(spos, trees)
+      val decls = Interactive.completions(trees, spos)
 
       val items = decls.map({ decl =>
         val item = new CompletionItem
@@ -186,9 +186,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      val sym = Interactive.enclosingSymbol(spos, trees)
+      val sym = Interactive.enclosingSymbol(trees, spos)
 
-      Interactive.definitions(sym, trees).map(location).asJava
+      Interactive.definitions(trees, sym).map(location).asJava
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -236,7 +236,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
       val trees = driver.trees
-      val sym = Interactive.enclosingSymbol(pos, trees) 
+      val sym = Interactive.enclosingSymbol(trees, pos) 
       val refs = Interactive.references(trees, sym, includeDeclarations = true)(driver.ctx)
 
       refs.map(ref => new DocumentHighlight(range(ref), DocumentHighlightKind.Read)).asJava
@@ -249,14 +249,14 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val uriTrees = driver.trees.filter(tree => toUri(tree.source) == uri)
 
-      val syms = Interactive.definitions("", uriTrees)
+      val syms = Interactive.definitions(uriTrees, "")
       syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
       implicit val ctx = driver.ctx
 
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
-      val tp = Interactive.enclosingType(pos, driver.trees)
+      val tp = Interactive.enclosingType(driver.trees, pos)
       println("hover: " + tp.show)
 
       val str = tp.widenTermRefExpr.show.toString
@@ -273,7 +273,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
       val trees = driver.trees
-      val sym = Interactive.enclosingSymbol(pos, trees) 
+      val sym = Interactive.enclosingSymbol(trees, pos) 
       val refs = Interactive.references(trees, sym, params.getContext.isIncludeDeclaration)(driver.ctx)
 
       refs.map(location).asJava
@@ -285,7 +285,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
 
 
-      val sym = Interactive.enclosingSymbol(pos, trees)
+      val sym = Interactive.enclosingSymbol(trees, pos)
       val newName = params.getNewName
 
       val poss = Interactive.references(trees, sym, includeDeclarations = true)
@@ -307,7 +307,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       implicit val ctx = driver.ctx
 
-      val syms = Interactive.definitions(query, driver.trees)
+      val syms = Interactive.definitions(driver.trees, query)
       syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
   }
