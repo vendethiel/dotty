@@ -12,11 +12,8 @@ import collection.mutable
 import scala.reflect.api.{ Universe => ApiUniverse }
 
 object Definitions {
-
-  /** The maximum number of elements in a tuple or product.
-   *  This should be removed once we go to hlists.
-   */
-  val MaxTupleArity = 22
+  /** TODOC OLIVIER*/
+  val MaxCaseClassTupleArity = 4
 
   /** The maximum arity N of a function type that's implemented
    *  as a trait `scala.FunctionN`. Functions of higher arity are possible,
@@ -676,8 +673,14 @@ class Definitions {
   private lazy val ImplementedFunctionType = mkArityArray("scala.Function", MaxImplementedFunctionArity, 0)
   def FunctionClassPerRun = new PerRun[Array[Symbol]](implicit ctx => ImplementedFunctionType.map(_.symbol.asClass))
 
-  lazy val TupleType = mkArityArray("scala.Tuple", MaxTupleArity, 2)
-  lazy val ProductNType = mkArityArray("scala.Product", MaxTupleArity, 0)
+  lazy val TNilType: TypeRef = ctx.requiredClassRef("dotty.TNil$")
+  lazy val TupleType: TypeRef = ctx.requiredClassRef("dotty.Tuple")
+  lazy val TupleConsType: TypeRef = ctx.requiredClassRef("dotty.TupleCons")
+  lazy val TupleImplNType: TypeRef = ctx.requiredClassRef("dotty.TupleImplN")
+  lazy val TupleUnapplySeqType: TypeRef = ctx.requiredClassRef("dotty.TupleUnapplySeq$")
+  lazy val TupleImplType: Array[TypeRef] = mkArityArray("dotty.TupleImpl", MaxCaseClassTupleArity, 1)
+
+  lazy val ProductNType = mkArityArray("scala.Product", 22, 0)
 
   def FunctionClass(n: Int)(implicit ctx: Context) =
     if (n < MaxImplementedFunctionArity) FunctionClassPerRun()(ctx)(n)
@@ -694,8 +697,11 @@ class Definitions {
     else if (n < MaxImplementedFunctionArity) ImplementedFunctionType(n)
     else FunctionClass(n).typeRef
 
-  private lazy val TupleTypes: Set[TypeRef] = TupleType.toSet
-  private lazy val ProductTypes: Set[TypeRef] = ProductNType.toSet
+  lazy val TNilSymbol = TNilType.classSymbol.companionModule.symbol
+  lazy val TupleConsSymbol = TupleConsType.classSymbol.companionModule.symbol
+  lazy val TupleImplNSymbol = TupleImplNType.classSymbol.companionModule.symbol
+  lazy val TupleUnapplySeqSymbol = TupleUnapplySeqType.classSymbol.companionModule.symbol
+  lazy val TupleImplSymbols = TupleImplType.tail.map(_.classSymbol.companionModule.symbol).toSet
 
   /** If `cls` is a class in the scala package, its name, otherwise EmptyTypeName */
   def scalaClassName(cls: Symbol)(implicit ctx: Context): TypeName =
@@ -758,14 +764,8 @@ class Definitions {
   def isPolymorphicAfterErasure(sym: Symbol) =
      (sym eq Any_isInstanceOf) || (sym eq Any_asInstanceOf)
 
-  def isTupleType(tp: Type)(implicit ctx: Context) = {
-    val arity = tp.dealias.argInfos.length
-    arity <= MaxTupleArity && TupleType(arity) != null && (tp isRef TupleType(arity).symbol)
-  }
-
-  def tupleType(elems: List[Type]) = {
-    TupleType(elems.size).appliedTo(elems)
-  }
+  def isTupleType(tp: Type)(implicit ctx: Context) =
+    tp.derivesFrom(TupleType.symbol)
 
   def isProductSubType(tp: Type)(implicit ctx: Context) =
     (tp derivesFrom ProductType.symbol) && tp.baseClasses.exists(isProductClass)

@@ -52,8 +52,7 @@ object Applications {
    *  This is the case of `tp` is a subtype of the Product<numArgs> class.
    */
   def isProductMatch(tp: Type, numArgs: Int)(implicit ctx: Context) =
-    0 <= numArgs && numArgs <= Definitions.MaxTupleArity &&
-    tp.derivesFrom(defn.ProductNType(numArgs).typeSymbol)
+    0 <= numArgs && tp.derivesFrom(defn.ProductNType(numArgs).typeSymbol)
 
   /** Does `tp` fit the "get match" conditions as an unapply result type?
    *  This is the case of `tp` has a `get` member as well as a
