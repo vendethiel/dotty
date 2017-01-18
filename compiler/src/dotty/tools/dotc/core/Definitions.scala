@@ -362,7 +362,6 @@ class Definitions {
   lazy val ArrayModuleType = ctx.requiredModuleRef("scala.Array")
   def ArrayModule(implicit ctx: Context) = ArrayModuleType.symbol.moduleClass.asClass
 
-
   lazy val UnitType: TypeRef = valueTypeRef("scala.Unit", BoxedUnitType, java.lang.Void.TYPE, UnitEnc)
   def UnitClass(implicit ctx: Context) = UnitType.symbol.asClass
   lazy val BooleanType = valueTypeRef("scala.Boolean", BoxedBooleanType, java.lang.Boolean.TYPE, BooleanEnc)
@@ -738,8 +737,8 @@ class Definitions {
   )
 
   val PredefImportFns = List[() => TermRef](
-      () => ScalaPredefModuleRef,
-      () => DottyPredefModuleRef
+    () => ScalaPredefModuleRef,
+    () => DottyPredefModuleRef
   )
 
   lazy val RootImportFns =

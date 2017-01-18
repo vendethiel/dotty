@@ -677,7 +677,7 @@ object desugar {
     val param = makeSyntheticParameter()
     def selector(n: Int) = Select(refOfDef(param), nme.selectorName(n))
     val vdefs =
-      params.zipWithIndex.map{
+      params.zipWithIndex.map {
         case (param, idx) =>
           DefDef(param.name, Nil, Nil, TypeTree(), selector(idx)).withPos(param.pos)
       }

@@ -32,11 +32,7 @@ import dotty.tools.dotc.core.Flags
 
 import scala.reflect.internal.util.Collections
 
-/** This transform eliminates patterns. Right now it's a dummy.
- *  Awaiting the real pattern matcher.
- *  elimRepeated is required
- * TODO: outer tests are not generated yet.
- */
+/** Translates pattern matching. */
 class PatternMatcher extends MiniPhaseTransform with DenotTransformer {
   import dotty.tools.dotc.ast.tpd._
 
@@ -144,7 +140,7 @@ class PatternMatcher extends MiniPhaseTransform with DenotTransformer {
 
       // the force is needed mainly to deal with the GADT typing hack (we can't detect it otherwise as tp nor pt need contain an abstract type, we're just casting wildly)
       def _asInstanceOf(b: Symbol, tp: Type): Tree = ref(b).ensureConforms(tp) // andType here breaks t1048
-      def _isInstanceOf(b: Symbol, tp: Type): Tree = ref(b).select(defn.Any_isInstanceOf).appliedToType(tp)
+      def _isInstanceOf(b: Symbol, tp: Type): Tree = ref(b).isInstance(tp)
     }
   }
 
