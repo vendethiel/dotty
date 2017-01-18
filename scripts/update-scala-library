@@ -3,3 +3,7 @@
 baseDir=`pwd`
 . $baseDir/scripts/common
 update DarkDimius scala scala-scala dotty-library
+
+cd scala/scala
+git apply ../scripts/patches/scala-library-minor-tuples-changes.patch
+cd ..

@@ -1,0 +1,115 @@
+From 297d286a8ff1d4e444a5f6c3c91417cf5e1264ae Mon Sep 17 00:00:00 2001
+From: Olivier Blanvillain <olivier.blanvillain@gmail.com>
+Date: Wed, 18 Jan 2017 13:09:54 +0100
+Subject: [PATCH] Minor changes needed for the new tuple encoding
+
+---
+ src/library/scala/collection/mutable/ArrayOps.scala | 20 ++++++++++----------
+ src/library/scala/math/Ordering.scala               |  3 ++-
+ src/library/scala/runtime/Tuple2Zipped.scala        |  2 +-
+ src/library/scala/runtime/Tuple3Zipped.scala        |  2 +-
+ 4 files changed, 14 insertions(+), 13 deletions(-)
+
+diff --git a/src/library/scala/collection/mutable/ArrayOps.scala b/src/library/scala/collection/mutable/ArrayOps.scala
+index 00491ef..eae52f2 100644
+--- a/src/library/scala/collection/mutable/ArrayOps.scala
++++ b/src/library/scala/collection/mutable/ArrayOps.scala
+@@ -107,9 +107,9 @@ trait ArrayOps[T] extends Any with ArrayLike[T, Array[T]] with CustomParalleliza
+       bb.result()
+     }
+   }
+-  
++
+   /** Converts an array of pairs into an array of first elements and an array of second elements.
+-   *  
++   *
+    *  @tparam T1    the type of the first half of the element pairs
+    *  @tparam T2    the type of the second half of the element pairs
+    *  @param asPair an implicit conversion which asserts that the element type
+@@ -129,15 +129,15 @@ trait ArrayOps[T] extends Any with ArrayLike[T, Array[T]] with CustomParalleliza
+     var i = 0
+     while (i < length) {
+       val e = apply(i)
+-      a1(i) = e._1
+-      a2(i) = e._2
++      a1(i) = asPair(e)._1
++      a2(i) = asPair(e)._2
+       i += 1
+     }
+     (a1, a2)
+   }
+-  
++
+   /** Converts an array of triples into three arrays, one containing the elements from each position of the triple.
+-   *  
++   *
+    *  @tparam T1      the type of the first of three elements in the triple
+    *  @tparam T2      the type of the second of three elements in the triple
+    *  @tparam T3      the type of the third of three elements in the triple
+@@ -162,14 +162,14 @@ trait ArrayOps[T] extends Any with ArrayLike[T, Array[T]] with CustomParalleliza
+     var i = 0
+     while (i < length) {
+       val e = apply(i)
+-      a1(i) = e._1
+-      a2(i) = e._2
+-      a3(i) = e._3
++      a1(i) = asTriple(e)._1
++      a2(i) = asTriple(e)._2
++      a3(i) = asTriple(e)._3
+       i += 1
+     }
+     (a1, a2, a3)
+   }
+-  
++
+ 
+   def seq = thisCollection
+ 
+diff --git a/src/library/scala/math/Ordering.scala b/src/library/scala/math/Ordering.scala
+index 66d50e4..0ce342b 100644
+--- a/src/library/scala/math/Ordering.scala
++++ b/src/library/scala/math/Ordering.scala
+@@ -393,6 +393,7 @@ object Ordering extends LowPriorityOrderingImplicits {
+       }
+     }
+ 
++/*
+   implicit def Tuple5[T1, T2, T3, T4, T5](implicit ord1: Ordering[T1], ord2: Ordering[T2], ord3: Ordering[T3], ord4: Ordering[T4], ord5: Ordering[T5]): Ordering[(T1, T2, T3, T4, T5)] =
+     new Ordering[(T1, T2, T3, T4, T5)]{
+       def compare(x: (T1, T2, T3, T4, T5), y: Tuple5[T1, T2, T3, T4, T5]): Int = {
+@@ -497,5 +498,5 @@ object Ordering extends LowPriorityOrderingImplicits {
+         0
+       }
+     }
+-
++*/
+ }
+diff --git a/src/library/scala/runtime/Tuple2Zipped.scala b/src/library/scala/runtime/Tuple2Zipped.scala
+index 512c4fb..a9c66b4 100644
+--- a/src/library/scala/runtime/Tuple2Zipped.scala
++++ b/src/library/scala/runtime/Tuple2Zipped.scala
+@@ -28,7 +28,7 @@ trait ZippedTraversable2[+El1, +El2] extends Any {
+ object ZippedTraversable2 {
+   implicit def zippedTraversable2ToTraversable[El1, El2](zz: ZippedTraversable2[El1, El2]): Traversable[(El1, El2)] = {
+     new scala.collection.AbstractTraversable[(El1, El2)] {
+-      def foreach[U](f: ((El1, El2)) => U): Unit = zz foreach Function.untupled(f)
++      def foreach[U](f: ((El1, El2)) => U): Unit = zz foreach ((a, b) => f((a, b)))
+     }
+   }
+ }
+diff --git a/src/library/scala/runtime/Tuple3Zipped.scala b/src/library/scala/runtime/Tuple3Zipped.scala
+index ffd44ac..f4af615 100644
+--- a/src/library/scala/runtime/Tuple3Zipped.scala
++++ b/src/library/scala/runtime/Tuple3Zipped.scala
+@@ -26,7 +26,7 @@ trait ZippedTraversable3[+El1, +El2, +El3] extends Any {
+ object ZippedTraversable3 {
+   implicit def zippedTraversable3ToTraversable[El1, El2, El3](zz: ZippedTraversable3[El1, El2, El3]): Traversable[(El1, El2, El3)] = {
+     new scala.collection.AbstractTraversable[(El1, El2, El3)] {
+-      def foreach[U](f: ((El1, El2, El3)) => U): Unit = zz foreach Function.untupled(f)
++      def foreach[U](f: ((El1, El2, El3)) => U): Unit = zz foreach ((a, b, c) => f((a, b, c)))
+     }
+   }
+ }
+-- 
+2.1.4
+
