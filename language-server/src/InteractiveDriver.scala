@@ -105,7 +105,7 @@ class ServerDriver(settings: List[String]) extends Driver {
     def classPathClasses(cp: ClassPath): IndexedSeq[ClassPath#ClassRep] =
       cp.classes ++ cp.packages.flatMap(classPathClasses)
 
-    val tastyClasses = classPathClasses(ctx.platform.classPath).map(_.name.toTypeName)
+    val tastyClasses = classPathClasses(ctx.platform.classPath).map(_.fullName.toTypeName)
 
     (sourceClasses.flatMap(c => tree(c, fromSource = true)) ++
       tastyClasses.flatMap(c => tree(c, fromSource = false))).toList
