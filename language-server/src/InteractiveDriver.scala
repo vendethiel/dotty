@@ -114,7 +114,7 @@ class ServerDriver(settings: List[String]) extends Driver {
         case t: PackageDef =>
           traverseChildren(t)
         case t @ TypeDef(_, tmpl : Template) =>
-          names += t.symbol.name.asTypeName
+          names += t.symbol.fullName.asTypeName
         case _ =>
       }
     }
