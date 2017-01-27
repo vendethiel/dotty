@@ -4,12 +4,13 @@ package config
 
 import java.net.{ URL, MalformedURLException }
 import WrappedProperties.AccessControl
-import io.{ ClassPath, JavaClassPath, File, Directory, Path, AbstractFile }
+import io.{ JFile, ClassPath, JavaClassPath, File, SystemFile , Directory, SystemDirectory, Path, AbstractFile }
 import ClassPath.{ JavaContext, DefaultJavaContext, join, split }
 import PartialFunction.condOpt
 import scala.language.postfixOps
 import core.Contexts._
 import Settings._
+import File._
 
 // Loosely based on the draft specification at:
 // https://wiki.scala-lang.org/display/SW/Classpath
@@ -21,10 +22,6 @@ object PathResolver {
   import AccessControl._
 
   def firstNonEmpty(xs: String*) = xs find (_ != "") getOrElse ""
-
-  /** Map all classpath elements to absolute paths and reconstruct the classpath.
-    */
-  def makeAbsolute(cp: String) = ClassPath.map(cp, x => Path(x).toAbsolute.path)
 
   /** pretty print class path */
   def ppcp(s: String) = split(s) match {
@@ -77,21 +74,22 @@ object PathResolver {
     def useJavaClassPath  = Environment.useJavaClassPath
 
     def scalaHome         = Environment.scalaHome
-    def scalaHomeDir      = Directory(scalaHome)
+    def scalaHomeDir      = SystemDirectory(new JFile(scalaHome))
     def scalaHomeExists   = scalaHomeDir.isDirectory
-    def scalaLibDir       = Directory(scalaHomeDir / "lib")
-    def scalaClassesDir   = Directory(scalaHomeDir / "classes")
+    def scalaLibDir       = SystemDirectory(scalaHomeDir / "lib")
+    def scalaClassesDir   = SystemDirectory(scalaHomeDir / "classes")
 
-    def scalaLibAsJar     = File(scalaLibDir / "scala-library.jar")
-    def scalaLibAsDir     = Directory(scalaClassesDir / "library")
+    def scalaLibAsJar     = SystemFile(scalaLibDir / "scala-library.jar")
+    def scalaLibAsDir     = SystemDirectory(scalaClassesDir / "library")
 
-    def scalaLibDirFound: Option[Directory] =
-      if (scalaLibAsJar.isFile) Some(scalaLibDir)
+    def scalaLibDirFound: Option[Directory] = {
+      if (!scalaLibAsJar.isDirectory && scalaLibAsJar.exists) Some(scalaLibDir)
       else if (scalaLibAsDir.isDirectory) Some(scalaClassesDir)
       else None
+    }
 
     def scalaLibFound =
-      if (scalaLibAsJar.isFile) scalaLibAsJar.path
+      if (!scalaLibAsJar.isDirectory && scalaLibAsJar.exists) scalaLibAsJar.path
       else if (scalaLibAsDir.isDirectory) scalaLibAsDir.path
       else ""
 
@@ -110,7 +108,7 @@ object PathResolver {
 
     def scalaExtDirs = Environment.scalaExtDirs
 
-    def scalaPluginPath = (scalaHomeDir / "misc" / "scala-devel" / "plugins").path
+    def scalaPluginPath = SystemDirectory(scalaHomeDir / "misc" / "scala-devel" / "plugins").path
 
     override def toString = """
       |object Defaults {

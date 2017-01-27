@@ -7,7 +7,7 @@
 package dotty.tools
 package io
 
-import java.io.{ InputStream, OutputStream, IOException, FileNotFoundException, FileInputStream, DataOutputStream }
+import java.io.{ InputStream, OutputStream, IOException, FileNotFoundException, FileInputStream, DataOutputStream, ByteArrayInputStream }
 import java.util.jar._
 import scala.collection.JavaConverters._
 import Attributes.Name
@@ -33,29 +33,31 @@ import scala.language.{postfixOps, implicitConversions}
 // static Attributes.Name   SPECIFICATION_VENDOR
 // static Attributes.Name   SPECIFICATION_VERSION
 
-class Jar(file: File) extends Iterable[JarEntry] {
-  def this(jfile: JFile) = this(File(jfile))
-  def this(path: String) = this(File(path))
+class Jar(file: WritableBinaryFile) extends Iterable[JarEntry] {
 
   protected def errorFn(msg: String): Unit = Console println msg
 
-  lazy val jarFile  = new JarFile(file.jfile)
   lazy val manifest = withJarInput(s => Option(s.getManifest))
 
-  def mainClass     = manifest map (f => f(Name.MAIN_CLASS))
+  def mainClass = manifest map (f => f(Name.MAIN_CLASS))
+
   /** The manifest-defined classpath String if available. */
-  def classPathString: Option[String] =
-    for (m <- manifest ; cp <- m.attrs get Name.CLASS_PATH) yield cp
+  def classPathString: Option[String] = for {
+    m <- manifest
+    cp <- m.attrs get Name.CLASS_PATH
+  } yield cp
+
   def classPathElements: List[String] = classPathString match {
     case Some(s)  => s split "\\s+" toList
     case _        => Nil
   }
 
   def withJarInput[T](f: JarInputStream => T): T = {
-    val in = new JarInputStream(file.inputStream())
+    val in = new JarInputStream(file.inputStream)
     try f(in)
     finally in.close()
   }
+
   def jarWriter(mainAttrs: (Attributes.Name, String)*) = {
     new JarWriter(file, Jar.WManifest(mainAttrs: _*).underlying)
   }
@@ -64,17 +66,12 @@ class Jar(file: File) extends Iterable[JarEntry] {
     Iterator continually in.getNextJarEntry() takeWhile (_ != null) foreach f
   }
   override def iterator: Iterator[JarEntry] = this.toList.iterator
-  def fileishIterator: Iterator[Fileish] = jarFile.entries.asScala map (x => Fileish(x, () => getEntryStream(x)))
 
-  private def getEntryStream(entry: JarEntry) = jarFile getInputStream entry match {
-    case null   => errorFn("No such entry: " + entry) ; null
-    case x      => x
-  }
-  override def toString = "" + file
+  override def toString = file.toString
 }
 
-class JarWriter(val file: File, val manifest: Manifest) {
-  private lazy val out = new JarOutputStream(file.outputStream(), manifest)
+class JarWriter(val file: WritableBinaryFile, val manifest: Manifest) {
+  private lazy val out = new JarOutputStream(file.outputStream, manifest)
 
   /** Adds a jar entry for the given path and returns an output
    *  stream to which the data should immediately be written.
@@ -87,24 +84,31 @@ class JarWriter(val file: File, val manifest: Manifest) {
   }
 
   def writeAllFrom(dir: Directory): Unit = {
-    try dir.list foreach (x => addEntry(x, ""))
+    try dir.listFiles foreach (x => addEntry(x, ""))
     finally out.close()
   }
+
   def addStream(entry: JarEntry, in: InputStream): Unit =  {
     out putNextEntry entry
     try transfer(in, out)
     finally out.closeEntry()
   }
+
   def addFile(file: File, prefix: String): Unit =  {
     val entry = new JarEntry(prefix + file.name)
-    addStream(entry, file.inputStream())
+    file match {
+      case file: TextFile =>
+        addStream(entry, new ByteArrayInputStream(file.content.getBytes))
+      case file: BinaryFile =>
+        addStream(entry, file.inputStream)
+    }
   }
-  def addEntry(entry: Path, prefix: String): Unit =  {
-    if (entry.isFile) addFile(entry.toFile, prefix)
-    else addDirectory(entry.toDirectory, prefix + entry.name + "/")
-  }
-  def addDirectory(entry: Directory, prefix: String): Unit =  {
-    entry.list foreach (p => addEntry(p, prefix))
+
+  def addEntry(entry: File, prefix: String): Unit = entry match {
+    case entry: Directory =>
+      entry.listFiles.foreach(addEntry(_, prefix + entry.name + "/"))
+    case entry: File =>
+      addFile(entry, prefix)
   }
 
   private def transfer(in: InputStream, out: OutputStream) = {
@@ -158,14 +162,20 @@ object Jar {
 
   // See http://download.java.net/jdk7/docs/api/java/nio/file/Path.html
   // for some ideas.
-  private val ZipMagicNumber = List[Byte](80, 75, 3, 4)
-  private def magicNumberIsZip(f: Path) = f.isFile && (f.toFile.bytes().take(4).toList == ZipMagicNumber)
+  private val ZipMagicNumber = Array[Byte](80, 75, 3, 4)
 
-  def isJarOrZip(f: Path): Boolean = isJarOrZip(f, true)
-  def isJarOrZip(f: Path, examineFile: Boolean): Boolean =
+  private def magicNumberIsZip(f: BinaryFile) =
+    f.isFile && (f.content.slice(0, 4) == ZipMagicNumber)
+
+  def isJarOrZip(f: File): Boolean = f match {
+    case f: BinaryFile => isJarOrZip(f, true)
+    case _ => false
+  }
+
+  def isJarOrZip(f: BinaryFile, examineFile: Boolean): Boolean =
     f.hasExtension("zip", "jar") || (examineFile && magicNumberIsZip(f))
 
-  def create(file: File, sourceDir: Directory, mainClass: String): Unit =  {
+  def create(file: WritableBinaryFile, sourceDir: Directory, mainClass: String): Unit = {
     val writer = new Jar(file).jarWriter(Name.MAIN_CLASS -> mainClass)
     writer writeAllFrom sourceDir
   }

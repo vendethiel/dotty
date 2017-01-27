@@ -32,7 +32,7 @@ object ClassPath {
 
     /** Get all subdirectories, jars, zips out of a directory. */
     def lsDir(dir: Directory, filt: String => Boolean = _ => true) = {
-      val files = synchronized(dir.list)
+      val files = synchronized(dir.listFiles)
       files filter (x => filt(x.name) && (x.isDirectory || isJarOrZip(x))) map (_.path) toList
     }
 
@@ -40,11 +40,11 @@ object ClassPath {
       if (s contains File.separator) s.substring(0, s.lastIndexOf(File.separator))
       else "."
 
-    if (pattern == "*") lsDir(Directory("."))
-    else if (pattern endsWith wildSuffix) lsDir(Directory(pattern dropRight 2))
+    if (pattern == "*") lsDir(SystemDirectory(new JFile(".")))
+    else if (pattern endsWith wildSuffix) lsDir(SystemDirectory(new JFile(pattern dropRight 2)))
     else if (pattern contains '*') {
       val regexp = ("^%s$" format pattern.replaceAll("""\*""", """.*""")).r
-      lsDir(Directory(pattern).parent, regexp findFirstIn _ isDefined)
+      lsDir(SystemDirectory(new JFile(pattern)).parent, regexp findFirstIn _ isDefined)
     }
     else List(pattern)
   }
@@ -90,13 +90,13 @@ object ClassPath {
    *  relative to the location of the jar.
    */
   def expandManifestPath(jarPath: String): List[URL] = {
-    val file = File(jarPath)
+    val file = SystemFile(new JFile(jarPath))
     if (!file.isFile) return Nil
 
     val baseDir = file.parent
-    new Jar(file).classPathElements map (elem =>
-      specToURL(elem) getOrElse (baseDir / elem).toURL
-    )
+    new Jar(file).classPathElements map { elem =>
+      specToURL(elem) getOrElse (baseDir / elem).toURI.toURL
+    }
   }
 
   /** A useful name filter. */

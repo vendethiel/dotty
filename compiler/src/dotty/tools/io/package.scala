@@ -14,10 +14,6 @@ package object io {
   // Forwarders from scala.reflect.io
   type AbstractFile = scala.reflect.io.AbstractFile
   val AbstractFile = scala.reflect.io.AbstractFile
-  type Directory = scala.reflect.io.Directory
-  val Directory = scala.reflect.io.Directory
-  type File = scala.reflect.io.File
-  val File = scala.reflect.io.File
   type Path = scala.reflect.io.Path
   val Path = scala.reflect.io.Path
   type PlainFile = scala.reflect.io.PlainFile
