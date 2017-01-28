@@ -73,6 +73,10 @@ object Positions {
     def contains(that: Position): Boolean =
       !that.exists || exists && (start <= that.start && end >= that.end)
 
+    /** Do this and that have the same range? */
+    def sameRange(that: Position): Boolean =
+      (!that.exists && !exists) || exists && (start == that.start && end == that.end)
+
     /** Is this position synthetic? */
     def isSynthetic = pointDelta == SyntheticPointDelta
 
