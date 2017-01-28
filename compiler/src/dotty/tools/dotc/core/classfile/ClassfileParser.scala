@@ -33,7 +33,7 @@ class ClassfileParser(
 
   protected val in = new AbstractFileReader(classfile)
 
-  protected val staticModule: Symbol = moduleRoot.sourceModule(ictx)
+  protected val staticModule: Symbol = if (moduleRoot != null) moduleRoot.sourceModule(ictx) else null
 
   protected val instanceScope: MutableScope = newScope     // the scope of all instance definitions
   protected val staticScope: MutableScope = newScope       // the scope of all static definitions
@@ -42,13 +42,42 @@ class ClassfileParser(
   protected var currentClassName: SimpleName = _      // JVM name of the current class
   protected var classTParams = Map[Name,Symbol]()
 
-  classRoot.info = (new NoCompleter).withDecls(instanceScope)
-  moduleRoot.info = (new NoCompleter).withDecls(staticScope).withSourceModule(_ => staticModule)
+  if (classRoot != null) classRoot.info = (new NoCompleter).withDecls(instanceScope)
+  if (moduleRoot != null) moduleRoot.info = (new NoCompleter).withDecls(staticScope).withSourceModule(_ => staticModule)
 
   private def currentIsTopLevel(implicit ctx: Context) = classRoot.owner is Flags.PackageClass
 
   private def mismatchError(className: SimpleName) =
     throw new IOException(s"class file '${in.file}' has location not matching its contents: contains class $className")
+
+  // FIXME
+  def hasTasty(implicit ctx: Context): Boolean = {
+    parseHeader
+    this.pool = new ConstantPool
+
+    val jflags       = in.nextChar
+    val nameIdx      = in.nextChar
+    val oldbp = in.bp
+
+    skipSuperclasses()
+    skipMembers() // fields
+    skipMembers() // methods
+    val attrs = in.nextChar
+    val attrbp = in.bp
+
+    def scan(target: TypeName): Boolean = {
+      in.bp = attrbp
+      var i = 0
+      while (i < attrs && pool.getName(in.nextChar).toTypeName != target) {
+        val attrLen = in.nextInt
+        in.skip(attrLen)
+        i += 1
+      }
+      i < attrs
+    }
+
+    scan(tpnme.TASTYATTR)
+  }
 
   def run()(implicit ctx: Context): Option[Embedded] = try {
     ctx.debuglog("[class] >> " + classRoot.fullName)

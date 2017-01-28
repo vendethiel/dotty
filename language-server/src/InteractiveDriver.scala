@@ -99,13 +99,24 @@ class ServerDriver(settings: List[String]) extends Driver {
     }
   }
 
+  lazy val tastyClasses = {
+    def classNames(cp: ClassPath): IndexedSeq[TypeName] =
+      cp.classes
+        .filter(cls => cls.binary match {
+          case None =>
+            true
+          case Some(binfile) =>
+            // FIXME: need a better way to check if classfile has tasty section
+            new classfile.ClassfileParser(binfile, null, null)(ctx).hasTasty
+        })
+        .map(_.name.toTypeName) ++
+      cp.packages.flatMap(pkg => classNames(pkg).map(name => s"${pkg.name}.$name".toTypeName))
+
+    classNames(ctx.platform.classPath)
+  }
+
   def trees = {
     val sourceClasses = openClasses.values.flatten
-
-    def classPathClasses(cp: ClassPath): IndexedSeq[ClassPath#ClassRep] =
-      cp.classes ++ cp.packages.flatMap(classPathClasses)
-
-    val tastyClasses = classPathClasses(ctx.platform.classPath).map(_.fullName.toTypeName)
 
     (sourceClasses.flatMap(c => tree(c, fromSource = true)) ++
       tastyClasses.flatMap(c => tree(c, fromSource = false))).toList
