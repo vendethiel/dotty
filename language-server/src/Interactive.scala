@@ -72,6 +72,7 @@ object Interactive {
         case _ =>
           path
       }
+      // println("###PATH: " + path.map(_.show))
       sanePath(path).asInstanceOf[List[tpd.Tree]]
     })
 

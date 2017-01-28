@@ -133,7 +133,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     println("classPath: " + classPath)
     println("target: " + target)
 
-    driver = new ServerDriver(List(/*"-Yplain-printer",*/"-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", target + ":" + classPath))
+    driver = new ServerDriver(List(/*"-Yplain-printer",*/"-Ydebug", "-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", target + ":" + classPath))
 
 
     val c = new ServerCapabilities
