@@ -54,5 +54,6 @@ object Test {
     assert(lCount == 1, lCount)
     sds(data2)
     assert(tCount == 2, tCount)
+    assert(implicitly[Values[Col]].values == collection.immutable.List(Red, Green, Blue))
   }
 }
