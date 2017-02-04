@@ -190,8 +190,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val sym = Interactive.enclosingSymbol(trees, spos)
-
-      JEither.forRight(Interactive.definitions(trees, sym).map(location).asJava)
+      val defs = Interactive.definitions(trees, sym, namePosition = true, allowApproximation = true)
+      JEither.forRight(defs.map(location).asJava)
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
