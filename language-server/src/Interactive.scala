@@ -148,18 +148,23 @@ object Interactive {
     buf.toList
   }
 
-  def definitions(trees: List[SourceTree], sym: Symbol, namePosition: Boolean = true)(implicit ctx: Context): List[SourcePosition] = {
+  def definitions(trees: List[SourceTree], sym: Symbol, namePosition: Boolean = true,
+    allowApproximation: Boolean = false)(implicit ctx: Context): List[SourcePosition] = {
     val poss = new mutable.ListBuffer[SourcePosition]
 
     if (!sym.exists)
       Nil
-    else
+    else {
       // Type annotation not needed when compiling with dotty
-      positionedAccumulator[SourcePosition](trees,
+      val res = positionedAccumulator[SourcePosition](trees,
         (tree, spos, buf) =>
           if (tree.isInstanceOf[MemberDef] && matchingSymbol(tree, sym))
             buf += spos,
         namePosition)
+      if (res.isEmpty && allowApproximation) {
+        definitions(trees, nonLocalDummy(sym.owner), namePosition, allowApproximation).take(1)
+      } else res
+    }
   }
 
   def allDefinitions(trees: List[SourceTree], filter: String = "", namePosition: Boolean = true)(implicit ctx: Context): List[(Symbol, SourcePosition)] =
