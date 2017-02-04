@@ -109,13 +109,16 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
   def computeAsync[R](fun: CancelChecker => R): CompletableFuture[R] =
     CompletableFutures.computeAsync({(cancelToken: CancelChecker) =>
-      cancelToken.checkCanceled()
-      try {
-        fun(cancelToken)
-      } catch {
-        case NonFatal(ex) =>
-          ex.printStackTrace
-          throw ex
+      // We do not support any concurrent use of the compiler currently.
+      synchronized {
+        cancelToken.checkCanceled()
+        try {
+          fun(cancelToken)
+        } catch {
+          case NonFatal(ex) =>
+            ex.printStackTrace
+            throw ex
+        }
       }
     }.asJava)
 
