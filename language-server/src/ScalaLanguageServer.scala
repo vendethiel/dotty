@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture
 
 import org.eclipse.lsp4j
 import org.eclipse.lsp4j.jsonrpc.{CancelChecker, CompletableFutures}
+import org.eclipse.lsp4j.jsonrpc.messages.{Either => JEither}
 import org.eclipse.lsp4j._
 import org.eclipse.lsp4j.services._
 
@@ -162,7 +163,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     }
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = null
     // FIXME: share code with messages.NotAMember
-    override def completion(params: TextDocumentPositionParams): CompletableFuture[CompletionList] = computeAsync { cancelToken =>
+    override def completion(params: TextDocumentPositionParams) = computeAsync { cancelToken =>
       implicit val ctx = driver.ctx
 
       val trees = driver.trees
@@ -178,16 +179,16 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
         item
       })
 
-      new CompletionList(/*isIncomplete = */ false, items.asJava)
+      JEither.forRight(new CompletionList(/*isIncomplete = */ false, items.asJava))
     }
-    override def definition(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+    override def definition(params: TextDocumentPositionParams) = computeAsync { cancelToken =>
       implicit val ctx = driver.ctx
 
       val trees = driver.trees
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val sym = Interactive.enclosingSymbol(trees, spos)
 
-      Interactive.definitions(trees, sym).map(location).asJava
+      JEither.forRight(Interactive.definitions(trees, sym).map(location).asJava)
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -259,7 +260,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       println("hover: " + tp.show)
 
       val str = tp.widenTermRefExpr.show.toString
-      new Hover(List(str).asJava, null)
+      val h = new Hover()
+      h.setContents(str)
+      h
     }
 
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
