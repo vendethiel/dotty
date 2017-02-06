@@ -291,9 +291,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
 
       val sym = Interactive.enclosingSymbol(trees, pos)
+      val linkedSym = sym.linkedClass
+
       val newName = params.getNewName
 
-      val poss = Interactive.references(trees, sym)
+      val poss = Interactive.references(trees, sym) ++ Interactive.references(trees, linkedSym)
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name), newName)).asJava)
 
