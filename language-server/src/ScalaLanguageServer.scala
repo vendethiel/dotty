@@ -38,7 +38,7 @@ import scala.io.Codec
 import dotty.tools.dotc.util.SourceFile
 import java.io._
 
-import Flags._, Symbols._, Names._
+import Flags._, Symbols._, Names._, NameOps._
 import core.Decorators._
 
 import ast.Trees._
@@ -295,7 +295,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val poss = Interactive.references(trees, sym)
 
-      val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name.length), newName)).asJava)
+      val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name), newName)).asJava)
 
       new WorkspaceEdit(changes.asJava)
     }
@@ -321,7 +321,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 object ScalaLanguageServer {
   import ast.tpd._
 
-  def nameRange(p: SourcePosition, nameLength: Int): Range = {
+  def nameRange(p: SourcePosition, name: Name): Range = {
+    val nameLength = name.stripModuleClassSuffix.length
     val (beginName, endName) =
       if (p.pos.isSynthetic)
         (p.pos.end - nameLength, p.pos.end)

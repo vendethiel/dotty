@@ -207,7 +207,7 @@ object Interactive {
    */
   private[this] def displayedPos(tree: NameTree, namePosition: Boolean)(implicit ctx: Context): Position = {
     val treePos = tree.pos
-    val nameLength = tree.name.show.toString.length
+    val nameLength = tree.name.stripModuleClassSuffix.show.toString.length
     if (namePosition) {
       // FIXME: This is incorrect in some cases, like with backquoted identifiers,
       //        see https://github.com/lampepfl/dotty/pull/1634#issuecomment-257079436
