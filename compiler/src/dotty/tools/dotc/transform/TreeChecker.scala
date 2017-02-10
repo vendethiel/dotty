@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package transform
 
 import TreeTransforms._
@@ -143,7 +144,7 @@ class TreeChecker extends Phase with SymTransformer {
     // don't check value classes after typer, as the constraint about constructors doesn't hold after transform
     override def checkDerivedValueClass(clazz: Symbol, stats: List[Tree])(implicit ctx: Context) = ()
 
-    def withDefinedSym[T](tree: untpd.Tree)(op: => T)(implicit ctx: Context): T = tree match {
+    def withDefinedSym[T](tree: untpd.Tree)(op: => T @allowCaptures)(implicit ctx: Context): T = tree match {
       case tree: DefTree =>
         val sym = tree.symbol
         assert(isValidJVMName(sym.name), s"${sym.fullName} name is invalid on jvm")
@@ -175,10 +176,10 @@ class TreeChecker extends Phase with SymTransformer {
       case _ => op
     }
 
-    def withDefinedSyms[T](trees: List[untpd.Tree])(op: => T)(implicit ctx: Context) =
+    def withDefinedSyms[T](trees: List[untpd.Tree])(op: => T @allowCaptures)(implicit ctx: Context) =
       trees.foldRightBN(op)(withDefinedSym(_)(_))
 
-    def withDefinedSymss[T](vparamss: List[List[untpd.ValDef]])(op: => T)(implicit ctx: Context): T =
+    def withDefinedSymss[T](vparamss: List[List[untpd.ValDef]])(op: => T @allowCaptures)(implicit ctx: Context): T =
       vparamss.foldRightBN(op)(withDefinedSyms(_)(_))
 
     def assertDefined(tree: untpd.Tree)(implicit ctx: Context) =

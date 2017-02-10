@@ -1,4 +1,5 @@
-package dotty.tools.dotc.util
+package dotty.tools
+package dotc.util
 
 import collection.mutable.ListBuffer
 
@@ -9,7 +10,7 @@ abstract class SimpleMap[K <: AnyRef, +V >: Null <: AnyRef] extends (K => V) {
   def updated[V1 >: V <: AnyRef](k: K, v: V1): SimpleMap[K, V1]
   def contains(k: K): Boolean = apply(k) != null
   def mapValuesNow[V1 >: V <: AnyRef](f: (K, V1) => V1): SimpleMap[K, V1]
-  def foreachBinding(f: (K, V) => Unit): Unit
+  def foreachBinding(f: ((K, V) => Unit) @allowCaptures): Unit
   def map2[T](f: (K, V) => T): List[T] = {
     val buf = new ListBuffer[T]
     foreachBinding((k, v) => buf += f(k, v))

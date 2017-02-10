@@ -96,7 +96,7 @@ object Types {
     def exists: Boolean = true
 
     /** This type, if it exists, otherwise `that` type */
-    def orElse(that: => Type) = if (exists) this else that
+    def orElse(that: => Type @allowCaptures) = if (exists) this else that
 
     /** Is this type a value type? */
     final def isValueType: Boolean = this.isInstanceOf[ValueType]
@@ -235,16 +235,16 @@ object Types {
 
     /** Returns true if there is a part of this type that satisfies predicate `p`.
      */
-    final def existsPart(p: Type => Boolean, forceLazy: Boolean = true)(implicit ctx: Context): Boolean =
+    final def existsPart(p: (Type => Boolean) @allowCaptures, forceLazy: Boolean = true)(implicit ctx: Context): Boolean =
       new ExistsAccumulator(p, forceLazy).apply(false, this)
 
     /** Returns true if all parts of this type satisfy predicate `p`.
      */
-    final def forallParts(p: Type => Boolean)(implicit ctx: Context): Boolean =
+    final def forallParts(p: (Type => Boolean) @allowCaptures)(implicit ctx: Context): Boolean =
       !existsPart(!p(_))
 
     /** Performs operation on all parts of this type */
-    final def foreachPart(p: Type => Unit, stopAtStatic: Boolean = false)(implicit ctx: Context): Unit =
+    final def foreachPart(p: (Type => Unit) @allowCaptures, stopAtStatic: Boolean = false)(implicit ctx: Context): Unit =
       new ForeachAccumulator(p, stopAtStatic).apply((), this)
 
     /** The parts of this type which are type or term refs */
@@ -258,18 +258,18 @@ object Types {
      *  @param excludeLowerBounds  If set to true, the lower bounds of abstract
      *                             types will be ignored.
      */
-    def namedPartsWith(p: NamedType => Boolean, excludeLowerBounds: Boolean = false)
+    def namedPartsWith(p: (NamedType => Boolean) @allowCaptures, excludeLowerBounds: Boolean = false)
       (implicit ctx: Context): collection.Set[NamedType] =
       new NamedPartsAccumulator(p, excludeLowerBounds).apply(mutable.LinkedHashSet(), this)
 
     /** Map function `f` over elements of an AndType, rebuilding with function `g` */
-    def mapReduceAnd[T](f: Type => T)(g: (T, T) => T)(implicit ctx: Context): T = stripTypeVar match {
+    def mapReduceAnd[T](f: (Type => T) @allowCaptures)(g: ((T, T) => T) @allowCaptures)(implicit ctx: Context): T = stripTypeVar match {
       case AndType(tp1, tp2) => g(tp1.mapReduceAnd(f)(g), tp2.mapReduceAnd(f)(g))
       case _ => f(this)
     }
 
     /** Map function `f` over elements of an OrType, rebuilding with function `g` */
-    final def mapReduceOr[T](f: Type => T)(g: (T, T) => T)(implicit ctx: Context): T = stripTypeVar match {
+    final def mapReduceOr[T](f: (Type => T) @allowCaptures)(g: ((T, T) => T) @allowCaptures)(implicit ctx: Context): T = stripTypeVar match {
       case OrType(tp1, tp2) => g(tp1.mapReduceOr(f)(g), tp2.mapReduceOr(f)(g))
       case _ => f(this)
     }
@@ -629,7 +629,7 @@ object Types {
         Set()
     }
 
-    def memberDenots(keepOnly: NameFilter, f: (Name, mutable.Buffer[SingleDenotation]) => Unit)(implicit ctx: Context): Seq[SingleDenotation] = {
+    def memberDenots(keepOnly: NameFilter, f: ((Name, mutable.Buffer[SingleDenotation]) => Unit) @allowCaptures)(implicit ctx: Context): Seq[SingleDenotation] = {
       val buf = mutable.ArrayBuffer[SingleDenotation]()
       for (name <- memberNames(keepOnly)) f(name, buf)
       buf
@@ -2111,7 +2111,7 @@ object Types {
     }
   }
 
-  class RecType(parentExp: RecType => Type) extends RefinedOrRecType with BindingType {
+  class RecType(parentExp: (RecType => Type) @allowCaptures) extends RefinedOrRecType with BindingType {
 
     // See discussion in findMember#goRec why these vars are needed
     private[Types] var opened: Boolean = false
@@ -2166,7 +2166,7 @@ object Types {
      *   TODO: Figure out how to guarantee absence of cycles
      *         of length > 1
      */
-    def apply(parentExp: RecType => Type)(implicit ctx: Context): RecType = {
+    def apply(parentExp: (RecType => Type) @allowCaptures)(implicit ctx: Context): RecType = {
       val rt = new RecType(parentExp)
       def normalize(tp: Type): Type = tp.stripTypeVar match {
         case tp: RecType =>
@@ -2182,7 +2182,7 @@ object Types {
       }
       unique(rt.derivedRecType(normalize(rt.parent))).checkInst
     }
-    def closeOver(parentExp: RecType => Type)(implicit ctx: Context) = {
+    def closeOver(parentExp: (RecType => Type) @allowCaptures)(implicit ctx: Context) = {
       val rt = this(parentExp)
       if (rt.isReferredToBy(rt.parent)) rt else rt.parent
     }
@@ -2313,7 +2313,7 @@ object Types {
   trait MethodOrPoly extends MethodicType
 
   abstract case class MethodType(paramNames: List[TermName], paramTypes: List[Type])
-      (resultTypeExp: MethodType => Type)
+      (resultTypeExp: (MethodType => Type)  @allowCaptures)
     extends CachedGroundType with BindingType with TermType with MethodOrPoly with NarrowCached { thisMethodType =>
     import MethodType._
 
@@ -2399,13 +2399,13 @@ object Types {
                           resType: Type = this.resType)(implicit ctx: Context) =
       if ((paramNames eq this.paramNames) && (paramTypes eq this.paramTypes) && (resType eq this.resType)) this
       else {
-        val resTypeFn = (x: MethodType) => resType.subst(this, x)
+        val resTypeFn: (MethodType => Type) @allowCaptures = (x: MethodType) => resType.subst(this, x) // OK
         if (isJava) JavaMethodType(paramNames, paramTypes)(resTypeFn)
         else if (isImplicit) ImplicitMethodType(paramNames, paramTypes)(resTypeFn)
         else MethodType(paramNames, paramTypes)(resTypeFn)
       }
 
-    def instantiate(argTypes: => List[Type])(implicit ctx: Context): Type =
+    def instantiate(argTypes: => List[Type] @allowCaptures)(implicit ctx: Context): Type =
       if (isDependent) resultType.substParams(this, argTypes)
       else resultType
 
@@ -2446,10 +2446,10 @@ object Types {
   }
 
   abstract class MethodTypeCompanion {
-    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType
+    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: (MethodType => Type) @allowCaptures)(implicit ctx: Context): MethodType
     def apply(paramNames: List[TermName], paramTypes: List[Type], resultType: Type)(implicit ctx: Context): MethodType =
       apply(paramNames, paramTypes)(_ => resultType)
-    def apply(paramTypes: List[Type])(resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType =
+    def apply(paramTypes: List[Type])(resultTypeExp: (MethodType => Type) @allowCaptures)(implicit ctx: Context): MethodType =
       apply(nme.syntheticParamNames(paramTypes.length), paramTypes)(resultTypeExp)
     def apply(paramTypes: List[Type], resultType: Type)(implicit ctx: Context): MethodType =
       apply(nme.syntheticParamNames(paramTypes.length), paramTypes, resultType)
@@ -2484,7 +2484,7 @@ object Types {
   }
 
   object MethodType extends MethodTypeCompanion {
-    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: MethodType => Type)(implicit ctx: Context) =
+    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: (MethodType => Type) @allowCaptures)(implicit ctx: Context) =
       unique(new CachedMethodType(paramNames, paramTypes)(resultTypeExp))
 
     private type DependencyStatus = Byte
@@ -2497,12 +2497,12 @@ object Types {
   }
 
   object JavaMethodType extends MethodTypeCompanion {
-    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: MethodType => Type)(implicit ctx: Context) =
+    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: (MethodType => Type) @allowCaptures)(implicit ctx: Context) =
       unique(new JavaMethodType(paramNames, paramTypes)(resultTypeExp))
   }
 
   object ImplicitMethodType extends MethodTypeCompanion {
-    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: MethodType => Type)(implicit ctx: Context) =
+    def apply(paramNames: List[TermName], paramTypes: List[Type])(resultTypeExp: (MethodType => Type) @allowCaptures)(implicit ctx: Context) =
       unique(new ImplicitMethodType(paramNames, paramTypes)(resultTypeExp))
   }
 
@@ -2528,7 +2528,7 @@ object Types {
 
   /** A type lambda of the form `[v_0 X_0, ..., v_n X_n] => T` */
   class PolyType(val paramNames: List[TypeName], val variances: List[Int])(
-      paramBoundsExp: PolyType => List[TypeBounds], resultTypeExp: PolyType => Type)
+      paramBoundsExp: (PolyType => List[TypeBounds])  @allowCaptures, resultTypeExp: (PolyType => Type) @allowCaptures)
   extends CachedProxyType with BindingType with MethodOrPoly {
 
     /** The bounds of the type parameters */
@@ -2635,8 +2635,8 @@ object Types {
 
   object PolyType {
     def apply(paramNames: List[TypeName], variances: List[Int] = Nil)(
-        paramBoundsExp: PolyType => List[TypeBounds],
-        resultTypeExp: PolyType => Type)(implicit ctx: Context): PolyType = {
+        paramBoundsExp: (PolyType => List[TypeBounds]) @allowCaptures,
+        resultTypeExp: (PolyType => Type) @allowCaptures)(implicit ctx: Context): PolyType = {
       val vs = if (variances.isEmpty) paramNames.map(alwaysZero) else variances
       unique(new PolyType(paramNames, vs)(paramBoundsExp, resultTypeExp))
     }

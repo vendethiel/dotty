@@ -108,7 +108,7 @@ object Parsers {
     /** Issue an error at given offset if beyond last error offset
       *  and update lastErrorOffset.
       */
-    def syntaxError(msg: => Message, offset: Int = in.offset): Unit =
+    def syntaxError(msg: => Message @allowCaptures, offset: Int = in.offset): Unit =
       if (offset > lastErrorOffset) {
         syntaxError(msg, Position(offset))
         lastErrorOffset = in.offset
@@ -117,7 +117,7 @@ object Parsers {
     /** Unconditionally issue an error at given position, without
       *  updating lastErrorOffset.
       */
-    def syntaxError(msg: => Message, pos: Position): Unit =
+    def syntaxError(msg: => Message @allowCaptures, pos: Position): Unit =
       ctx.error(msg, source atPos pos)
 
   }
@@ -225,23 +225,23 @@ object Parsers {
       }
     }
 
-    def warning(msg: => Message, sourcePos: SourcePosition) =
+    def warning(msg: => Message @allowCaptures, sourcePos: SourcePosition) =
       ctx.warning(msg, sourcePos)
 
-    def warning(msg: => Message, offset: Int = in.offset) =
+    def warning(msg: => Message @allowCaptures, offset: Int = in.offset) =
       ctx.warning(msg, source atPos Position(offset))
 
-    def deprecationWarning(msg: => Message, offset: Int = in.offset) =
+    def deprecationWarning(msg: => Message @allowCaptures, offset: Int = in.offset) =
       ctx.deprecationWarning(msg, source atPos Position(offset))
 
     /** Issue an error at current offset taht input is incomplete */
-    def incompleteInputError(msg: => Message) =
+    def incompleteInputError(msg: => Message @allowCaptures) =
       ctx.incompleteInputError(msg, source atPos Position(in.offset))
 
     /** If at end of file, issue an incompleteInputError.
      *  Otherwise issue a syntax error and skip to next safe point.
      */
-   def syntaxErrorOrIncomplete(msg: => Message) =
+   def syntaxErrorOrIncomplete(msg: => Message @allowCaptures) =
       if (in.token == EOF) incompleteInputError(msg)
       else {
         syntaxError(msg)
@@ -1285,7 +1285,7 @@ object Parsers {
     def argumentExprs(): List[Tree] =
       if (in.token == LBRACE) blockExpr() :: Nil else parArgumentExprs()
 
-    val argumentExpr = () => exprInParens() match {
+    val argumentExpr: (() => Tree) @allowCaptures = () => exprInParens() match {
       case a @ Assign(Ident(id), rhs) => cpy.NamedArg(a)(id, rhs)
       case e => e
     }
@@ -1474,7 +1474,7 @@ object Parsers {
      *  PatVar           ::= id
      *                    |  `_'
      */
-    val simplePattern = () => in.token match {
+    val simplePattern: (() => Tree) @allowCaptures = () => in.token match {
       case IDENTIFIER | BACKQUOTED_IDENT | THIS =>
         path(thisOK = true) match {
           case id @ Ident(nme.raw.MINUS) if isNumericLit => literal(startOffset(id))

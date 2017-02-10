@@ -50,7 +50,7 @@ object Comments {
 
     val isDocComment = raw.startsWith("/**")
 
-    def expand(f: String => String): Comment = new Comment(pos, f(raw)) {
+    def expand(f: (String => String) @allowCaptures): Comment = new Comment(pos, f(raw)) {
       val isExpanded = true
       val usecases = self.usecases
     }

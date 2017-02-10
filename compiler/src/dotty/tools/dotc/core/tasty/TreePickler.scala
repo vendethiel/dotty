@@ -25,7 +25,7 @@ class TreePickler(pickler: TastyPickler) {
   private val forwardSymRefs = new mutable.HashMap[Symbol, List[Addr]]
   private val pickledTypes = new java.util.IdentityHashMap[Type, Any] // Value type is really Addr, but that's not compatible with null
 
-  private def withLength(op: => Unit) = {
+  private def withLength(op: => Unit @allowCaptures) = {
     val lengthAddr = reserveRef(relative = true)
     op
     fillRef(lengthAddr, currentAddr, relative = true)
@@ -307,7 +307,7 @@ class TreePickler(pickler: TastyPickler) {
   def pickleTreeUnlessEmpty(tree: Tree)(implicit ctx: Context): Unit =
     if (!tree.isEmpty) pickleTree(tree)
 
-  def pickleDef(tag: Int, sym: Symbol, tpt: Tree, rhs: Tree = EmptyTree, pickleParams: => Unit = ())(implicit ctx: Context) = {
+  def pickleDef(tag: Int, sym: Symbol, tpt: Tree, rhs: Tree = EmptyTree, pickleParams: => Unit @allowCaptures = ())(implicit ctx: Context) = {
     assert(symRefs(sym) == NoAddr, sym)
     registerDef(sym)
     writeByte(tag)

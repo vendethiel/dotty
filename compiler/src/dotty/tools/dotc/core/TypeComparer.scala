@@ -1413,7 +1413,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
   // ----------- Diagnostics --------------------------------------------------
 
   /** A hook for showing subtype traces. Overridden in ExplainingTypeComparer */
-  def traceIndented[T](str: String)(op: => T): T = op
+  def traceIndented[T](str: String)(op: => T @allowCaptures): T = op
 
   private def traceInfo(tp1: Type, tp2: Type) =
     s"${tp1.show} <:< ${tp2.show}" + {
@@ -1472,7 +1472,7 @@ class ExplainingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
 
   private var skipped = false
 
-  override def traceIndented[T](str: String)(op: => T): T =
+  override def traceIndented[T](str: String)(op: => T @allowCaptures): T =
     if (skipped) op
     else {
       indent += 2

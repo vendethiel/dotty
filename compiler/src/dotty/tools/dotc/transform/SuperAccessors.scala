@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package transform
 
 import dotty.tools.dotc.transform.TreeTransforms.{TransformerInfo, TreeTransform, TreeTransformer}
@@ -406,7 +407,7 @@ class SuperAccessors(thisTransformer: DenotTransformer) {
     }
 
     /** Wrap template to template transform `op` with needed initialization and finalization */
-    def wrapTemplate(tree: Template)(op: Template => Template)(implicit ctx: Context) = {
+    def wrapTemplate(tree: Template)(op: (Template => Template) @allowCaptures)(implicit ctx: Context) = {
       accDefs(currentClass) = new mutable.ListBuffer[Tree]
       val impl = op(tree)
       val accessors = accDefs.remove(currentClass).get
@@ -422,6 +423,6 @@ class SuperAccessors(thisTransformer: DenotTransformer) {
     }
 
     /** Wrap `DefDef` producing operation `op`, potentially setting `invalidClass` info */
-    def wrapDefDef(ddef: DefDef)(op: => DefDef)(implicit ctx: Context) =
+    def wrapDefDef(ddef: DefDef)(op: => DefDef @allowCaptures)(implicit ctx: Context) =
       if (isMethodWithExtension(ddef.symbol)) withInvalidCurrentClass(op) else op
 }

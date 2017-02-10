@@ -270,7 +270,7 @@ trait Symbols { this: Context =>
     owner: Symbol,
     names: List[TypeName],
     flags: FlagSet,
-    boundsFn: List[TypeRef] => List[Type]): List[TypeSymbol] = {
+    boundsFn: (List[TypeRef] => List[Type]) @allowCaptures): List[TypeSymbol] = {
 
     val tparamBuf = new mutable.ListBuffer[TypeSymbol]
     val trefBuf = new mutable.ListBuffer[TypeRef]
@@ -466,11 +466,11 @@ object Symbols {
       }
 
     /** This symbol, if it exists, otherwise the result of evaluating `that` */
-    def orElse(that: => Symbol)(implicit ctx: Context) =
+    def orElse(that: => Symbol @allowCaptures)(implicit ctx: Context) =
       if (this.exists) this else that
 
     /** If this symbol satisfies predicate `p` this symbol, otherwise `NoSymbol` */
-    def filter(p: Symbol => Boolean): Symbol = if (p(this)) this else NoSymbol
+    def filter(p: (Symbol => Boolean) @allowCaptures): Symbol = if (p(this)) this else NoSymbol
 
     /** The current name of this symbol */
     final def name(implicit ctx: Context): ThisName = denot.name.asInstanceOf[ThisName]

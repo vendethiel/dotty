@@ -507,7 +507,7 @@ trait Implicits { self: Typer =>
    *                which is itself parameterized by another string,
    *                indicating where the implicit parameter is needed
    */
-  def inferImplicitArg(formal: Type, error: (String => String) => Unit, pos: Position)(implicit ctx: Context): Tree = {
+  def inferImplicitArg(formal: Type, error: ((String => String) => Unit) @allowCaptures, pos: Position)(implicit ctx: Context): Tree = {
 
     /** If `formal` is of the form ClassTag[T], where `T` is a class type,
      *  synthesize a class tag for `T`.
@@ -547,7 +547,7 @@ trait Implicits { self: Typer =>
         val arg = synthesizedClassTag(formal, pos)
         if (!arg.isEmpty) arg
         else {
-          var msgFn = (where: String) =>
+          var msgFn: (String => String) @allowCaptures = (where: String) =>
             em"no implicit argument of type $formal found for $where" + failure.postscript
           for {
             notFound <- formal.typeSymbol.getAnnotation(defn.ImplicitNotFoundAnnot)
@@ -647,7 +647,7 @@ trait Implicits { self: Typer =>
 
     private def nestedContext = ctx.fresh.setMode(ctx.mode &~ Mode.ImplicitsEnabled)
 
-    private def implicitProto(resultType: Type, f: Type => Type) =
+    private def implicitProto(resultType: Type, f: (Type => Type) @allowCaptures) =
       if (argument.isEmpty) f(resultType) else ViewProto(f(argument.tpe.widen), f(resultType))
         // Not clear whether we need to drop the `.widen` here. All tests pass with it in place, though.
 

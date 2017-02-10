@@ -31,7 +31,7 @@ import collection.mutable
     }
 
   @inline
-  def track[T](fn: String)(op: => T) =
+  def track[T](fn: String)(op: => T @allowCaptures) =
     if (enabled) doTrack(fn)(op) else op
 
   def doTrack[T](fn: String)(op: => T) =

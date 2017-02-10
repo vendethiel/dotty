@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package printing
 
 import core._
@@ -101,7 +102,7 @@ abstract class Printer {
       /** Perform string or text-producing operation `op` so that only a
    *  summarized text with given recursion depth is shown
    */
-  def summarized[T](depth: Int)(op: => T): T
+  def summarized[T](depth: Int)(op: => T @allowCaptures): T
 
   /** A plain printer without any embellishments */
   def plain: Printer

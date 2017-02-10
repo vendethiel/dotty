@@ -18,7 +18,7 @@ object Bench extends Driver {
 
   def newCompiler(implicit ctx: Context): Compiler = new Compiler
 
-  private def ntimes(n: Int)(op: => Reporter): Reporter =
+  private def ntimes(n: Int)(op: => Reporter @allowCaptures): Reporter =
     (emptyReporter /: (0 until n)) ((_, _) => op)
 
   override def doCompile(compiler: Compiler, fileNames: List[String])(implicit ctx: Context): Reporter =

@@ -38,7 +38,7 @@ trait ConstraintHandling {
   protected var alwaysFluid = false
 
   /** Perform `op` in a mode where all attempts to set `frozen` to true are ignored */
-  def fluidly[T](op: => T): T = {
+  def fluidly[T](op: => T @allowCaptures): T = {
     val saved = alwaysFluid
     alwaysFluid = true
     try op finally alwaysFluid = saved

@@ -209,7 +209,7 @@ object ProtoTypes {
       myTypedArg.size == args.length
     }
 
-    private def cacheTypedArg(arg: untpd.Tree, typerFn: untpd.Tree => Tree)(implicit ctx: Context): Tree = {
+    private def cacheTypedArg(arg: untpd.Tree, typerFn: (untpd.Tree => Tree) @allowCaptures)(implicit ctx: Context): Tree = {
       var targ = myTypedArg(arg)
       if (targ == null) {
         targ = typerFn(arg)

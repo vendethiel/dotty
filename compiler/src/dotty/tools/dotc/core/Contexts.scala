@@ -518,7 +518,7 @@ object Contexts {
     period = InitialPeriod
     mode = Mode.None
     typerState = new TyperState(new ConsoleReporter())
-    printerFn = new RefinedPrinter(_)
+    printerFn = new RefinedPrinter(_) // OK, captured context is not used
     owner = NoSymbol
     sstate = settings.defaultState
     tree = untpd.EmptyTree

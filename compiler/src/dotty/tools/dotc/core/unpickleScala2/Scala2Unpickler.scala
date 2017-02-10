@@ -293,7 +293,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
    *  operation <code>op</code> with <code>readIndex at start of i'th
    *  entry. Restore <code>readIndex</code> afterwards.
    */
-  protected def at[T <: AnyRef](i: Int, op: () => T): T = {
+  protected def at[T <: AnyRef](i: Int, op: (() => T) @allowCaptures): T = {
     var r = entries(i)
     if (r eq null) {
       r = atReadPos(index(i), op)
@@ -303,7 +303,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
     r.asInstanceOf[T]
   }
 
-  protected def atReadPos[T](start: Int, op: () => T): T = {
+  protected def atReadPos[T](start: Int, op: (() => T) @allowCaptures): T = {
     val savedIndex = readIndex
     readIndex = start
     try op()
@@ -327,7 +327,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   protected def readSymbol()(implicit ctx: Context): Symbol = readDisambiguatedSymbol(alwaysTrue)()
 
   /** Read a symbol, with possible disambiguation */
-  protected def readDisambiguatedSymbol(p: Symbol => Boolean)()(implicit ctx: Context): Symbol = {
+  protected def readDisambiguatedSymbol(p: (Symbol => Boolean) @allowCaptures)()(implicit ctx: Context): Symbol = {
     val start = indexCoord(readIndex)
     val tag = readByte()
     val end = readNat() + readIndex
@@ -605,7 +605,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
     // Need to be careful not to run into cyclic references here (observed when
     // comiling t247.scala). That's why we avoiud taking `symbol` of a TypeRef
     // unless names match up.
-    val isBound = (tp: Type) => {
+    val isBound: (Type => Boolean) @allowCaptures = (tp: Type) => {
       def refersTo(tp: Type, sym: Symbol): Boolean = tp match {
         case tp @ TypeRef(_, name) => sym.name == name && sym == tp.symbol
         case tp: TypeVar => refersTo(tp.underlying, sym)
@@ -830,7 +830,7 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
     r.asInstanceOf[Symbol]
   }
 
-  protected def readDisambiguatedSymbolRef(p: Symbol => Boolean)(implicit ctx: Context): Symbol =
+  protected def readDisambiguatedSymbolRef(p: (Symbol => Boolean) @allowCaptures)(implicit ctx: Context): Symbol =
     at(readNat(), readDisambiguatedSymbol(p))
 
   protected def readNameRef()(implicit ctx: Context): Name = at(readNat(), readName)

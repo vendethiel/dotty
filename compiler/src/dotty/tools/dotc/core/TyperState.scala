@@ -76,7 +76,7 @@ class TyperState(r: Reporter) extends DotClass with Showable {
   /** Can this state be transitively committed until the top-level? */
   def isGlobalCommittable: Boolean = false
 
-  def tryWithFallback[T](op: => T)(fallback: => T)(implicit ctx: Context): T = unsupported("tryWithFallBack")
+  def tryWithFallback[T](op: => T @allowCaptures)(fallback: => T @allowCaptures)(implicit ctx: Context): T = unsupported("tryWithFallBack")
 
   override def toText(printer: Printer): Text = "ImmutableTyperState"
 

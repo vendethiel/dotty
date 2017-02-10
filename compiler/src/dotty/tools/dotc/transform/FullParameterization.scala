@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package transform
 
 import core._
@@ -103,7 +104,7 @@ trait FullParameterization {
     val ctnames = ctparams.map(_.name.unexpandedName)
 
     /** The method result type */
-    def resultType(mapClassParams: Type => Type) = {
+    def resultType(mapClassParams: (Type => Type) @allowCaptures) = {
       val thisParamType = mapClassParams(clazz.classInfo.selfType)
       val firstArgType = if (liftThisType) thisParamType & clazz.thisType else thisParamType
       MethodType(nme.SELF :: Nil, firstArgType :: Nil)(mt =>

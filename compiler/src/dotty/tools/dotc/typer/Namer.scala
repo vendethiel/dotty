@@ -258,7 +258,7 @@ class Namer { typer: Typer =>
     typr.println(i"creating symbol for $tree in ${ctx.mode}")
 
     def checkNoConflict(name: Name): Name = {
-      def errorName(msg: => String) = {
+      def errorName(msg: => String @allowCaptures) = {
         ctx.error(msg, tree.pos)
         name.freshened
       }
@@ -865,7 +865,7 @@ class Namer { typer: Typer =>
   }
 
   /** Typecheck `tree` during completion using `typed`, and remember result in TypedAhead map */
-  def typedAheadImpl(tree: Tree, typed: untpd.Tree => tpd.Tree)(implicit ctx: Context): tpd.Tree = {
+  def typedAheadImpl(tree: Tree, typed: (untpd.Tree => tpd.Tree) @allowCaptures)(implicit ctx: Context): tpd.Tree = {
     val xtree = expanded(tree)
     xtree.getAttachment(TypedAhead) match {
       case Some(ttree) => ttree
@@ -912,7 +912,7 @@ class Namer { typer: Typer =>
    *  @param paramFn  A wrapping function that produces the type of the
    *                  defined symbol, given its final return type
    */
-  def valOrDefDefSig(mdef: ValOrDefDef, sym: Symbol, typeParams: List[Symbol], paramss: List[List[Symbol]], paramFn: Type => Type)(implicit ctx: Context): Type = {
+  def valOrDefDefSig(mdef: ValOrDefDef, sym: Symbol, typeParams: List[Symbol], paramss: List[List[Symbol]], paramFn: (Type => Type) @allowCaptures)(implicit ctx: Context): Type = {
 
     def inferredType = {
       /** A type for this definition that might be inherited from elsewhere:

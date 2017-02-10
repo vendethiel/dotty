@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package transform
 
 import core._
@@ -58,7 +59,7 @@ class CheckReentrant extends MiniPhaseTransform { thisTransformer =>
     sym.hasAnnotation(sharableAnnot()) ||
     sym.hasAnnotation(unsharedAnnot())
 
-  def scanning(sym: Symbol)(op: => Unit)(implicit ctx: Context): Unit = {
+  def scanning(sym: Symbol)(op: => Unit @allowCaptures)(implicit ctx: Context): Unit = {
     ctx.log(i"${"  " * indent}scanning $sym")
     indent += 1
     try op

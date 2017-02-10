@@ -38,7 +38,7 @@ object Checking {
    *  well as for AppliedTypeTree nodes. Also checks that type arguments to
    *  *-type parameters are fully applied.
    */
-  def checkBounds(args: List[tpd.Tree], boundss: List[TypeBounds], instantiate: (Type, List[Type]) => Type)(implicit ctx: Context): Unit = {
+  def checkBounds(args: List[tpd.Tree], boundss: List[TypeBounds], instantiate: ((Type, List[Type]) => Type) @allowCaptures)(implicit ctx: Context): Unit = {
     (args, boundss).zipped.foreach { (arg, bound) =>
       if (!bound.isHK && arg.tpe.isHK)
         ctx.error(ex"missing type parameter(s) for $arg", arg.pos)
@@ -512,7 +512,7 @@ trait Checking {
    *  their lower bound conforms to their upper bound. If a type argument is
    *  infeasible, issue and error and continue with upper bound.
    */
-  def checkFeasible(tp: Type, pos: Position, where: => String = "")(implicit ctx: Context): Type = tp match {
+  def checkFeasible(tp: Type, pos: Position, where: => String @allowCaptures = "")(implicit ctx: Context): Type = tp match {
     case tp: RefinedType =>
       tp.derivedRefinedType(tp.parent, tp.refinedName, checkFeasible(tp.refinedInfo, pos, where))
     case tp: RecType =>
@@ -525,7 +525,7 @@ trait Checking {
   }
 
   /** Check that `tree` is a pure expression of constant type */
-  def checkInlineConformant(tree: Tree, what: => String)(implicit ctx: Context): Unit =
+  def checkInlineConformant(tree: Tree, what: => String @allowCaptures)(implicit ctx: Context): Unit =
     tree.tpe match {
       case tp: TermRef if tp.symbol.is(InlineParam) => // ok
       case tp => tp.widenTermRefExpr match {

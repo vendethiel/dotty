@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package typer
 
 import java.lang.ArithmeticException
@@ -48,7 +49,7 @@ object ConstFold {
       }
     }
 
-  private def finish(tree: Tree)(compX: => Constant)(implicit ctx: Context): Tree =
+  private def finish(tree: Tree)(compX: => Constant @allowCaptures)(implicit ctx: Context): Tree =
     try {
       val x = compX
       if (x ne null) tree withType ConstantType(x)

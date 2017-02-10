@@ -3,7 +3,8 @@
  * @author  Martin Odersky
  */
 
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package core
 
 import Symbols._
@@ -112,7 +113,7 @@ object Scopes {
      *  Symbols occur in the result in reverse order relative to their occurrence
      *  in `this.toList`.
      */
-    final def denotsNamed(name: Name, select: SymDenotation => Boolean = selectAll)(implicit ctx: Context): PreDenotation = {
+    final def denotsNamed(name: Name, select: (SymDenotation => Boolean) @allowCaptures = selectAll)(implicit ctx: Context): PreDenotation = {
       var syms: PreDenotation = NoDenotation
       var e = lookupEntry(name)
       while (e != null) {
@@ -127,7 +128,7 @@ object Scopes {
      *  given predicates. If all symbols match, returns the scope itself, otherwise
      *  a copy with the matching symbols.
      */
-    final def filteredScope(p: Symbol => Boolean)(implicit ctx: Context): Scope = {
+    final def filteredScope(p: (Symbol => Boolean) @allowCaptures)(implicit ctx: Context): Scope = {
       var result: MutableScope = null
       for (sym <- iterator)
         if (!p(sym)) {

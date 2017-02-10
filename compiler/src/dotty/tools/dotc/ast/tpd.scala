@@ -93,7 +93,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
    *  where the closure's type is the target type of the expression (FunctionN, unless
    *  otherwise specified).
    */
-  def Closure(meth: TermSymbol, rhsFn: List[List[Tree]] => Tree, targs: List[Tree] = Nil, targetType: Type = NoType)(implicit ctx: Context): Block = {
+  def Closure(meth: TermSymbol, rhsFn: (List[List[Tree]] => Tree) @allowCaptures, targs: List[Tree] = Nil, targetType: Type = NoType)(implicit ctx: Context): Block = {
     val targetTpt = if (targetType.exists) TypeTree(targetType) else EmptyTree
     val call =
       if (targs.isEmpty) Ident(TermRef(NoPrefix, meth))
@@ -173,10 +173,10 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   def DefDef(sym: TermSymbol, rhs: Tree = EmptyTree)(implicit ctx: Context): DefDef =
     ta.assignType(DefDef(sym, Function.const(rhs) _), sym)
 
-  def DefDef(sym: TermSymbol, rhsFn: List[List[Tree]] => Tree)(implicit ctx: Context): DefDef =
+  def DefDef(sym: TermSymbol, rhsFn: (List[List[Tree]] => Tree) @allowCaptures)(implicit ctx: Context): DefDef =
     polyDefDef(sym, Function.const(rhsFn))
 
-  def polyDefDef(sym: TermSymbol, rhsFn: List[Type] => List[List[Tree]] => Tree)(implicit ctx: Context): DefDef = {
+  def polyDefDef(sym: TermSymbol, rhsFn: (List[Type] => ((List[List[Tree]] => Tree) @allowCaptures)) @allowCaptures)(implicit ctx: Context): DefDef = {
     val (tparams, mtp) = sym.info match {
       case tp: PolyType =>
         val tparams = ctx.newTypeParams(sym, tp.paramNames, EmptyFlags, tp.instantiateBounds)
@@ -767,7 +767,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     // --- Higher order traversal methods -------------------------------
 
     /** Apply `f` to each subtree of this tree */
-    def foreachSubTree(f: Tree => Unit)(implicit ctx: Context): Unit = {
+    def foreachSubTree(f: (Tree => Unit) @allowCaptures)(implicit ctx: Context): Unit = {
       val traverser = new TreeTraverser {
         def traverse(tree: Tree)(implicit ctx: Context) = foldOver(f(tree), tree)
       }
@@ -775,7 +775,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
 
     /** Is there a subtree of this tree that satisfies predicate `p`? */
-    def existsSubTree(p: Tree => Boolean)(implicit ctx: Context): Boolean = {
+    def existsSubTree(p: (Tree => Boolean) @allowCaptures)(implicit ctx: Context): Boolean = {
       val acc = new TreeAccumulator[Boolean] {
         def apply(x: Boolean, t: Tree)(implicit ctx: Context) = x || p(t) || foldOver(x, t)
       }
@@ -783,7 +783,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
 
     /** All subtrees of this tree that satisfy predicate `p`. */
-    def filterSubTrees(f: Tree => Boolean)(implicit ctx: Context): List[Tree] = {
+    def filterSubTrees(f: (Tree => Boolean) @allowCaptures)(implicit ctx: Context): List[Tree] = {
       val buf = new mutable.ListBuffer[Tree]
       foreachSubTree { tree => if (f(tree)) buf += tree }
       buf.toList
@@ -894,7 +894,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     else (trees.head.tpe eq trees1.head.tpe) && sameTypes(trees.tail, trees1.tail)
   }
 
-  def evalOnce(tree: Tree)(within: Tree => Tree)(implicit ctx: Context) = {
+  def evalOnce(tree: Tree)(within: (Tree => Tree) @allowCaptures)(implicit ctx: Context) = {
     if (isIdempotentExpr(tree)) within(tree)
     else {
       val vdef = SyntheticValDef(ctx.freshName("ev$").toTermName, tree)

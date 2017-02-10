@@ -804,9 +804,9 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
      *  overloaded unapply does *not* need to be applicable to its argument
      *  whereas overloaded variants need to have a conforming variant.
      */
-    def trySelectUnapply(qual: untpd.Tree)(fallBack: Tree => Tree): Tree = {
+    def trySelectUnapply(qual: untpd.Tree)(fallBack: (Tree => Tree) @allowCaptures): Tree = {
       // try first for non-overloaded, then for overloaded ocurrences
-      def tryWithName(name: TermName)(fallBack: Tree => Tree)(implicit ctx: Context): Tree =
+      def tryWithName(name: TermName)(fallBack: (Tree => Tree) @allowCaptures)(implicit ctx: Context): Tree =
         tryEither { implicit ctx =>
           val specificProto = new UnapplyFunProto(selType, this)
           typedExpr(untpd.Select(qual, name), specificProto)
@@ -967,7 +967,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
   def isApplicable(tp: Type, args: List[Type], resultType: Type)(implicit ctx: Context): Boolean =
     onMethod(tp, isApplicable(_, args, resultType))
 
-  private def onMethod(tp: Type, p: TermRef => Boolean)(implicit ctx: Context): Boolean = tp match {
+  private def onMethod(tp: Type, p: (TermRef => Boolean) @allowCaptures)(implicit ctx: Context): Boolean = tp match {
     case methRef: TermRef if methRef.widenSingleton.isInstanceOf[MethodicType] =>
       p(methRef)
     case mt: MethodicType =>
@@ -1353,7 +1353,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
         }
         arg match {
           case arg: untpd.Function if arg.args.exists(isUnknownParamType) =>
-            def isUniform[T](xs: List[T])(p: (T, T) => Boolean) = xs.forall(p(_, xs.head))
+            def isUniform[T](xs: List[T])(p: ((T, T) => Boolean) @allowCaptures) = xs.forall(p(_, xs.head))
             val formalsForArg: List[Type] = altFormals.map(_.head)
             // For alternatives alt_1, ..., alt_n, test whether formal types for current argument are of the form
             //   (p_1_1, ..., p_m_1) => r_1
@@ -1390,7 +1390,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     recur(alts.map(alt => paramTypes(alt.widen)), pt.args)
   }
 
-  private def harmonizeWith[T <: AnyRef](ts: List[T])(tpe: T => Type, adapt: (T, Type) => T)(implicit ctx: Context): List[T] = {
+  private def harmonizeWith[T <: AnyRef](ts: List[T])(tpe: (T => Type) @allowCaptures, adapt: ((T, Type) => T) @allowCaptures)(implicit ctx: Context): List[T] = {
     def numericClasses(ts: List[T], acc: Set[Symbol]): Set[Symbol] = ts match {
       case t :: ts1 =>
         val sym = tpe(t).widen.classSymbol

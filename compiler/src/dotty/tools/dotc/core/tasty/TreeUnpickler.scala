@@ -219,7 +219,7 @@ class TreeUnpickler(reader: TastyReader, tastyName: TastyName.Table, posUnpickle
       val tag = readByte()
       pickling.println(s"reading type ${astTagToString(tag)} at $start")
 
-      def registeringType[T](tp: Type, op: => T): T = {
+      def registeringType[T](tp: Type, op: => T @allowCaptures): T = {
         typeAtAddr(start) = tp
         op
       }
@@ -884,7 +884,7 @@ class TreeUnpickler(reader: TastyReader, tastyName: TastyName.Table, posUnpickle
         }
       }
 
-      def completeSelect(name: Name, tpf: Type => Type): Select = {
+      def completeSelect(name: Name, tpf: (Type => Type) @allowCaptures): Select = {
         val localCtx =
           if (name == nme.CONSTRUCTOR) ctx.addMode(Mode.InSuperCall) else ctx
         val qual = readTerm()(localCtx)
@@ -935,7 +935,7 @@ class TreeUnpickler(reader: TastyReader, tastyName: TastyName.Table, posUnpickle
           if (ctx.owner.isClass) ctx1.setOwner(ctx1.newLocalDummy(ctx.owner)) else ctx1
         }
 
-        def readBlock(mkTree: (List[Tree], Tree) => Tree): Tree = {
+        def readBlock(mkTree: ((List[Tree], Tree) => Tree) @allowCaptures): Tree = {
           val exprReader = fork
           skipTree()
           val localCtx = localNonClassCtx

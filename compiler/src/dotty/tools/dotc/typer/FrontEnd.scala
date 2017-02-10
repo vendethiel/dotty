@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package typer
 
 import core._
@@ -28,7 +29,7 @@ class FrontEnd extends Phase {
   def stillToBeEntered(name: String): Boolean =
     remaining.exists(_.compilationUnit.toString.endsWith(name + ".scala"))
 
-  def monitor(doing: String)(body: => Unit)(implicit ctx: Context) =
+  def monitor(doing: String)(body: => Unit @allowCaptures)(implicit ctx: Context) =
     try body
     catch {
       case NonFatal(ex) =>

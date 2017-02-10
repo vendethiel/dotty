@@ -79,7 +79,7 @@ object Inliner {
        *  @return The call to the accessor method that replaces the original access.
        */
       def addAccessor(tree: Tree, refPart: Tree, targs: List[Tree], argss: List[List[Tree]],
-                      accessedType: Type, rhs: (Tree, List[Type], List[List[Tree]]) => Tree)(implicit ctx: Context): Tree = {
+                      accessedType: Type, rhs: ((Tree, List[Type], List[List[Tree]]) => Tree) @allowCaptures)(implicit ctx: Context): Tree = {
         val qual = qualifier(refPart)
         def refIsLocal = qual match {
           case qual: This => qual.symbol == refPart.symbol.owner
@@ -188,7 +188,7 @@ object Inliner {
       case _ =>
         if (!ctx.isAfterTyper) {
           val inlineCtx = ctx
-          sym.updateAnnotation(LazyBodyAnnotation { _ =>
+          sym.updateAnnotation(LazyBodyAnnotation { _ => // INTENTIONAL
             implicit val ctx = inlineCtx
             ctx.withNoError(treeExpr(ctx))(makeInlineable)
           })

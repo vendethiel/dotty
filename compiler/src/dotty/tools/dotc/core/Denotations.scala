@@ -141,28 +141,28 @@ object Denotations {
     def exists: Boolean = true
 
     /** A denotation with the info of this denotation transformed using `f` */
-    def mapInfo(f: Type => Type)(implicit ctx: Context): Denotation
+    def mapInfo(f: (Type => Type) @allowCaptures)(implicit ctx: Context): Denotation
 
     /** If this denotation does not exist, fallback to alternative */
-    final def orElse(that: => Denotation) = if (this.exists) this else that
+    final def orElse(that: => Denotation @allowCaptures) = if (this.exists) this else that
 
     /** The set of alternative single-denotations making up this denotation */
     final def alternatives: List[SingleDenotation] = altsWith(alwaysTrue)
 
     /** The alternatives of this denotation that satisfy the predicate `p`. */
-    def altsWith(p: Symbol => Boolean): List[SingleDenotation]
+    def altsWith(p: (Symbol => Boolean) @allowCaptures): List[SingleDenotation]
 
     /** The unique alternative of this denotation that satisfies the predicate `p`,
      *  or NoDenotation if no satisfying alternative exists.
      *  @throws TypeError if there is at more than one alternative that satisfies `p`.
      */
-    def suchThat(p: Symbol => Boolean)(implicit ctx: Context): SingleDenotation
+    def suchThat(p: (Symbol => Boolean) @allowCaptures)(implicit ctx: Context): SingleDenotation
 
     /** If this is a SingleDenotation, return it, otherwise throw a TypeError */
     def checkUnique(implicit ctx: Context): SingleDenotation = suchThat(alwaysTrue)
 
     /** Does this denotation have an alternative that satisfies the predicate `p`? */
-    def hasAltWith(p: SingleDenotation => Boolean): Boolean
+    def hasAltWith(p: (SingleDenotation => Boolean) @allowCaptures): Boolean
 
     /** The denotation made up from the alternatives of this denotation that
      *  are accessible from prefix `pre`, or NoDenotation if no accessible alternative exists.
@@ -183,7 +183,7 @@ object Denotations {
      *  single-denotations that do not satisfy the predicate are left alone
      *  (whereas suchThat would map them to NoDenotation).
      */
-    def disambiguate(p: Symbol => Boolean)(implicit ctx: Context): SingleDenotation = this match {
+    def disambiguate(p: (Symbol => Boolean) @allowCaptures)(implicit ctx: Context): SingleDenotation = this match {
       case sdenot: SingleDenotation => sdenot
       case mdenot => suchThat(p) orElse NoQualifyingRef(alternatives)
     }
@@ -192,7 +192,7 @@ object Denotations {
      *  if generateStubs is specified, return a stubsymbol if denotation is a missing ref.
      *  Throw a `TypeError` if predicate fails to disambiguate symbol or no alternative matches.
      */
-    def requiredSymbol(p: Symbol => Boolean, source: AbstractFile = null, generateStubs: Boolean = true)(implicit ctx: Context): Symbol =
+    def requiredSymbol(p: (Symbol => Boolean) @allowCaptures, source: AbstractFile = null, generateStubs: Boolean = true)(implicit ctx: Context): Symbol =
       disambiguate(p) match {
         case m @ MissingRef(ownerd, name) =>
           if (generateStubs) {
@@ -619,15 +619,15 @@ object Denotations {
       if ((symbol eq this.symbol) && (info eq this.info)) this
       else newLikeThis(symbol, info)
 
-    def mapInfo(f: Type => Type)(implicit ctx: Context): SingleDenotation =
+    def mapInfo(f: (Type => Type) @allowCaptures)(implicit ctx: Context): SingleDenotation =
       derivedSingleDenotation(symbol, f(info))
 
-    def orElse(that: => SingleDenotation) = if (this.exists) this else that
+    def orElse(that: => SingleDenotation @allowCaptures) = if (this.exists) this else that
 
     def altsWith(p: Symbol => Boolean): List[SingleDenotation] =
       if (exists && p(symbol)) this :: Nil else Nil
 
-    def suchThat(p: Symbol => Boolean)(implicit ctx: Context): SingleDenotation =
+    def suchThat(p: (Symbol => Boolean) @allowCaptures)(implicit ctx: Context): SingleDenotation =
       if (exists && p(symbol)) this else NoDenotation
 
     def hasAltWith(p: SingleDenotation => Boolean): Boolean =
@@ -882,7 +882,7 @@ object Denotations {
     /** Apply a transformation `f` to all denotations in this group that start at or after
      *  given phase. Denotations are replaced while keeping the same validity periods.
      */
-    protected def transformAfter(phase: DenotTransformer, f: SymDenotation => SymDenotation)(implicit ctx: Context): Unit = {
+    protected def transformAfter(phase: DenotTransformer, f: (SymDenotation => SymDenotation) @allowCaptures)(implicit ctx: Context): Unit = {
       var current = symbol.current
       while (current.validFor.firstPhaseId < phase.id && (current.nextInRun.validFor.code > current.validFor.code))
         current = current.nextInRun
@@ -1226,7 +1226,7 @@ object Denotations {
   }
 
   /** An exception for accessing symbols that are no longer valid in current run */
-  class StaleSymbol(msg: => String) extends Exception {
+  class StaleSymbol(msg: => String @allowCaptures) extends Exception {
     util.Stats.record("stale symbol")
     override def getMessage() = msg
   }

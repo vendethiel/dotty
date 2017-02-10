@@ -49,7 +49,7 @@ trait TypeAssigner {
    *     if this is not possible, replace the ClassInfo as above.
    *   - drop refinements referring to a forbidden symbol.
    */
-  def avoid(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
+  def avoid(tp: Type, symsToAvoid: => List[Symbol] @allowCaptures)(implicit ctx: Context): Type = {
     val widenMap = new TypeMap {
       lazy val forbidden = symsToAvoid.toSet
       def toAvoid(tp: Type): Boolean =

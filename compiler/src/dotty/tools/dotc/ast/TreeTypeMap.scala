@@ -32,8 +32,8 @@ import dotty.tools.dotc.transform.SymUtils._
  *  set, we would get a data race assertion error.
  */
 final class TreeTypeMap(
-  val typeMap: Type => Type = IdentityTypeMap,
-  val treeMap: tpd.Tree => tpd.Tree = identity _,
+  val typeMap: (Type => Type) @allowCaptures = IdentityTypeMap,
+  val treeMap: (tpd.Tree => tpd.Tree) @allowCaptures = identity _,
   val oldOwners: List[Symbol] = Nil,
   val newOwners: List[Symbol] = Nil,
   val substFrom: List[Symbol] = Nil,

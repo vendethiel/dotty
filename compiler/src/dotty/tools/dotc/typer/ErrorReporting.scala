@@ -18,10 +18,10 @@ object ErrorReporting {
 
   import tpd._
 
-  def errorTree(tree: untpd.Tree, msg: => Message)(implicit ctx: Context): tpd.Tree =
+  def errorTree(tree: untpd.Tree, msg: => Message @allowCaptures)(implicit ctx: Context): tpd.Tree =
     tree withType errorType(msg, tree.pos)
 
-  def errorType(msg: => Message, pos: Position)(implicit ctx: Context): ErrorType = {
+  def errorType(msg: => Message @allowCaptures, pos: Position)(implicit ctx: Context): ErrorType = {
     ctx.error(msg, pos)
     new ErrorType(msg)
   }

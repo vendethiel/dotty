@@ -133,12 +133,12 @@ abstract class Constraint extends Showable {
   def domainParams: List[PolyParam]
 
   /** Check whether predicate holds for all parameters in constraint */
-  def forallParams(p: PolyParam => Boolean): Boolean
+  def forallParams(p: (PolyParam => Boolean) @allowCaptures): Boolean
 
   /** Perform operation `op` on all typevars, or only on uninstantiated
    *  typevars, depending on whether `uninstOnly` is set or not.
    */
-  def foreachTypeVar(op: TypeVar => Unit): Unit
+  def foreachTypeVar(op: (TypeVar => Unit) @allowCaptures): Unit
 
   /** The uninstantiated typevars of this constraint */
   def uninstVars: collection.Seq[TypeVar]

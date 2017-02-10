@@ -157,13 +157,13 @@ class PickleBuffer(data: Array[Byte], from: Int, to: Int) {
    *  @param op  ...
    *  @return    ...
    */
-  def until[T](end: Int, op: () => T): List[T] =
+  def until[T](end: Int, op: (() => T) @allowCaptures): List[T] =
     if (readIndex == end) List() else op() :: until(end, op)
 
   /** Perform operation <code>op</code> the number of
    *  times specified.  Concatenate the results into a list.
    */
-  def times[T](n: Int, op: ()=>T): List[T] =
+  def times[T](n: Int, op: (()=>T) @allowCaptures): List[T] =
     if (n == 0) List() else op() :: times(n-1, op)
 
   /** Pickle = majorVersion_Nat minorVersion_Nat nbEntries_Nat {Entry}

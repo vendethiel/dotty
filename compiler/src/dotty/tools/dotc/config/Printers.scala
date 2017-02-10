@@ -1,9 +1,10 @@
-package dotty.tools.dotc.config
+package dotty.tools
+package dotc.config
 
 object Printers {
 
   class Printer {
-    def println(msg: => String): Unit = System.out.println(msg)
+    def println(msg: => String @allowCaptures): Unit = System.out.println(msg)
   }
 
   object noPrinter extends Printer {

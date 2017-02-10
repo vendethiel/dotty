@@ -139,7 +139,8 @@ class ShortcutImplicits extends MiniPhase with IdentityDenotTransformer { thisTr
             val tparamSyms = mdef.tparams.map(_.symbol)
             val vparamSymss = mdef.vparamss.map(_.map(_.symbol))
             val clparamSyms = clparams.map(_.symbol)
-            val remappedCore = (ts: List[Type]) => (prefss: List[List[Tree]]) =>
+            val remappedCore: (List[Type] => (List[List[Tree]] => Tree) @allowCaptures) @allowCaptures =
+              (ts: List[Type]) => (prefss: List[List[Tree]]) =>
               meth.rhs
                 .subst(tparamSyms ::: (vparamSymss.flatten ++ clparamSyms),
                        ts.map(_.typeSymbol) ::: prefss.flatten.map(_.symbol))

@@ -72,11 +72,11 @@ object OrderingConstraint {
       update(prev, current, param.binder, param.paramNum, entry)
 
     def map(prev: OrderingConstraint, current: OrderingConstraint,
-        poly: PolyType, idx: Int, f: T => T)(implicit ctx: Context): OrderingConstraint =
+        poly: PolyType, idx: Int, f: (T => T) @allowCaptures)(implicit ctx: Context): OrderingConstraint =
      update(prev, current, poly, idx, f(apply(current, poly, idx)))
 
     def map(prev: OrderingConstraint, current: OrderingConstraint,
-        param: PolyParam, f: T => T)(implicit ctx: Context): OrderingConstraint =
+        param: PolyParam, f: (T => T) @allowCaptures)(implicit ctx: Context): OrderingConstraint =
       map(prev, current, param.binder, param.paramNum, f)
   }
 
@@ -403,7 +403,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       def replaceParam(tp: Type, atPoly: PolyType, atIdx: Int): Type = tp match {
         case bounds @ TypeBounds(lo, hi) =>
 
-          def recombine(andor: AndOrType, op: (Type, Boolean) => Type, isUpper: Boolean): Type = {
+          def recombine(andor: AndOrType, op: ((Type, Boolean) => Type) @allowCaptures, isUpper: Boolean): Type = {
             val tp1 = op(andor.tp1, isUpper)
             val tp2 = op(andor.tp2, isUpper)
             if ((tp1 eq andor.tp1) && (tp2 eq andor.tp2)) andor
@@ -481,12 +481,12 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     true
   }
 
-  def foreachParam(p: (PolyType, Int) => Unit): Unit =
+  def foreachParam(p: ((PolyType, Int) => Unit) @allowCaptures): Unit =
     boundsMap.foreachBinding { (poly, entries) =>
       0.until(poly.paramNames.length).foreach(p(poly, _))
     }
 
-  def foreachTypeVar(op: TypeVar => Unit): Unit =
+  def foreachTypeVar(op: (TypeVar => Unit) @allowCaptures): Unit =
     boundsMap.foreachBinding { (poly, entries) =>
       for (i <- 0 until paramCount(entries)) {
         typeVar(entries, i) match {
@@ -497,7 +497,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
     }
 
   def & (other: Constraint)(implicit ctx: Context) = {
-    def merge[T](m1: ArrayValuedMap[T], m2: ArrayValuedMap[T], join: (T, T) => T): ArrayValuedMap[T] = {
+    def merge[T](m1: ArrayValuedMap[T], m2: ArrayValuedMap[T], join: ((T, T) => T) @allowCaptures): ArrayValuedMap[T] = {
       var merged = m1
       def mergeArrays(xs1: Array[T], xs2: Array[T]) = {
         val xs = xs1.clone

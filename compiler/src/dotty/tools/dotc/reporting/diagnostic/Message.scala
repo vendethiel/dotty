@@ -74,7 +74,7 @@ abstract class Message(val errorId: Int) { self =>
   * This is useful when we need to add additional information to an existing
   * message.
   */
-class ExtendMessage(_msg: () => Message)(f: String => String) { self =>
+class ExtendMessage(_msg: (() => Message) @allowCaptures)(f: String => String) { self =>
   lazy val msg = f(_msg().msg)
   lazy val kind = _msg().kind
   lazy val explanation = _msg().explanation

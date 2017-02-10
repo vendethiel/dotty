@@ -102,7 +102,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     /** Method is necessary because error messages need to bind to
      *  to typedIdent's context which is lost in nested calls to findRef
      */
-    def error(msg: => Message, pos: Position) = ctx.error(msg, pos)
+    def error(msg: => Message @allowCaptures, pos: Position) = ctx.error(msg, pos)
 
     /** Does this identifier appear as a constructor of a pattern? */
     def isPatternConstr =
@@ -488,7 +488,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
      *  @param  wildName what name `w` to use in the rewriting of
      *                   (x: T) to (x @ (w: T)). This is either `_` or `_*`.
      */
-    def cases(ifPat: => Tree, ifExpr: => Tree, wildName: TermName) = tree.expr match {
+    def cases(ifPat: => Tree @allowCaptures, ifExpr: => Tree @allowCaptures, wildName: TermName) = tree.expr match {
       case id: untpd.Ident if (ctx.mode is Mode.Pattern) && isVarPattern(id) =>
         if (id.name == nme.WILDCARD || id.name == nme.WILDCARD_STAR) ifPat
         else {
@@ -620,7 +620,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
    *  2. If (1) fails, force all type variables so that the block's type is
    *     fully defined and try again.
    */
-  protected def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol], forcedDefined: Boolean = false)(implicit ctx: Context): Tree = {
+  protected def ensureNoLocalRefs(tree: Tree, pt: Type, localSyms: => List[Symbol] @allowCaptures, forcedDefined: Boolean = false)(implicit ctx: Context): Tree = {
     def ascribeType(tree: Tree, pt: Type): Tree = tree match {
       case block @ Block(stats, expr) =>
         val expr1 = ascribeType(expr, pt)
@@ -1638,7 +1638,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
   def typedPattern(tree: untpd.Tree, selType: Type = WildcardType)(implicit ctx: Context): Tree =
     typed(tree, selType)(ctx addMode Mode.Pattern)
 
-  def tryEither[T](op: Context => T)(fallBack: (T, TyperState) => T)(implicit ctx: Context) = {
+  def tryEither[T](op: Context => T)(fallBack: ((T, TyperState) => T) @allowCaptures)(implicit ctx: Context) = {
     val nestedCtx = ctx.fresh.setNewTyperState
     val result = op(nestedCtx)
     if (nestedCtx.reporter.hasErrors)
@@ -1685,7 +1685,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
    *    around the qualifier part `qual` so that the result conforms to the expected type
    *    with wildcard result type.
    */
-  def tryInsertApplyOrImplicit(tree: Tree, pt: ProtoType)(fallBack: => Tree)(implicit ctx: Context): Tree = {
+  def tryInsertApplyOrImplicit(tree: Tree, pt: ProtoType)(fallBack: => Tree @allowCaptures)(implicit ctx: Context): Tree = {
 
     def tryApply(implicit ctx: Context) = {
       val sel = typedSelect(untpd.Select(untpd.TypedSplice(tree), nme.apply), pt)

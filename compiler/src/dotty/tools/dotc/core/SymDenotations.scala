@@ -271,11 +271,11 @@ object SymDenotations {
       dropOtherAnnotations(annotations, cls).nonEmpty
 
     /** Apply transform `f` to all annotations of this denotation */
-    final def transformAnnotations(f: Annotation => Annotation)(implicit ctx: Context): Unit =
+    final def transformAnnotations(f: (Annotation => Annotation) @allowCaptures)(implicit ctx: Context): Unit =
       annotations = annotations.mapConserve(f)
 
     /** Keep only those annotations that satisfy `p` */
-    final def filterAnnotations(p: Annotation => Boolean)(implicit ctx: Context): Unit =
+    final def filterAnnotations(p: (Annotation => Boolean) @allowCaptures)(implicit ctx: Context): Unit =
       annotations = annotations.filterConserve(p)
 
     /** Optionally, the annotation matching the given class symbol */
@@ -674,7 +674,7 @@ object SymDenotations {
 
       /** Is protected access to target symbol permitted? */
       def isProtectedAccessOK = {
-        def fail(str: => String): Boolean = {
+        def fail(str: => String @allowCaptures): Boolean = {
           if (whyNot != null) whyNot append str
           false
         }
@@ -1187,7 +1187,7 @@ object SymDenotations {
     /** Apply a transformation `f` to all denotations in this group that start at or after
      *  given phase. Denotations are replaced while keeping the same validity periods.
      */
-    override def transformAfter(phase: DenotTransformer, f: SymDenotation => SymDenotation)(implicit ctx: Context): Unit =
+    override def transformAfter(phase: DenotTransformer, f: (SymDenotation => SymDenotation) @allowCaptures)(implicit ctx: Context): Unit =
       super.transformAfter(phase, f)
 
     /** If denotation is private, remove the Private flag and expand the name if necessary */
@@ -1941,7 +1941,7 @@ object SymDenotations {
   /** A completer for missing references */
   class StubInfo() extends LazyType {
 
-    def initializeToDefaults(denot: SymDenotation, errMsg: => String)(implicit ctx: Context) = {
+    def initializeToDefaults(denot: SymDenotation, errMsg: => String @allowCaptures)(implicit ctx: Context) = {
       denot.info = denot match {
         case denot: ClassDenotation =>
           ClassInfo(denot.owner.thisType, denot.classSymbol, Nil, EmptyScope)

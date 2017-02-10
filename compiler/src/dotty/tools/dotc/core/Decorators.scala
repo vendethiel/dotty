@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package core
 
 import annotation.tailrec
@@ -25,7 +26,7 @@ object Decorators {
    *  works like find but avoids Option, replacing None with NoSymbol.
    */
   implicit class SymbolIteratorDecorator(val it: Iterator[Symbol]) extends AnyVal {
-    final def findSymbol(p: Symbol => Boolean): Symbol = {
+    final def findSymbol(p: (Symbol => Boolean) @allowCaptures): Symbol = {
       while (it.hasNext) {
         val sym = it.next
         if (p(sym)) return sym
@@ -41,7 +42,7 @@ object Decorators {
    */
   implicit class ListDecorator[T](val xs: List[T]) extends AnyVal {
 
-    final def mapconserve[U](f: T => U): List[U] = {
+    final def mapconserve[U](f: (T => U) @allowCaptures): List[U] = {
       @tailrec
       def loop(mapped: ListBuffer[U], unchanged: List[U], pending: List[T]): List[U] =
         if (pending.isEmpty) {
@@ -72,7 +73,7 @@ object Decorators {
      *  if `p` is true for all elements and `xs` is not longer
      *  than `MaxFilterRecursions`.
      */
-    def filterConserve(p: T => Boolean): List[T] = {
+    def filterConserve(p: (T => Boolean) @allowCaptures): List[T] = {
       def loop(xs: List[T], nrec: Int): List[T] = xs match {
         case Nil => xs
         case x :: xs1 =>
@@ -92,7 +93,7 @@ object Decorators {
      *  `xs` to themselves. Also, it is required that `ys` is at least
      *  as long as `xs`.
      */
-    def zipWithConserve[U](ys: List[U])(f: (T, U) => T): List[T] =
+    def zipWithConserve[U](ys: List[U])(f: ((T, U) => T) @allowCaptures): List[T] =
       if (xs.isEmpty) xs
       else {
         val x1 = f(xs.head, ys.head)
@@ -102,7 +103,7 @@ object Decorators {
         else x1 :: xs1
       }
 
-    def foldRightBN[U](z: => U)(op: (T, => U) => U): U = xs match {
+    def foldRightBN[U](z: => U)(op: ((T, => U) => U) @allowCaptures): U = xs match {
       case Nil => z
       case x :: xs1 => op(x, xs1.foldRightBN(z)(op))
     }
@@ -122,8 +123,8 @@ object Decorators {
   }
 
   implicit class ListOfListDecorator[T](val xss: List[List[T]]) extends AnyVal {
-    def nestedMap[U](f: T => U): List[List[U]] = xss map (_ map f)
-    def nestedMapconserve[U](f: T => U): List[List[U]] = xss mapconserve (_ mapconserve f)
+    def nestedMap[U](f: (T => U) @allowCaptures): List[List[U]] = xss map (_ map f)
+    def nestedMapconserve[U](f: (T => U) @allowCaptures): List[List[U]] = xss mapconserve (_ mapconserve f)
   }
 
   implicit class TextToString(val text: Text) extends AnyVal {

@@ -1,4 +1,5 @@
-package dotty.tools.dotc
+package dotty.tools
+package dotc
 package printing
 
 import core._
@@ -504,14 +505,14 @@ class PlainPrinter(_ctx: Context) extends Printer {
 
   private var maxSummarized = Int.MaxValue
 
-  def summarized[T](depth: Int)(op: => T): T = {
+  def summarized[T](depth: Int)(op: => T @allowCaptures): T = {
     val saved = maxSummarized
     maxSummarized = ctx.toTextRecursions + depth
     try op
     finally maxSummarized = depth
   }
 
-  def summarized[T](op: => T): T = summarized(summarizeDepth)(op)
+  def summarized[T](op: => T @allowCaptures): T = summarized(summarizeDepth)(op)
 
   def plain = this
 }

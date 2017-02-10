@@ -227,7 +227,7 @@ object Inferencing {
    */
   def interpolateUndetVars(tree: Tree, ownedBy: Symbol)(implicit ctx: Context): Unit = {
     val constraint = ctx.typerState.constraint
-    val qualifies = (tvar: TypeVar) =>
+    val qualifies: (TypeVar => Boolean) @allowCaptures = (tvar: TypeVar) =>
       (tree contains tvar.bindingTree) || ownedBy.exists && tvar.owner == ownedBy
     def interpolate() = Stats.track("interpolateUndetVars") {
       val tp = tree.tpe.widen

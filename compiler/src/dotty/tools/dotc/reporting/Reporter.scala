@@ -31,22 +31,22 @@ import Reporter._
 trait Reporting { this: Context =>
 
   /** For sending messages that are printed only if -verbose is set */
-  def inform(msg: => String, pos: SourcePosition = NoSourcePosition): Unit =
+  def inform(msg: => String @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     if (this.settings.verbose.value) this.echo(msg, pos)
 
-  def echo(msg: => String, pos: SourcePosition = NoSourcePosition): Unit =
+  def echo(msg: => String @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new Info(msg, pos))
 
-  def deprecationWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def deprecationWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new DeprecationWarning(msg, pos))
 
-  def migrationWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def migrationWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new MigrationWarning(msg, pos))
 
-  def uncheckedWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def uncheckedWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new UncheckedWarning(msg, pos))
 
-  def featureWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def featureWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new FeatureWarning(msg, pos))
 
   def featureWarning(feature: String, featureDescription: String, isScala2Feature: Boolean,
@@ -72,71 +72,71 @@ trait Reporting { this: Context =>
     else reporter.report(new FeatureWarning(msg, pos))
   }
 
-  def warning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def warning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new Warning(msg, pos))
 
-  def strictWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def strictWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     if (this.settings.strict.value) error(msg, pos)
     else reporter.report {
       new ExtendMessage(() => msg)(_ + "\n(This would be an error under strict mode)").warning(pos)
     }
 
-  def error(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def error(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report(new Error(msg, pos))
 
-  def errorOrMigrationWarning(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def errorOrMigrationWarning(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     if (ctx.scala2Mode) migrationWarning(msg, pos) else error(msg, pos)
 
-  def restrictionError(msg: => Message, pos: SourcePosition = NoSourcePosition): Unit =
+  def restrictionError(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     reporter.report {
       new ExtendMessage(() => msg)(m => s"Implementation restriction: $m").error(pos)
     }
 
-  def incompleteInputError(msg: => Message, pos: SourcePosition = NoSourcePosition)(implicit ctx: Context): Unit =
+  def incompleteInputError(msg: => Message @allowCaptures, pos: SourcePosition = NoSourcePosition)(implicit ctx: Context): Unit =
     reporter.incomplete(new Error(msg, pos))(ctx)
 
   /** Log msg if settings.log contains the current phase.
    *  See [[config.CompilerCommand#explainAdvanced]] for the exact meaning of
    *  "contains" here.
    */
-  def log(msg: => String, pos: SourcePosition = NoSourcePosition): Unit =
+  def log(msg: => String @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     if (this.settings.log.value.containsPhase(phase))
       echo(s"[log ${ctx.phasesStack.reverse.mkString(" -> ")}] $msg", pos)
 
-  def debuglog(msg: => String): Unit =
+  def debuglog(msg: => String @allowCaptures): Unit =
     if (ctx.debug) log(msg)
 
-  def informTime(msg: => String, start: Long): Unit = {
+  def informTime(msg: => String @allowCaptures, start: Long): Unit = {
     def elapsed = s" in ${currentTimeMillis - start}ms"
     informProgress(msg + elapsed)
   }
 
-  def informProgress(msg: => String) =
+  def informProgress(msg: => String @allowCaptures) =
     inform("[" + msg + "]")
 
-  def trace[T](msg: => String)(value: T) = {
+  def trace[T](msg: => String @allowCaptures)(value: T) = {
     log(msg + " " + value)
     value
   }
 
-  def debugwarn(msg: => String, pos: SourcePosition = NoSourcePosition): Unit =
+  def debugwarn(msg: => String @allowCaptures, pos: SourcePosition = NoSourcePosition): Unit =
     if (this.settings.debug.value) warning(msg, pos)
 
   @inline
-  def debugTraceIndented[TD](question: => String, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => TD): TD =
+  def debugTraceIndented[TD](question: => String @allowCaptures, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => TD @allowCaptures): TD =
     conditionalTraceIndented(this.settings.debugTrace.value, question, printer, show)(op)
 
   @inline
-  def conditionalTraceIndented[TC](cond: Boolean, question: => String, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => TC): TC =
+  def conditionalTraceIndented[TC](cond: Boolean, question: => String @allowCaptures, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => TC @allowCaptures): TC =
     if (cond) traceIndented[TC](question, printer, show)(op)
     else op
 
   @inline
-  def traceIndented[T](question: => String, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => T): T =
+  def traceIndented[T](question: => String @allowCaptures, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => T @allowCaptures): T =
     if (printer eq config.Printers.noPrinter) op
     else doTraceIndented[T](question, printer, show)(op)
 
-  private def doTraceIndented[T](question: => String, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => T): T = {
+  private def doTraceIndented[T](question: => String @allowCaptures, printer: Printers.Printer = Printers.default, show: Boolean = false)(op: => T @allowCaptures): T = {
     def resStr(res: Any): String = res match {
       case res: printing.Showable if show => res.show
       case _ => String.valueOf(res)
@@ -147,7 +147,7 @@ trait Reporting { this: Context =>
     doTraceIndented[T](s"==> $q?", (res: Any) => s"<== $q = ${resStr(res)}")(op)
   }
 
-  def doTraceIndented[T](leading: => String, trailing: Any => String)(op: => T): T =
+  def doTraceIndented[T](leading: => String @allowCaptures, trailing: (Any => String) @allowCaptures)(op: => T @allowCaptures): T =
     if (ctx.mode.is(Mode.Printing)) op
     else {
       var finalized = false
@@ -180,7 +180,7 @@ trait Reporting { this: Context =>
     * @return   either the result of `op` if it had errors or the result of `f`
     *           applied to it
     */
-  def withNoError[A, B >: A](op: => A)(f: A => B): B = {
+  def withNoError[A, B >: A](op: => A @allowCaptures)(f: (A => B) @allowCaptures): B = {
     val before = reporter.errorCount
     val op0 = op
 
@@ -213,7 +213,7 @@ abstract class Reporter extends interfaces.ReporterResult {
 
   type ErrorHandler = MessageContainer => Context => Unit
   private var incompleteHandler: ErrorHandler = d => c => report(d)(c)
-  def withIncompleteHandler[T](handler: ErrorHandler)(op: => T): T = {
+  def withIncompleteHandler[T](handler: ErrorHandler)(op: => T @allowCaptures): T = {
     val saved = incompleteHandler
     incompleteHandler = handler
     try op
