@@ -54,6 +54,7 @@ object Contexts {
    *      of all class fields of type context; allow them only in whitelisted
    *      classes (which should be short-lived).
    */
+  @checkCaptures
   abstract class Context extends Periods
                             with Substituters
                             with TypeOps

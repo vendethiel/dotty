@@ -3,6 +3,7 @@ package transform
 
 import TreeTransforms._
 import core._
+import Annotations._
 import DenotTransformers._
 import Symbols._
 import SymDenotations._
@@ -80,7 +81,11 @@ class ElimByName extends MiniPhaseTransform with InfoTransformer { thisTransform
           case _ =>
             val inSuper = if (ctx.mode.is(Mode.InSuperCall)) InSuperCall else EmptyFlags
             val meth = ctx.newSymbol(
-                ctx.owner, nme.ANON_FUN, Synthetic | Method | inSuper, MethodType(Nil, Nil, argType))
+              ctx.owner, nme.ANON_FUN, Synthetic | Method | inSuper, MethodType(Nil, Nil, argType))
+
+            if (formalExpr.widen.hasAnnotation(defn.AllowCapturesAnnot))
+              meth.symbol.addAnnotation(Annotation(defn.AllowCapturesAnnot))
+
             Closure(meth, _ =>
               atGroupEnd { implicit ctx: Context =>
                 arg.changeOwner(ctx.owner, meth)

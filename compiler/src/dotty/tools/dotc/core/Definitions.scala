@@ -607,6 +607,13 @@ class Definitions {
   lazy val SetterMetaAnnotType = ctx.requiredClassRef("scala.annotation.meta.setter")
   def SetterMetaAnnot(implicit ctx: Context) = SetterMetaAnnotType.symbol.asClass
 
+  // Annotations used in CheckCaptures
+  lazy val CheckCapturesAnnotType = ctx.requiredClassRef("scala.checkCaptures")
+  def CheckCapturesAnnot(implicit ctx: Context) = CheckCapturesAnnotType.symbol.asClass
+  lazy val AllowCapturesAnnotType = ctx.requiredClassRef("scala.allowCaptures")
+  def AllowCapturesAnnot(implicit ctx: Context) = AllowCapturesAnnotType.symbol.asClass
+
+
   // convenient one-parameter method types
   def methOfAny(tp: Type) = MethodType(List(AnyType), tp)
   def methOfAnyVal(tp: Type) = MethodType(List(AnyValType), tp)

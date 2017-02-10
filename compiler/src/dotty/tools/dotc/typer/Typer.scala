@@ -782,7 +782,12 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
           val inlineable = pt.hasAnnotation(defn.InlineParamAnnot)
           desugar.makeClosure(inferredParams, fnBody, resultTpt, inlineable)
         }
-      typed(desugared, pt)
+      val typedTree = typed(desugared, pt)
+      if (pt.hasAnnotation(defn.AllowCapturesAnnot)) typedTree match {
+        case closure(env, meth, tpt) =>
+          meth.symbol.addAnnotation(Annotation(defn.AllowCapturesAnnot))
+      }
+      typedTree
     }
   }
 

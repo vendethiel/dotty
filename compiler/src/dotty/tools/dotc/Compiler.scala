@@ -92,6 +92,7 @@ class Compiler {
            new ElimStaticThis,      // Replace `this` references to static objects by global identifiers
            new Flatten,             // Lift all inner classes to package scope
            new RestoreScopes),      // Repair scopes rendered invalid by moving definitions in prior phases of the group
+      List(new CheckCaptures),
       List(new ExpandPrivate,       // Widen private definitions accessed from nested classes
            new SelectStatic,        // get rid of selects that would be compiled into GetStatic
            new CollectEntryPoints,  // Find classes with main methods
