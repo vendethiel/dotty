@@ -191,7 +191,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
       val sym = Interactive.enclosingSymbol(trees, spos)
       val defs = Interactive.definitions(trees, sym, namePosition = true, allowApproximation = true)
-      JEither.forRight(defs.map(location).asJava)
+      defs.map(location).asJava
     }
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
@@ -263,9 +263,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       println("hover: " + tp.show)
 
       val str = tp.widenTermRefExpr.show.toString
-      val h = new Hover()
-      h.setContents(str)
-      h
+
+      new Hover(List(JEither.forLeft[String, MarkedString](str)).asJava, null)
     }
 
     override def formatting(params: DocumentFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
