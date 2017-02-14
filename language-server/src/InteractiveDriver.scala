@@ -73,7 +73,7 @@ class ServerDriver(settings: List[String]) extends Driver {
   val compiler: Compiler = new Compiler
 
   private def tree(className: TypeName, fromSource: Boolean): Option[SourceTree] = {
-    println(s"tree($className, $fromSource)")
+    // println(s"tree($className, $fromSource)")
     val clsd =
       if (className.contains('.')) ctx.base.staticRef(className)
       else ctx.definitions.EmptyPackageClass.info.decl(className)
@@ -82,7 +82,7 @@ class ServerDriver(settings: List[String]) extends Driver {
         clsd.info // force denotation
         val tree = clsd.symbol.tree
         if (tree != null) {
-          println("Got tree: " + clsd)
+          // println("Got tree: " + clsd)
           assert(tree.isInstanceOf[TypeDef])
           val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
           if (!fromSource && openClasses.contains(toUri(sourceFile))) {
@@ -91,7 +91,7 @@ class ServerDriver(settings: List[String]) extends Driver {
           } else
             Some(SourceTree(sourceFile, tree))
         } else {
-          println("no tree: " + clsd)
+          // println("no tree: " + clsd)
           None
         }
       case _ =>
