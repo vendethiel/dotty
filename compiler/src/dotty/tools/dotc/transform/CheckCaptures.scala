@@ -43,19 +43,12 @@ class CheckCaptures extends Phase {
       case Apply(fun, args) =>
         traverse(fun)
 
-        def canCapture(capturedType: Type) = {
-          !fun.symbol.fullName.startsWith("scala.") &&
-          (fun match {
-            case Select(qual, _) if qual.tpe.isInstanceOf[SingletonType] =>
-              capturedType != qual.tpe
-            case _ =>
-              true
-          })
-        }
+        // Assume our usage of the standard library is safe
+        val alwaysAllowCaptures = fun.symbol.fullName.startsWith("scala.")
 
         args.foreach({
-          case c @ closure(env, meth, _) =>
-            capturedTypes(env, meth).filter(canCapture).foreach(checkCapture(_, meth, c.pos))
+          case c @ closure(env, meth, _) if alwaysAllowCaptures =>
+            // Do nothing.
           case arg =>
             traverse(arg)
         })
