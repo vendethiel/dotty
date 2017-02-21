@@ -50,13 +50,14 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   import ScalaLanguageServer._
   var driver: ServerDriver = _
 
-  var publishDiagnostics: PublishDiagnosticsParams => Unit = _
   var rewrites: dotty.tools.dotc.rewrite.Rewrites = _
 
   val actions = new mutable.LinkedHashMap[org.eclipse.lsp4j.Diagnostic, Command]
 
   var classPath: String = _
   var target: String = _
+
+  var client: LanguageClient = _
 
   def diagnostic(cont: MessageContainer): Option[lsp4j.Diagnostic] =
     if (!cont.pos.exists)
@@ -95,7 +96,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     }
 
   override def connect(client: LanguageClient): Unit = {
-    publishDiagnostics = client.publishDiagnostics _
+    this.client = client
   }
 
   override def exit(): Unit = {
@@ -204,7 +205,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val diags = driver.run(uri, text)
 
 
-      publishDiagnostics(new PublishDiagnosticsParams(
+      client.publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
         diags.flatMap(diagnostic).asJava))
     }
@@ -223,7 +224,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val diags = driver.run(uri, text)
 
-      publishDiagnostics(new PublishDiagnosticsParams(
+      client.publishDiagnostics(new PublishDiagnosticsParams(
         document.getUri,
         diags.flatMap(diagnostic).asJava))
     }
