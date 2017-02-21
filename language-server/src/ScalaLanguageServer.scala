@@ -124,7 +124,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
-    val ensime = scala.io.Source.fromURL("file://" + params.getRootPath + "/.ensime").mkString
+    val ensime = scala.io.Source.fromURL(params.getRootUri + "/.ensime").mkString
 
     classPath = """:compile-deps (.*)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)) match {
       case Some(deps) =>
