@@ -108,7 +108,7 @@ class tests extends CompilerTest {
     Directory(defaultOutputDir + "java").deleteRecursively()
   }
 
-  @Test def pickle_pickleOK = compileFiles(testsDir + "pickling/", testPickling)
+  /*@Test def pickle_pickleOK = compileFiles(testsDir + "pickling/", testPickling)
 // This directory doesn't exist anymore
 // @Test def pickle_pickling = compileDir(coreDir, "pickling", testPickling)
   @Test def pickle_ast = compileDir(dotcDir, "ast", testPickling)
@@ -200,11 +200,11 @@ class tests extends CompilerTest {
   @Test def neg_noimports = compileFile(negCustomArgs, "noimports", List("-Yno-imports"))
   @Test def neg_noimpots2 = compileFile(negCustomArgs, "noimports2", List("-Yno-imports"))
 
-  @Test def run_all = runFiles(runDir)
+  @Test def run_all = runFiles(runDir) */
 
   private val stdlibFiles: List[String] = StdLibSources.whitelisted
 
-  @Test def checkWBLists = {
+  /*@Test def checkWBLists = {
     val stdlibFilesBlackListed = StdLibSources.blacklisted
 
     val duplicates = stdlibFilesBlackListed.groupBy(x => x).filter(_._2.size > 1).filter(_._2.size > 1)
@@ -214,10 +214,10 @@ class tests extends CompilerTest {
     val filesNotInStdLib = stdlibFilesBlackListed.toSet -- StdLibSources.all
     val msg2 = filesNotInStdLib.map(x => s"'$x'").mkString(s"Entries in ${StdLibSources.blacklistFile} where not found:\n", "\n", "\n")
     assertTrue(msg2, filesNotInStdLib.isEmpty)
-  }
+  } */
 
-  @Test def compileStdLib = compileList("compileStdLib", stdlibFiles, "-migration" :: "-Yno-inline" :: scala2mode)
-  @Test def compileMixed = compileLine(
+  @Test def compileStdLib = compileList("compileStdLib", stdlibFiles, "-verbose" :: "-migration" :: "-Yno-inline" :: scala2mode)
+  /*@Test def compileMixed = compileLine(
       """../tests/pos/B.scala
         |../scala-scala/src/library/scala/collection/immutable/Seq.scala
         |../scala-scala/src/library/scala/collection/parallel/ParSeq.scala
@@ -379,5 +379,5 @@ class tests extends CompilerTest {
     compileDir(dotcDir, "transform", opt)
     compileDir(dotcDir, "typer", opt)
     compileDir(dotcDir, "util", opt)
-  }
+  }  */
 }

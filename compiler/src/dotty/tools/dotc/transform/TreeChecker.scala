@@ -118,7 +118,7 @@ class TreeChecker extends Phase with SymTransformer {
   def check(phasesToRun: Seq[Phase], ctx: Context) = {
     val prevPhase = ctx.phase.prev // can be a mini-phase
     val squahsedPhase = ctx.squashed(prevPhase)
-    ctx.echo(s"checking ${ctx.compilationUnit} after phase ${squahsedPhase}")
+    // ctx.echo(s"checking ${ctx.compilationUnit} after phase ${squahsedPhase}")
 
     val checkingCtx = ctx
         .fresh
