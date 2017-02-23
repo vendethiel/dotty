@@ -73,29 +73,32 @@ class ServerDriver(settings: List[String]) extends Driver {
   val compiler: Compiler = new Compiler
 
   private def tree(className: TypeName, fromSource: Boolean): Option[SourceTree] = {
-    // println(s"tree($className, $fromSource)")
-    val clsd =
-      if (className.contains('.')) ctx.base.staticRef(className)
-      else ctx.definitions.EmptyPackageClass.info.decl(className)
-    clsd match {
-      case clsd: ClassDenotation =>
-        clsd.info // force denotation
-        val tree = clsd.symbol.tree
-        if (tree != null) {
-          // println("Got tree: " + clsd)
-          assert(tree.isInstanceOf[TypeDef])
-          val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
-          if (!fromSource && openClasses.contains(toUri(sourceFile))) {
-            //println("Skipping, already open from source")
+    if (className.toString == "scala.annotation.internal.SourceFile")
+      None // No SourceFile annotation on SourceFile itself
+    else {
+      val clsd =
+        if (className.contains('.')) ctx.base.staticRef(className)
+        else ctx.definitions.EmptyPackageClass.info.decl(className)
+      clsd match {
+        case clsd: ClassDenotation =>
+          clsd.info // force denotation
+          val tree = clsd.symbol.tree
+          if (tree != null) {
+            // println("Got tree: " + clsd)
+            assert(tree.isInstanceOf[TypeDef])
+            val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
+            if (!fromSource && openClasses.contains(toUri(sourceFile))) {
+              //println("Skipping, already open from source")
+              None
+            } else
+              Some(SourceTree(sourceFile, tree))
+          } else {
+            // println("no tree: " + clsd)
             None
-          } else
-            Some(SourceTree(sourceFile, tree))
-        } else {
-          // println("no tree: " + clsd)
-          None
-        }
-      case _ =>
-        sys.error(s"class not found: $className")
+          }
+        case _ =>
+          sys.error(s"class not found: $className")
+      }
     }
   }
 
