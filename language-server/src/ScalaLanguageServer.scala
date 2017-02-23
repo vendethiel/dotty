@@ -43,21 +43,40 @@ import core.Decorators._
 
 import ast.Trees._
 
+case class IDEConfig(
+  id: String,
+  sources: Seq[JFile],
+  scalacArgs: Seq[String],
+  depCp: Seq[JFile],
+  target: JFile
+)
 
 class ScalaLanguageServer extends LanguageServer with LanguageClientAware { thisServer =>
   import ast.tpd._
 
   import ScalaLanguageServer._
-  var driver: ServerDriver = _
 
   var rewrites: dotty.tools.dotc.rewrite.Rewrites = _
 
   val actions = new mutable.LinkedHashMap[org.eclipse.lsp4j.Diagnostic, Command]
 
+  val drivers = new mutable.HashMap[IDEConfig, ServerDriver]
+
   var classPath: String = _
   var target: String = _
 
   var client: LanguageClient = _
+
+  def findDriver(uri: URI): ServerDriver = {
+    val matchingConfigs = drivers.keys.filter(config => config.sources.exists(sourceDir => uri.getRawPath.startsWith(sourceDir.getAbsolutePath.toString))).toList
+    matchingConfigs match {
+      case List(config) =>
+        drivers(config)
+      case _ =>
+        assert(false, s"${uri} matched ${matchingConfigs}")
+        ???
+    }
+  }
 
   def diagnostic(cont: MessageContainer): Option[lsp4j.Diagnostic] =
     if (!cont.pos.exists)
@@ -127,18 +146,36 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
     val ensime = scala.io.Source.fromURL(params.getRootUri + "/.ensime").mkString
 
+    var configs: List[IDEConfig] = Nil
+
+    val ideConfigStr = scala.io.Source.fromURL(params.getRootUri + "/.dotty-ide").mkString
+    val ideConfig = scala.xml.XML.loadString(ideConfigStr)
+    ideConfig.descendant foreach { node =>
+      val id = node.attribute("id").get.head.toString
+      val sources = node.attribute("sources").get.head.toString.split(",").toSeq.map(new JFile(_))
+      val scalacArgs = node.attribute("scalacArgs").get.head.toString.split(",").toSeq
+      val depCp = node.attribute("depCp").get.head.toString.split(",").toSeq.map(new JFile(_))
+      val target = new JFile(node.attribute("target").get.head.toString)
+      configs = IDEConfig(id, sources, scalacArgs, depCp, target) :: configs
+    }
+    println("configs: " + configs.mkString("\n"))
+    /*
     classPath = """:compile-deps (.*)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)) match {
       case Some(deps) =>
         """"(.*?)"""".r.unanchored.findAllMatchIn(deps).map(_.group(1)).mkString(":")
       case None =>
         //println("XX#: " + ensime + "###")
         ""
-    }
+«    }
     target = """:targets \("(.*)"\)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)).get
     println("classPath: " + classPath)
     println("target: " + target)
+    */
 
-    driver = new ServerDriver(List(/*"-Yplain-printer",*/"-Ydebug", "-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite", "-classpath", target + ":" + classPath))
+    val defaultFlags = List(/*"-Yplain-printer",*/"-Ydebug", "-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite")
+    for (config <- configs) {
+      drivers.put(config, new ServerDriver(defaultFlags ++ config.scalacArgs.toList ++ List("-classpath", (config.target +: config.depCp).mkString(":"))))
+    }
 
 
     val c = new ServerCapabilities
@@ -168,10 +205,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def codeLens(params: CodeLensParams): CompletableFuture[jList[_ <: CodeLens]] = null
     // FIXME: share code with messages.NotAMember
     override def completion(params: TextDocumentPositionParams) = computeAsync { cancelToken =>
+      val uri = new URI(params.getTextDocument.getUri)
+      val driver = findDriver(uri)
       implicit val ctx = driver.ctx
 
       val trees = driver.trees
-      val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val spos = driver.sourcePosition(uri, params.getPosition)
 
       val decls = Interactive.completions(trees, spos)
 
@@ -186,10 +225,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       JEither.forRight(new CompletionList(/*isIncomplete = */ false, items.asJava))
     }
     override def definition(params: TextDocumentPositionParams) = computeAsync { cancelToken =>
+      val uri = new URI(params.getTextDocument.getUri)
+      val driver = findDriver(uri)
       implicit val ctx = driver.ctx
 
       val trees = driver.trees
-      val spos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val spos = driver.sourcePosition(uri, params.getPosition)
       val sym = Interactive.enclosingSymbol(trees, spos)
       val defs = Interactive.definitions(trees, sym, namePosition = true, allowApproximation = true)
       defs.map(location).asJava
@@ -197,6 +238,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def didChange(params: DidChangeTextDocumentParams): Unit = {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
+      val driver = findDriver(uri)
+
       val path = Paths.get(uri)
       val change = params.getContentChanges.get(0)
       assert(change.getRange == null, "TextDocumentSyncKind.Incremental support is not implemented")
@@ -213,11 +256,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
 
-      driver.close(uri)
+      findDriver(uri).close(uri)
     }
     override def didOpen(params: DidOpenTextDocumentParams): Unit = {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
+      val driver = findDriver(uri)
       val path = Paths.get(uri)
       println("open: " + path)
       val text = params.getTextDocument.getText
@@ -232,6 +276,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = computeAsync { cancelToken =>
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
+      val driver = findDriver(uri)
 
       implicit val ctx = driver.ctx
 
@@ -248,6 +293,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def documentSymbol(params: DocumentSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
+      val driver = findDriver(uri)
 
       implicit val ctx = driver.ctx
 
@@ -257,9 +303,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
     }
     override def hover(params: TextDocumentPositionParams): CompletableFuture[Hover] = computeAsync { cancelToken =>
+      val uri = new URI(params.getTextDocument.getUri)
+      val driver = findDriver(uri)
+
       implicit val ctx = driver.ctx
 
-      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val pos = driver.sourcePosition(uri, params.getPosition)
       val tp = Interactive.enclosingType(driver.trees, pos)
       println("hover: " + tp.show)
 
@@ -273,9 +322,11 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def onTypeFormatting(params: DocumentOnTypeFormattingParams): CompletableFuture[jList[_ <: TextEdit]] = null
 
     override def references(params: ReferenceParams): CompletableFuture[jList[_ <: Location]] = computeAsync { cancelToken =>
+      val uri = new URI(params.getTextDocument.getUri)
+      val driver = findDriver(uri)
       implicit val ctx = driver.ctx
 
-      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val pos = driver.sourcePosition(uri, params.getPosition)
 
       val trees = driver.trees
       val sym = Interactive.enclosingSymbol(trees, pos) 
@@ -284,10 +335,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       refs.map(location).asJava
     }
     override def rename(params: RenameParams): CompletableFuture[WorkspaceEdit] = computeAsync { cancelToken =>
+      val uri = new URI(params.getTextDocument.getUri)
+      val driver = findDriver(uri)
       implicit val ctx = driver.ctx
 
       val trees = driver.trees
-      val pos = driver.sourcePosition(new URI(params.getTextDocument.getUri), params.getPosition)
+      val pos = driver.sourcePosition(uri, params.getPosition)
 
 
       val sym = Interactive.enclosingSymbol(trees, pos)
@@ -312,10 +365,12 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
       val query = params.getQuery
 
-      implicit val ctx = driver.ctx
+      drivers.values.flatMap(driver => {
+        implicit val ctx = driver.ctx
 
-      val syms = Interactive.allDefinitions(driver.trees, filter = query)
-      syms.map({case (sym, spos) => symbolInfo(sym, spos)}).asJava
+        val syms = Interactive.allDefinitions(driver.trees, filter = query)
+        syms.map({case (sym, spos) => symbolInfo(sym, spos)})
+      }).toList.asJava
     }
   }
 }
