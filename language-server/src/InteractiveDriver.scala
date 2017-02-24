@@ -108,11 +108,17 @@ class ServerDriver(settings: List[String]) extends Driver {
         .filter(cls => cls.binary match {
           case None =>
             true
-          case Some(binfile) =>
+          case Some(binFile) =>
             // FIXME: need a better way to check if classfile has tasty section
-            new classfile.ClassfileParser(binfile, null, null)(ctx).hasTasty
+            val tastyFile =
+              if (binFile.toString.endsWith("$.class"))
+                AbstractFile.getFile(binFile.toString.dropRight("$.class".length) ++ ".class")
+              else
+                binFile
+            tastyFile != null &&
+            new classfile.ClassfileParser(tastyFile, null, null)(ctx).hasTasty
         })
-        .map(_.name.toTypeName) ++
+        .map(cls => cls.name.toTypeName) ++
       cp.packages.flatMap(pkg => classNames(pkg).map(name => s"${pkg.name}.$name".toTypeName))
 
     classNames(ctx.platform.classPath)
