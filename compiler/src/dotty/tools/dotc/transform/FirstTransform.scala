@@ -184,8 +184,26 @@ class FirstTransform extends MiniPhaseTransform with InfoTransformer with Annota
   override def transformTyped(tree: Typed)(implicit ctx: Context, info: TransformerInfo) =
     constToLiteral(tree)
     
-  override def transformBlock(tree: Block)(implicit ctx: Context, info: TransformerInfo) =
+  override def transformBlock(tree: Block)(implicit ctx: Context, info: TransformerInfo) = {
+
+    val badType = // minimized
+      RefinedType(
+        ctx.requiredClassRef("AbstractIterator2"),
+        "GroupedIterator2".toTypeName,
+        TypeRef(ctx.requiredClassRef("AbstractIterator2"), "GroupedIterator2".toTypeName))
+
+    badType.member("GroupedIterator2".toTypeName)
+
+    val badType2 =
+      RefinedType(
+        ctx.requiredClassRef("scala.collection.AbstractIterator"),
+        "GroupedIterator".toTypeName,
+        TypeRef(ctx.requiredClassRef("scala.collection.AbstractIterator"), "GroupedIterator".toTypeName))
+
+    badType2.member("GroupedIterator".toTypeName)
+
     constToLiteral(tree)
+  }
 
   // invariants: all modules have companion objects
   // all types are TypeTrees
