@@ -7,16 +7,16 @@ import Periods._
 import Symbols._
 import Types._
 import Scopes._
-import typer.{FrontEnd, Typer, ImportInfo, RefChecks}
-import reporting.{Reporter, ConsoleReporter}
+import typer.{FrontEnd, ImportInfo, RefChecks, Typer}
+import reporting.{ConsoleReporter, Reporter}
 import Phases.Phase
 import transform._
 import util.FreshNameCreator
 import transform.TreeTransforms.{TreeTransform, TreeTransformer}
 import core.DenotTransformers.DenotTransformer
 import core.Denotations.SingleDenotation
-
-import dotty.tools.backend.jvm.{LabelDefs, GenBCode, CollectSuperCalls}
+import dotty.tools.backend.jvm.{CollectSuperCalls, GenBCode, LabelDefs}
+import dotty.tools.dotc.transform.linker.Simplify
 
 /** The central class of the dotc compiler. The job of a compiler is to create
  *  runs, which process given `phases` in a given `rootContext`.
@@ -59,6 +59,9 @@ class Compiler {
            new LiftTry,             // Put try expressions that might execute on non-empty stacks into their own methods
            new ClassOf),            // Expand `Predef.classOf` calls.
       List(new TryCatchPatterns,    // Compile cases in try/catch
+           new PatternConstantsFactorization, // extract common constant matches from patterns
+           new PatternTypeFactorization,      // extract common type matches from patterns
+
            new PatternMatcher,      // Compile pattern matches
            new ExplicitOuter,       // Add accessors to outer classes from nested ones.
            new ExplicitSelf,        // Make references to non-trivial self types explicit as casts
@@ -73,6 +76,7 @@ class Compiler {
            new ElimByName,          // Expand by-name parameters and arguments
            new AugmentScala2Traits, // Expand traits defined in Scala 2.11 to simulate old-style rewritings
            new ResolveSuper,        // Implement super accessors and add forwarders to trait methods
+           new Simplify,            // Perform local optimizations, simplified versions of what linker does.
            new PrimitiveForwarders, // Add forwarders to trait methods that have a mismatch between generic and primitives
            new ArrayConstructors),  // Intercept creation of (non-generic) arrays and intrinsify.
       List(new Erasure),            // Rewrite types to JVM model, erasing all type parameters, abstract types and refinements.
