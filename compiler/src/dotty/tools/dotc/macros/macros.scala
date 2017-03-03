@@ -116,11 +116,11 @@ package object macros {
    *  to:
    *
    *    class main {
-   *      <macro> def f[T](a: A)(b: B): C = null
+   *      <macro> def f[T](a: A)(b: B): C = ???
    *    }
    *
    *    object main$inline {
-   *      def f(prefix: scala.meta.Term)(T: scala.meta.Type)(a: scala.meta.Term)(b: scala.meta.Term): scala.meta.Tree = body
+   *      @static def f(prefix: scala.meta.Term)(T: scala.meta.Type)(a: scala.meta.Term)(b: scala.meta.Term): scala.meta.Tree = body
    *    }
    */
   def transform(tree: Tree)(implicit ctx: Context): Tree = {
