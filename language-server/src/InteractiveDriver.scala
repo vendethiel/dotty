@@ -35,7 +35,7 @@ import scala.io.Codec
 import dotty.tools.dotc.util.SourceFile
 import java.io._
 
-import Flags._, Symbols._, Names._
+import Flags._, Symbols._, Names._, NameOps._
 import core.Decorators._
 
 import ast.Trees._
@@ -89,6 +89,7 @@ class ServerDriver(settings: List[String]) extends Driver {
             val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
             if (!fromSource && openClasses.contains(toUri(sourceFile))) {
               //println("Skipping, already open from source")
+              assert(false, clsd) // TODO: remove fromSource parameter
               None
             } else
               Some(SourceTree(sourceFile, tree))
@@ -125,10 +126,14 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   def trees = {
-    val sourceClasses = openClasses.values.flatten
+    val sourceClasses = openClasses.values.flatten.toList
+    println("openClasses: " + openClasses)
+    val otherClasses = tastyClasses.filter(tastyCls =>
+      !sourceClasses.exists(sourceCls =>
+        tastyCls.stripModuleClassSuffix == sourceCls.stripModuleClassSuffix))
 
     (sourceClasses.flatMap(c => tree(c, fromSource = true)) ++
-      tastyClasses.flatMap(c => tree(c, fromSource = false))).toList
+      otherClasses.flatMap(c => tree(c, fromSource = false))).toList
   }
 
   def topLevelClassNames(tree: Tree): List[TypeName] = {
