@@ -10,7 +10,7 @@ import Names._, StdNames._, ast.Trees._, ast.{tpd, untpd}
 import Symbols._, Contexts._
 import util.Positions._
 import Parsers.Parser
-import scala.reflect.internal.util.StringOps.splitWhere
+import util.StringOps.splitWhere
 import scala.language.implicitConversions
 
 /** This class builds instance of `Tree` that represent XML.

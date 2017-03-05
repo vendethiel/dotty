@@ -6,9 +6,9 @@
 package dotty.tools
 package io
 
+import dotc.util.StringOps.splitWhere
 import java.net.URL
 import scala.collection.{ mutable, immutable }
-import scala.reflect.internal.util.StringOps.splitWhere
 import File.pathSeparator
 import java.net.MalformedURLException
 import Jar.isJarOrZip
