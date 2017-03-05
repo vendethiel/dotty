@@ -30,7 +30,7 @@ import dotty.tools.dotc.util.Positions.Position
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Flags
 
-import scala.reflect.internal.util.Collections
+import util.Collections
 
 /** This transform eliminates patterns. Right now it's a dummy.
  *  Awaiting the real pattern matcher.

@@ -23,10 +23,10 @@ import Decorators._
 import StdNames._
 import dotty.tools.dotc.reporting.diagnostic.messages.IdentifierExpected
 import dotty.tools.dotc.util.SourceFile
+import util.Collections._
 import util.Positions._
 import annotation.switch
 import scala.collection.mutable.ListBuffer
-import scala.reflect.internal.util.Collections._
 
 object JavaParsers {
 

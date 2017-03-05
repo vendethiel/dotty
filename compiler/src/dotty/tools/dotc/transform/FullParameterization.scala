@@ -12,7 +12,7 @@ import NameOps._
 import ast._
 import ast.Trees._
 
-import scala.reflect.internal.util.Collections
+import util.Collections
 
 /** Provides methods to produce fully parameterized versions of instance methods,
  *  where the `this` of the enclosing class is abstracted out in an extra leading
