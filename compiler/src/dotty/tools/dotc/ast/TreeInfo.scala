@@ -33,7 +33,11 @@ trait TreeInfo[T >: Untyped <: Type] { self: Trees.Instance[T] =>
   def defKind(tree: Tree): FlagSet = unsplice(tree) match {
     case EmptyTree | _: Import => NoInitsInterface
     case tree: TypeDef => if (tree.isClassDef) NoInits else NoInitsInterface
-    case tree: DefDef => if (tree.unforcedRhs == EmptyTree) NoInitsInterface else NoInits
+    case tree: DefDef =>
+      if (tree.unforcedRhs == EmptyTree)
+        (NoInitsInterface /: tree.vparamss.flatten)((fs, vparam) => fs & defKind(vparam))
+      else
+        NoInits
     case tree: ValDef => if (tree.unforcedRhs == EmptyTree) NoInitsInterface else EmptyFlags
     case _ => EmptyFlags
   }
