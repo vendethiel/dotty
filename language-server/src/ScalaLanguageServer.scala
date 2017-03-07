@@ -172,7 +172,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     println("target: " + target)
     */
 
-    val defaultFlags = List(/*"-Yplain-printer",*/"-Ydebug", "-Yprintpos", "-Ylog:frontend", "-Ystop-after:frontend", "-language:Scala2", "-rewrite")
+    val defaultFlags = List(/*"-Yplain-printer",*/"-Ydebug", "-Yprintpos", "-Ystop-after:frontend", "-language:Scala2", "-rewrite")
     for (config <- configs) {
       drivers.put(config, new ServerDriver(defaultFlags ++ config.scalacArgs.toList ++ List("-classpath", (config.target +: config.depCp).mkString(":"))))
     }
