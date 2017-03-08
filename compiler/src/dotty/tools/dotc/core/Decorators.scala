@@ -15,10 +15,19 @@ import printing.Formatting._
 object Decorators {
 
   /** Turns Strings into PreNames, adding toType/TermName methods */
-  implicit class StringDecorator(val s: String) extends AnyVal with PreName {
+  implicit class PreNamedString(val s: String) extends AnyVal with PreName {
     def toTypeName: TypeName = typeName(s)
     def toTermName: TermName = termName(s)
     def toText(printer: Printer): Text = Str(s)
+  }
+
+  implicit class StringDecorator(val s: String) extends AnyVal {
+    def splitWhere(f: Char => Boolean, doDropIndex: Boolean = false): Option[(String, String)] =
+      splitAt(s.indexWhere(f), doDropIndex)
+
+    private def splitAt(idx: Int, doDropIndex: Boolean = false): Option[(String, String)] =
+      if (idx == -1) None
+      else Some((s.take(idx), s.drop(if (doDropIndex) idx + 1 else idx)))
   }
 
   /** Implements a findSymbol method on iterators of Symbols that

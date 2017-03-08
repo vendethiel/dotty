@@ -23,7 +23,6 @@ import Decorators._
 import StdNames._
 import dotty.tools.dotc.reporting.diagnostic.messages.IdentifierExpected
 import dotty.tools.dotc.util.SourceFile
-import util.Collections._
 import util.Positions._
 import annotation.switch
 import scala.collection.mutable.ListBuffer
@@ -136,7 +135,7 @@ object JavaParsers {
       ValDef(name, tpt, EmptyTree).withMods(Modifiers(Flags.JavaDefined | Flags.ParamAccessor))
 
     def makeConstructor(formals: List[Tree], tparams: List[TypeDef], flags: FlagSet = Flags.JavaDefined) = {
-      val vparams = mapWithIndex(formals)((p, i) => makeSyntheticParam(i + 1, p))
+      val vparams = formals.zipWithIndex.map { case (p, i) => makeSyntheticParam(i + 1, p) }
       DefDef(nme.CONSTRUCTOR, tparams, List(vparams), TypeTree(), EmptyTree).withMods(Modifiers(flags))
     }
 
