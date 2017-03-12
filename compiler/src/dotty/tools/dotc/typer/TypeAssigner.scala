@@ -49,7 +49,58 @@ trait TypeAssigner {
    *     if this is not possible, replace the ClassInfo as above.
    *   - drop refinements referring to a forbidden symbol.
    */
-  def avoid(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
+  def avoid1(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
+    val widenMap = new ApproximatingTypeMap {
+      lazy val forbidden = symsToAvoid.toSet
+      def apply(tp: Type): Type = tp match {
+        case tp: TermRef =>
+          val sym = tp.symbol
+          if (sym.isStatic) tp
+          else if (!forbidden.contains(sym)) mapOver(tp)
+          else if (variance > 0 || tp.info.widenExpr <:< tp) tp.info.widenExpr
+          else NoType
+        case tp: NamedType =>
+          val sym = tp.symbol
+          if (sym.isStatic) tp
+          else if (!forbidden.contains(sym)) mapOver(tp)
+          else tp.info match {
+            case info: ClassInfo =>
+              val parentType = info.parentsWithArgs.reduceLeft(ctx.typeComparer.andType(_, _))
+              def addRefinement(parent: Type, decl: Symbol) = {
+                val inherited = parentType.findMember(decl.name, sym.thisType, Private)
+                    .suchThat(decl.matches(_))
+                val inheritedInfo = inherited.info
+                if (inheritedInfo.exists && decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
+                  val r = RefinedType(parent, decl.name, decl.info)
+                  typr.println(i"add ref $parent $decl --> " + r)
+                  r
+                }
+                else parent
+              }
+              val refinableDecls = info.decls.filterNot(
+                sym => sym.is(TypeParamAccessor | Private) || sym.isConstructor)
+              val fullType = (parentType /: refinableDecls)(addRefinement)
+              mapOver(fullType)
+            case TypeAlias(ref) =>
+              apply(ref)
+            case info: TypeProxy if variance > 0 =>
+              apply(info.superType)
+            case TypeBounds(lo, _) if variance < 0 =>
+              apply(lo)
+            case _ =>
+              NoType
+          }
+        case tp: TypeVar if ctx.typerState.constraint.contains(tp) =>
+          val lo = ctx.typerState.constraint.fullLowerBound(tp.origin)
+          val lo1 = apply(lo)
+          if (lo1 ne lo) lo1 else tp
+        case _ =>
+          mapOver(tp)
+      }
+    }
+    widenMap(tp)
+  }
+  def avoid2(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
     val widenMap = new TypeMap {
       lazy val forbidden = symsToAvoid.toSet
       def toAvoid(tp: Type): Boolean =
@@ -127,6 +178,12 @@ trait TypeAssigner {
       }
     }
     widenMap(tp)
+  }
+  def avoid(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
+    val tp1 = avoid1(tp, symsToAvoid)
+    val tp2 = avoid2(tp, symsToAvoid)
+    assert(tp1 =:= tp2, i"avoid diff for $tp,\nwas: $tp2\nnow: $tp1")
+    tp1
   }
 
   def avoidingType(expr: Tree, bindings: List[Tree])(implicit ctx: Context): Type =
