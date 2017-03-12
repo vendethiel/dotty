@@ -628,7 +628,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
   /** Ensure that an expression's type can be expressed without references to locally defined
    *  symbols. This is done by adding a type ascription of a widened type that does
    *  not refer to the locally defined symbols. The widened type is computed using
-   *  `TyperAssigner#avoid`. However, if the expected type is fully defined and not
+   *  `TypeAssigner#avoid`. However, if the expected type is fully defined and not
    *  a supertype of the widened type, we ascribe with the expected type instead.
    *
    *  There's a special case having to do with anonymous classes. Sometimes the
