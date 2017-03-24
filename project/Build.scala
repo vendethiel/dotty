@@ -4,10 +4,11 @@ import complete.DefaultParsers._
 import java.io.{ RandomAccessFile, File }
 import java.nio.channels.FileLock
 import scala.reflect.io.Path
-import sbtassembly.AssemblyKeys.assembly
+import scala.sys.process._
+// import sbtassembly.AssemblyKeys.assembly
 
-import org.scalajs.sbtplugin.ScalaJSPlugin
-import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+// import org.scalajs.sbtplugin.ScalaJSPlugin
+// import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbt.Package.ManifestAttributes
 
 object Build {
@@ -86,8 +87,8 @@ object Build {
   )
 
   /** Enforce 2.11.5. Do not let it be upgraded by dependencies. */
-  private val overrideScalaVersionSetting =
-    ivyScala := ivyScala.value.map(_.copy(overrideScalaVersion = true))
+  private val overrideScalaVersionSetting = {}
+    // ivyScala := ivyScala.value.map(_.copy(overrideScalaVersion = true))
 
   // set sources to src/, tests to test/ and resources to resources/
   lazy val sourceStructure = Seq(
@@ -183,9 +184,11 @@ object Build {
     settings(
       resourceDirectory in Test := baseDirectory.value / "test" / "resources",
 
+      /*
       // specify main and ignore tests when assembling
       mainClass in assembly := Some("dotty.tools.bot.Main"),
       test in assembly := {},
+      */
 
       libraryDependencies ++= {
         val circeVersion = "0.7.0"
@@ -217,9 +220,11 @@ object Build {
         Seq(file)
       }.taskValue,
 
+      /*
       // include sources in eclipse (downloads source code for all dependencies)
       //http://stackoverflow.com/questions/10472840/how-to-attach-sources-to-sbt-managed-dependencies-in-scala-ide#answer-11683728
       com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys.withSource := true,
+      */
 
       dottydocDeps := Seq(
         "com.vladsch.flexmark" % "flexmark" % "0.11.1",
@@ -245,10 +250,10 @@ object Build {
                                   "com.novocode" % "junit-interface" % "0.11" % "test"),
 
       resolvers += Resolver.typesafeIvyRepo("releases"), // For org.scala-sbt:interface
-      libraryDependencies += "org.scala-sbt" % "interface" % sbtVersion.value,
+      libraryDependencies += "org.scala-sbt" % "compiler-interface" % "1.0.0-X11",
 
       // enable improved incremental compilation algorithm
-      incOptions := incOptions.value.withNameHashing(true),
+      // incOptions := incOptions.value.withNameHashing(true),
 
       // For convenience, change the baseDirectory when running the compiler
       baseDirectory in (Compile, run) := baseDirectory.value / "..",
@@ -448,7 +453,7 @@ object Build {
     settings(sourceStructure).
     settings(dottyCompilerSettings).
     settings(
-      overrideScalaVersionSetting,
+      // overrideScalaVersionSetting,
 
       // necessary evil: dottydoc currently needs to be included in the dotty
       // project, for sbt integration
@@ -531,7 +536,7 @@ object Build {
     dependsOn(`dotty-compiler`).
     settings(sourceStructure).
     settings(
-      overrideScalaVersionSetting,
+      // overrideScalaVersionSetting,
 
       cleanSbtBridge := {
         val dottySbtBridgeVersion = version.value
@@ -553,8 +558,8 @@ object Build {
       description := "sbt compiler bridge for Dotty",
       resolvers += Resolver.typesafeIvyRepo("releases"), // For org.scala-sbt stuff
       libraryDependencies ++= Seq(
-        "org.scala-sbt" % "interface" % sbtVersion.value,
-        "org.scala-sbt" % "api" % sbtVersion.value % "test",
+        "org.scala-sbt" % "compiler-interface" % "1.0.0-X11",
+        "org.scala-sbt" % "zinc-apiinfo_2.12" % "1.0.0-X11" % "test",
         "org.specs2" %% "specs2" % "2.3.11" % "test"
       ),
       // The sources should be published with crossPaths := false since they
@@ -567,44 +572,44 @@ object Build {
       fork in Test := true,
       parallelExecution in Test := false
     ).
-    settings(ScriptedPlugin.scriptedSettings: _*).
-    settings(
-      ScriptedPlugin.sbtTestDirectory := baseDirectory.value / "sbt-test",
-      ScriptedPlugin.scriptedLaunchOpts := Seq("-Xmx1024m"),
-      ScriptedPlugin.scriptedBufferLog := false,
-      ScriptedPlugin.scripted := {
-        val x1 = (publishLocal in `dotty-interfaces`).value
-        val x2 = (publishLocal in `dotty-compiler`).value
-        val x3 = (publishLocal in `dotty-library`).value
-        val x4 = (publishLocal in dotty).value // Needed because sbt currently hardcodes the dotty artifact
-        ScriptedPlugin.scriptedTask.evaluated
-      }
-      // TODO: Use this instead of manually copying DottyInjectedPlugin.scala
-      // everywhere once https://github.com/sbt/sbt/issues/2601 gets fixed.
-      /*,
-      ScriptedPlugin.scriptedPrescripted := { f =>
-        IO.write(inj, """
-import sbt._
-import Keys._
+//     settings(ScriptedPlugin.scriptedSettings: _*).
+//     settings(
+//       ScriptedPlugin.sbtTestDirectory := baseDirectory.value / "sbt-test",
+//       ScriptedPlugin.scriptedLaunchOpts := Seq("-Xmx1024m"),
+//       ScriptedPlugin.scriptedBufferLog := false,
+//       ScriptedPlugin.scripted := {
+//         val x1 = (publishLocal in `dotty-interfaces`).value
+//         val x2 = (publishLocal in `dotty-compiler`).value
+//         val x3 = (publishLocal in `dotty-library`).value
+//         val x4 = (publishLocal in dotty).value // Needed because sbt currently hardcodes the dotty artifact
+//         ScriptedPlugin.scriptedTask.evaluated
+//       }
+//       // TODO: Use this instead of manually copying DottyInjectedPlugin.scala
+//       // everywhere once https://github.com/sbt/sbt/issues/2601 gets fixed.
+//       /*,
+//       ScriptedPlugin.scriptedPrescripted := { f =>
+//         IO.write(inj, """
+// import sbt._
+// import Keys._
 
-object DottyInjectedPlugin extends AutoPlugin {
-  override def requires = plugins.JvmPlugin
-  override def trigger = allRequirements
+// object DottyInjectedPlugin extends AutoPlugin {
+//   override def requires = plugins.JvmPlugin
+//   override def trigger = allRequirements
 
-  override val projectSettings = Seq(
-    scalaVersion := "0.1.1-SNAPSHOT",
-    scalaOrganization := "ch.epfl.lamp",
-    scalacOptions += "-language:Scala2",
-    scalaBinaryVersion  := "2.11",
-    autoScalaLibrary := false,
-    libraryDependencies ++= Seq("org.scala-lang" % "scala-library" % "2.11.5"),
-    scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % scalaVersion.value % "component").sources()
-  )
-}
-""")
-      }
-      */
-    ).
+//   override val projectSettings = Seq(
+//     scalaVersion := "0.1.1-SNAPSHOT",
+//     scalaOrganization := "ch.epfl.lamp",
+//     scalacOptions += "-language:Scala2",
+//     scalaBinaryVersion  := "2.11",
+//     autoScalaLibrary := false,
+//     libraryDependencies ++= Seq("org.scala-lang" % "scala-library" % "2.11.5"),
+//     scalaCompilerBridgeSource := ("ch.epfl.lamp" % "dotty-sbt-bridge" % scalaVersion.value % "component").sources()
+//   )
+// }
+// """)
+//       }
+//       */
+//     ).
     settings(publishing)
 
   /** A sandbox to play with the Scala.js back-end of dotty.
@@ -616,46 +621,46 @@ object DottyInjectedPlugin extends AutoPlugin {
    *  Simply running `dotty/run -scalajs` without this sandbox is not very
    *  useful, as that would not provide the linker and JS runners.
    */
-  lazy val sjsSandbox = project.in(file("sandbox/scalajs")).
-    enablePlugins(ScalaJSPlugin).
-    settings(sourceStructure).
-    settings(
-      overrideScalaVersionSetting,
+  // lazy val sjsSandbox = project.in(file("sandbox/scalajs")).
+  //   enablePlugins(ScalaJSPlugin).
+  //   settings(sourceStructure).
+  //   settings(
+  //     // overrideScalaVersionSetting,
 
-      /* Remove the Scala.js compiler plugin for scalac, and enable the
-       * Scala.js back-end of dotty instead.
-       */
-      libraryDependencies ~= { deps =>
-        deps.filterNot(_.name.startsWith("scalajs-compiler"))
-      },
-      scalacOptions += "-scalajs",
+  //     /* Remove the Scala.js compiler plugin for scalac, and enable the
+  //      * Scala.js back-end of dotty instead.
+  //      */
+  //     libraryDependencies ~= { deps =>
+  //       deps.filterNot(_.name.startsWith("scalajs-compiler"))
+  //     },
+  //     scalacOptions += "-scalajs",
 
-      // The main class cannot be found automatically due to the empty inc.Analysis
-      mainClass in Compile := Some("hello.world"),
+  //     // The main class cannot be found automatically due to the empty inc.Analysis
+  //     mainClass in Compile := Some("hello.world"),
 
-      // While developing the Scala.js back-end, it is very useful to see the trees dotc gives us
-      scalacOptions += "-Xprint:labelDef",
+  //     // While developing the Scala.js back-end, it is very useful to see the trees dotc gives us
+  //     scalacOptions += "-Xprint:labelDef",
 
-      /* Debug-friendly Scala.js optimizer options.
-       * In particular, typecheck the Scala.js IR found on the classpath.
-       */
-      scalaJSOptimizerOptions ~= {
-        _.withCheckScalaJSIR(true).withParallel(false)
-      }
-    ).
-    settings(compileWithDottySettings).
-    settings(inConfig(Compile)(Seq(
-      /* Make sure jsDependencyManifest runs after compile, otherwise compile
-       * might remove the entire directory afterwards.
-       */
-      jsDependencyManifest := jsDependencyManifest.dependsOn(compile).value
-    )))
+  //     /* Debug-friendly Scala.js optimizer options.
+  //      * In particular, typecheck the Scala.js IR found on the classpath.
+  //      */
+  //     scalaJSOptimizerOptions ~= {
+  //       _.withCheckScalaJSIR(true).withParallel(false)
+  //     }
+  //   ).
+  //   settings(compileWithDottySettings).
+  //   settings(inConfig(Compile)(Seq(
+  //     /* Make sure jsDependencyManifest runs after compile, otherwise compile
+  //      * might remove the entire directory afterwards.
+  //      */
+  //     jsDependencyManifest := jsDependencyManifest.dependsOn(compile).value
+  //   )))
 
   lazy val `dotty-bench` = project.in(file("bench")).
     dependsOn(`dotty-compiler` % "compile->test").
     settings(sourceStructure).
     settings(
-      overrideScalaVersionSetting,
+      // overrideScalaVersionSetting,
 
       baseDirectory in (Test,run) := (baseDirectory in `dotty-compiler`).value,
 
@@ -749,7 +754,8 @@ object DottyInjectedPlugin extends AutoPlugin {
      scmInfo := Some(
        ScmInfo(
          url("https://github.com/lampepfl/dotty"),
-         "scm:git:git@github.com:lampepfl/dotty.git"
+         "scm:git:git@github.com:lampepfl/dotty.git",
+         None
        )
      ),
      pomExtra := (
@@ -809,6 +815,7 @@ object DottyInjectedPlugin extends AutoPlugin {
   }
 
   // Compile with dotty
+  /*
   lazy val compileWithDottySettings = {
     inConfig(Compile)(inTask(compile)(Defaults.runnerTask) ++ Seq(
       // Compile with dotty
@@ -901,5 +908,5 @@ object DottyInjectedPlugin extends AutoPlugin {
         sbt.inc.Analysis.Empty
       }
     ))
-  }
+  }*/
 }

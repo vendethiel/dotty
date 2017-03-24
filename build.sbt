@@ -8,7 +8,6 @@ val `dotty-bin-tests` = Build.`dotty-bin-tests`
 val `dotty-library` = Build.`dotty-library`
 val `dotty-library-bootstrapped` = Build.`dotty-library-bootstrapped`
 val `dotty-sbt-bridge` = Build.`dotty-sbt-bridge`
-val sjsSandbox = Build.sjsSandbox
 val `dotty-bench` = Build.`dotty-bench`
 val `scala-library` = Build.`scala-library`
 val `scala-compiler` = Build.`scala-compiler`
