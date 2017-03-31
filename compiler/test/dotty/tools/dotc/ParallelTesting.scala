@@ -309,7 +309,7 @@ trait ParallelTesting { self =>
         Runtime.getRuntime.exec(fullArgs).waitFor() == 0
       } else true
 
-      val reporter = TestReporter.parallelReporter(this, logLevel =
+      val reporter = TestReporter.parallelReporter(self, logLevel =
         if (suppressErrors || suppressAllOutput) ERROR + 1 else ERROR)
       val driver =
         if (times == 1) new Driver { def newCompiler(implicit ctx: Context) = new Compiler }
@@ -436,9 +436,13 @@ trait ParallelTesting { self =>
                 meth.invoke(null, Array("jvm")) // partest passes at least "jvm" as an arg
               }
             }
-          } finally {
             System.setOut(oldOut)
             System.setErr(oldErr)
+          } catch {
+            case t: Throwable =>
+              System.setOut(oldOut)
+              System.setErr(oldErr)
+              throw t
           }
         }
       }

@@ -15,7 +15,7 @@ import diagnostic.{ Message, MessageContainer, NoExplanation }
 import diagnostic.messages._
 import interfaces.Diagnostic.{ ERROR, WARNING, INFO }
 
-class TestReporter protected (outWriter: PrintWriter, filePrintln: String => Unit, logLevel: Int)
+class TestReporter protected (outWriter: () => PrintWriter, filePrintln: String => Unit, logLevel: Int)
 extends Reporter with UniqueMessagePositions with HideNonSensicalMessages with MessageRendering {
   import MessageContainer._
 
@@ -53,8 +53,8 @@ extends Reporter with UniqueMessagePositions with HideNonSensicalMessages with M
     val extraInfo = inlineInfo(m.pos)
 
     if (m.level >= logLevel) {
-      outWriter.println(msg)
-      if (extraInfo.nonEmpty) outWriter.println(extraInfo)
+      outWriter().println(msg)
+      if (extraInfo.nonEmpty) outWriter().println(extraInfo)
     }
 
     _messageBuf.append(msg)
@@ -94,22 +94,19 @@ object TestReporter {
   }
 
   def parallelReporter(lock: AnyRef, logLevel: Int): TestReporter = new TestReporter(
-    new PrintWriter(Console.err, true),
-    str => lock.synchronized {
-      logWriter.println(str)
-      logWriter.flush()
-    },
+    () => lock.synchronized { new PrintWriter(Console.err, true) },
+    str => lock.synchronized { writeToLog(str) },
     logLevel
   )
 
   def reporter(logLevel: Int): TestReporter = new TestReporter(
-    new PrintWriter(Console.err, true),
+    () => new PrintWriter(Console.err, true),
     writeToLog,
     logLevel
   )
 
   def simplifiedReporter(writer: PrintWriter): TestReporter = new TestReporter(
-    writer,
+    () => writer,
     writeToLog,
     WARNING
   ) {
