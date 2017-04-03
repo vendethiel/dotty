@@ -7,7 +7,7 @@ import scala.annotation.switch
 import Names._
 import Symbols._
 import Contexts._
-import Decorators.StringDecorator
+import Decorators.PreNamedString
 import util.NameTransformer
 import scala.collection.breakOut
 
@@ -97,6 +97,7 @@ object StdNames {
     val EMPTY: N                      = ""
     val EMPTY_PACKAGE: N              = Names.EMPTY_PACKAGE.toString
     val EVIDENCE_PARAM_PREFIX: N      = "evidence$"
+    val DEP_PARAM_PREFIX              = "<param>"
     val EXCEPTION_RESULT_PREFIX: N    = "exceptionResult"
     val EXPAND_SEPARATOR: N           = "$$"
     val IMPL_CLASS_SUFFIX: N          = "$class"
@@ -130,6 +131,7 @@ object StdNames {
     val COMPANION_CLASS_METHOD: N     = "companion$class"
     val TRAIT_SETTER_SEPARATOR: N     = "$_setter_$"
     val DIRECT_SUFFIX: N              = "$direct"
+    val LAZY_IMPLICIT_PREFIX: N       = "$lazy_implicit$"
 
     // value types (and AnyRef) are all used as terms as well
     // as (at least) arguments to the @specialize annotation.
@@ -534,6 +536,7 @@ object StdNames {
     val nullRuntimeClass: N     = "scala.runtime.Null$"
 
     val synthSwitch: N          = "$synthSwitch"
+    val _scope: N               = "$scope"
 
     // unencoded operators
     object raw {

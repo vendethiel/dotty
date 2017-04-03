@@ -185,12 +185,12 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
 
     def valueParamss(tp: Type): (List[List[TermSymbol]], Type) = tp match {
-      case tp @ MethodType(paramNames, paramTypes) =>
+      case tp: MethodType =>
         def valueParam(name: TermName, info: Type): TermSymbol = {
           val maybeImplicit = if (tp.isInstanceOf[ImplicitMethodType]) Implicit else EmptyFlags
           ctx.newSymbol(sym, name, TermParam | maybeImplicit, info)
         }
-        val params = (paramNames, paramTypes).zipped.map(valueParam)
+        val params = (tp.paramNames, tp.paramTypes).zipped.map(valueParam)
         val (paramss, rtp) = valueParamss(tp.instantiate(params map (_.termRef)))
         (params :: paramss, rtp)
       case tp => (Nil, tp.widenExpr)
@@ -260,7 +260,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   def AnonClass(parents: List[Type], fns: List[TermSymbol], methNames: List[TermName])(implicit ctx: Context): Block = {
     val owner = fns.head.owner
     val parents1 =
-      if (parents.head.classSymbol.is(Trait)) defn.ObjectType :: parents
+      if (parents.head.classSymbol.is(Trait)) parents.head.parents.head :: parents
       else parents
     val cls = ctx.newNormalizedClassSymbol(owner, tpnme.ANON_FUN, Synthetic, parents1,
         coord = fns.map(_.pos).reduceLeft(_ union _))
@@ -342,7 +342,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   private def followOuterLinks(t: Tree)(implicit ctx: Context) = t match {
     case t: This if ctx.erasedTypes && !(t.symbol == ctx.owner.enclosingClass || t.symbol.isStaticOwner) =>
       // after erasure outer paths should be respected
-      new ExplicitOuter.OuterOps(ctx).path(t.tpe.widen.classSymbol)
+      new ExplicitOuter.OuterOps(ctx).path(toCls = t.tpe.widen.classSymbol)
     case t =>
       t
   }
@@ -621,7 +621,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
      *  owner to `to`, and continue until a non-weak owner is reached.
      */
     def changeOwner(from: Symbol, to: Symbol)(implicit ctx: Context): ThisTree = {
-      def loop(from: Symbol, froms: List[Symbol], tos: List[Symbol]): ThisTree = {
+      @tailrec def loop(from: Symbol, froms: List[Symbol], tos: List[Symbol]): ThisTree = {
         if (from.isWeakOwner && !from.owner.isClass)
           loop(from.owner, from :: froms, to :: tos)
         else {
@@ -947,10 +947,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   /** A key to be used in a context property that tracks enclosing inlined calls */
   private val InlinedCalls = new Property.Key[List[Tree]]
 
-  /** A context derived form `ctx` that records `call` as innermost enclosing
-   *  call for which the inlined version is currently processed.
-   */
-  def inlineContext(call: Tree)(implicit ctx: Context): Context =
+  override def inlineContext(call: Tree)(implicit ctx: Context): Context =
     ctx.fresh.setProperty(InlinedCalls, call :: enclosingInlineds)
 
   /** All enclosing calls that are currently inlined, from innermost to outermost */

@@ -282,7 +282,7 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
    */
   def harmonizeUnion(tp: Type): Type = tp match {
     case tp: OrType =>
-      joinIfScala2(typeComparer.fluidly(tp.tp1 | tp.tp2))
+      joinIfScala2(ctx.typeComparer.lub(harmonizeUnion(tp.tp1), harmonizeUnion(tp.tp2), canConstrain = true))
     case tp @ AndType(tp1, tp2) =>
       tp derived_& (harmonizeUnion(tp1), harmonizeUnion(tp2))
     case tp: RefinedType =>
@@ -401,12 +401,12 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
     def forwardRefs(from: Symbol, to: Type, prefs: List[TypeRef]) = to match {
       case to @ TypeBounds(lo1, hi1) if lo1 eq hi1 =>
         for (pref <- prefs) {
-          def forward(): Unit =
+          def forward()(implicit ctx: Context): Unit =
             for (argSym <- pref.decls)
               if (argSym is BaseTypeArg)
                 forwardRef(argSym, from, to, cls, decls)
           pref.info match {
-            case info: TempClassInfo => info.addSuspension(forward)
+            case info: TempClassInfo => info.addSuspension(implicit ctx => forward())
             case _ => forward()
           }
         }
@@ -428,16 +428,10 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
         case tp: TypeRef =>
           tp
         case tp @ RefinedType(tp1, name: TypeName, rinfo) =>
-          rinfo match {
-            case TypeAlias(TypeRef(pre, name1)) if name1 == name && (pre =:= cls.thisType) =>
-              // Don't record refinements of the form X = this.X (These can arise using named parameters).
-              typr.println(s"dropping refinement $tp")
-            case _ =>
-              val prevInfo = refinements(name)
-              refinements = refinements.updated(name,
-                if (prevInfo == null) tp.refinedInfo else prevInfo & tp.refinedInfo)
-              formals = formals.updated(name, tp1.typeParamNamed(name))
-          }
+          val prevInfo = refinements(name)
+          refinements = refinements.updated(name,
+            if (prevInfo == null) tp.refinedInfo else prevInfo & tp.refinedInfo)
+          formals = formals.updated(name, tp1.typeParamNamed(name))
           normalizeToRef(tp1)
         case _: ErrorType =>
           defn.AnyType

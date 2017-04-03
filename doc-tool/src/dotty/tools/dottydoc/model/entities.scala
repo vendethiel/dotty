@@ -21,6 +21,9 @@ trait Entity { entity =>
 
   def annotations: List[String]
 
+  def hasShortenedDocstring: Boolean =
+    comment.map(d => d.body.length > d.short.length).getOrElse(false)
+
   def signature: String =
     entity.name + (entity match {
       case o: Object => "$"
@@ -105,7 +108,7 @@ trait Package extends Entity with Members with SuperTypes {
   val kind = "package"
 }
 
-trait TypeAlias extends Entity with Modifiers {
+trait TypeAlias extends Entity with Modifiers with TypeParams {
   val kind = "type"
   def alias: Option[Reference]
   def isAbstract: Boolean = !alias.isDefined

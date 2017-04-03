@@ -158,7 +158,7 @@ object SymDenotations {
     final def resetFlag(flags: FlagSet): Unit = { myFlags &~= flags }
 
     /** Set applicable flags from `flags` which is a subset of {NoInits, PureInterface} */
-    final def setApplicableFlags(flags: FlagSet): Unit = {
+    final def setNoInitsFlags(flags: FlagSet): Unit = {
       val mask = if (myFlags.is(Trait)) NoInitsInterface else NoInits
       setFlag(flags & mask)
     }
@@ -957,6 +957,10 @@ object SymDenotations {
       else
         companionNamed(name)(ctx.outersIterator.dropWhile(_.scope eq ctx.scope).next)
 
+    /** Is this symbol the same or a linked class of `sym`? */
+    final def isLinkedWith(sym: Symbol)(implicit ctx: Context): Boolean =
+      (symbol eq sym) || (linkedClass eq sym)
+
     /** If this is a class, the module class of its companion object.
      *  If this is a module class, its companion class.
      *  NoSymbol otherwise.
@@ -1040,7 +1044,7 @@ object SymDenotations {
      *  pre: `this.owner` is in the base class sequence of `base`.
      */
     final def superSymbolIn(base: Symbol)(implicit ctx: Context): Symbol = {
-      def loop(bcs: List[ClassSymbol]): Symbol = bcs match {
+      @tailrec def loop(bcs: List[ClassSymbol]): Symbol = bcs match {
         case bc :: bcs1 =>
           val sym = matchingDecl(bcs.head, base.thisType)
             .suchThat(alt => !(alt is Deferred)).symbol
@@ -1056,7 +1060,7 @@ object SymDenotations {
      *  (2) it is abstract override and its super symbol in `base` is
      *      nonexistent or incomplete.
      */
-    final def isIncompleteIn(base: Symbol)(implicit ctx: Context): Boolean =
+    @tailrec final def isIncompleteIn(base: Symbol)(implicit ctx: Context): Boolean =
       (this is Deferred) ||
       (this is AbsOverride) && {
         val supersym = superSymbolIn(base)
@@ -1085,9 +1089,6 @@ object SymDenotations {
 
     /** The type parameters of a class symbol, Nil for all other symbols */
     def typeParams(implicit ctx: Context): List[TypeSymbol] = Nil
-
-    /** The named type parameters declared or inherited by this symbol */
-    def namedTypeParams(implicit ctx: Context): Set[TypeSymbol] = Set()
 
     /** The type This(cls), where cls is this class, NoPrefix for all other symbols */
     def thisType(implicit ctx: Context): Type = NoPrefix
@@ -1226,11 +1227,9 @@ object SymDenotations {
     /** TODO: Document why caches are supposedly safe to use */
     private[this] var myTypeParams: List[TypeSymbol] = _
 
-    private[this] var myNamedTypeParams: Set[TypeSymbol] = _
-
     /** The type parameters in this class, in the order they appear in the current
      *  scope `decls`. This might be temporarily the incorrect order when
-     *  reading Scala2 pickled info. The problem is fixed by `updateTypeParams`
+     *  reading Scala2 pickled info. The problem is fixed by `ensureTypeParamsInCorrectOrder`,
      *  which is called once an unpickled symbol has been completed.
      */
     private def typeParamsFromDecls(implicit ctx: Context) =
@@ -1251,16 +1250,6 @@ object SymDenotations {
             }
           }
       myTypeParams
-    }
-
-    /** The named type parameters declared or inherited by this class */
-    override final def namedTypeParams(implicit ctx: Context): Set[TypeSymbol] = {
-      def computeNamedTypeParams: Set[TypeSymbol] =
-        if (ctx.erasedTypes || is(Module)) Set() // fast return for modules to avoid scanning package decls
-        else memberNames(abstractTypeNameFilter).map(name =>
-          info.member(name).symbol.asType).filter(_.is(TypeParam, butNot = ExpandedName)).toSet
-      if (myNamedTypeParams == null) myNamedTypeParams = computeNamedTypeParams
-      myNamedTypeParams
     }
 
     override protected[dotc] final def info_=(tp: Type) = {

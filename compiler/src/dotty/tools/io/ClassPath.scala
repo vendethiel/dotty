@@ -8,7 +8,7 @@ package io
 
 import java.net.URL
 import scala.collection.{ mutable, immutable }
-import scala.reflect.internal.util.StringOps.splitWhere
+import dotc.core.Decorators.StringDecorator
 import File.pathSeparator
 import java.net.MalformedURLException
 import Jar.isJarOrZip
@@ -238,24 +238,18 @@ abstract class ClassPath {
    * Does not support nested classes on .NET
    */
   def findClass(name: String): Option[AnyClassRep] =
-    splitWhere(name, _ == '.', true) match {
+    name.splitWhere(_ == '.', doDropIndex = true) match {
       case Some((pkg, rest)) =>
-        val rep = packages find (_.name == pkg) flatMap (_ findClass rest)
-        rep map {
-          case x: ClassRep  => x
-          case x            => throw new FatalError("Unexpected ClassRep '%s' found searching for name '%s'".format(x, name))
-        }
+        packages find (_.name == pkg) flatMap (_ findClass rest)
       case _ =>
         classes find (_.name == name)
     }
 
-  def findSourceFile(name: String): Option[AbstractFile] =
-    findClass(name) match {
-      case Some(ClassRep(Some(x: AbstractFile), _)) => Some(x)
-      case _                                        => None
-    }
+  def findBinaryFile(name: String): Option[AbstractFile] =
+    findClass(name).flatMap(_.binary)
 
   def sortString = join(split(asClasspathString).sorted: _*)
+
   override def equals(that: Any) = that match {
     case x: ClassPath => this.sortString == x.sortString
     case _            => false

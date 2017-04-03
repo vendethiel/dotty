@@ -29,6 +29,7 @@ import ErrorReporting.{err, errorType}
 import config.Printers.typr
 import collection.mutable
 import SymDenotations.NoCompleter
+import dotty.tools.dotc.reporting.diagnostic.messages.CantInstantiateAbstractClassOrTrait
 import dotty.tools.dotc.transform.ValueClasses._
 
 object Checking {
@@ -103,7 +104,7 @@ object Checking {
       case tref: TypeRef =>
         val cls = tref.symbol
         if (cls.is(AbstractOrTrait))
-          ctx.error(em"$cls is abstract; cannot be instantiated", pos)
+          ctx.error(CantInstantiateAbstractClassOrTrait(cls, isTrait = cls.is(Trait)), pos)
         if (!cls.is(Module)) {
           // Create a synthetic singleton type instance, and check whether
           // it conforms to the self type of the class as seen from that instance.
@@ -326,7 +327,7 @@ object Checking {
       if (!sym.is(Deferred))
         fail(i"`@native' members may not have implementation")
     }
-    else if (sym.is(Deferred, butNot = Param) && !sym.isSelfSym) {
+    else if (sym.is(Deferred, butNot = Param) && !sym.isType && !sym.isSelfSym) {
       if (!sym.owner.isClass || sym.owner.is(Module) || sym.owner.isAnonymousClass)
         fail(i"only classes can have declared but undefined members$varNote")
       checkWithDeferred(Private)
@@ -356,8 +357,7 @@ object Checking {
    */
   def checkNoPrivateLeaks(sym: Symbol, pos: Position)(implicit ctx: Context): Type = {
     class NotPrivate extends TypeMap {
-      type Errors = List[(String, Position)]
-      var errors: Errors = Nil
+      var errors: List[() => String] = Nil
 
       def accessBoundary(sym: Symbol): Symbol =
         if (sym.is(Private) || !sym.owner.isClass) sym.owner
@@ -383,8 +383,8 @@ object Checking {
           val prevErrors = errors
           var tp1 =
             if (isLeaked(tp.symbol)) {
-              errors = (em"non-private $sym refers to private ${tp.symbol}\n in its type signature ${sym.info}",
-                        sym.pos) :: errors
+              errors =
+                (() => em"non-private $sym refers to private ${tp.symbol}\n in its type signature ${sym.info}") :: errors
               tp
             }
             else mapOver(tp)
@@ -408,7 +408,7 @@ object Checking {
     }
     val notPrivate = new NotPrivate
     val info = notPrivate(sym.info)
-    notPrivate.errors.foreach { case (msg, pos) => ctx.errorOrMigrationWarning(msg, pos) }
+    notPrivate.errors.foreach(error => ctx.errorOrMigrationWarning(error(), pos))
     info
   }
 
@@ -441,14 +441,12 @@ object Checking {
           case List(param) =>
             if (param.is(Mutable))
               ctx.error("value class parameter must not be a var", param.pos)
-
           case _ =>
             ctx.error("value class needs to have exactly one val parameter", clazz.pos)
         }
       }
       stats.foreach(checkValueClassMember)
     }
-
   }
 }
 
@@ -601,6 +599,49 @@ trait Checking {
   /** Verify classes extending AnyVal meet the requirements */
   def checkDerivedValueClass(clazz: Symbol, stats: List[Tree])(implicit ctx: Context) =
     Checking.checkDerivedValueClass(clazz, stats)
+
+  /** Given a parent `parent` of a class `cls`, if `parent` is a trait check that
+   *  the superclass of `cls` derived from the superclass of `parent`.
+   *
+   *  An exception is made if `cls` extends `Any`, and `parent` is `java.io.Serializable`
+   *  or `java.lang.Comparable`. These two classes are treated by Scala as universal
+   *  traits. E.g. the following is OK:
+   *
+   *      ... extends Any with java.io.Serializable
+   *
+   *  The standard library relies on this idiom.
+   */
+  def checkTraitInheritance(parent: Symbol, cls: ClassSymbol, pos: Position)(implicit ctx: Context): Unit = {
+    parent match {
+      case parent: ClassSymbol if parent is Trait =>
+        val psuper = parent.superClass
+        val csuper = cls.superClass
+        val ok = csuper.derivesFrom(psuper) ||
+          parent.is(JavaDefined) && csuper == defn.AnyClass &&
+          (parent == defn.JavaSerializableClass || parent == defn.ComparableClass)
+        if (!ok)
+          ctx.error(em"illegal trait inheritance: super$csuper does not derive from $parent's super$psuper", pos)
+      case _ =>
+    }
+  }
+
+  /** Check that method parameter types do not reference their own parameter
+   *  or later parameters in the same parameter section.
+   */
+  def checkNoForwardDependencies(vparams: List[ValDef])(implicit ctx: Context): Unit = vparams match {
+    case vparam :: vparams1 =>
+      val check = new TreeTraverser {
+        def traverse(tree: Tree)(implicit ctx: Context) = tree match {
+          case id: Ident if vparams.exists(_.symbol == id.symbol) =>
+            ctx.error("illegal forward reference to method parameter", id.pos)
+          case _ =>
+            traverseChildren(tree)
+        }
+      }
+      check.traverse(vparam.tpt)
+      checkNoForwardDependencies(vparams1)
+    case Nil =>
+  }
 }
 
 trait NoChecking extends Checking {
@@ -617,4 +658,6 @@ trait NoChecking extends Checking {
   override def checkSimpleKinded(tpt: Tree)(implicit ctx: Context): Tree = tpt
   override def checkNotSingleton(tpt: Tree, where: String)(implicit ctx: Context): Tree = tpt
   override def checkDerivedValueClass(clazz: Symbol, stats: List[Tree])(implicit ctx: Context) = ()
+  override def checkTraitInheritance(parentSym: Symbol, cls: ClassSymbol, pos: Position)(implicit ctx: Context) = ()
+  override def checkNoForwardDependencies(vparams: List[ValDef])(implicit ctx: Context): Unit = ()
 }

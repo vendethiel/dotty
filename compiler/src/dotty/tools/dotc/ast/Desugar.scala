@@ -469,7 +469,13 @@ object desugar {
       val originalVparams = constr1.vparamss.toIterator.flatten
       val tparamAccessors = derivedTparams.map(_.withMods(originalTparams.next.mods))
       val caseAccessor = if (isCaseClass) CaseAccessor else EmptyFlags
-      val vparamAccessors = derivedVparamss.flatten.map(_.withMods(originalVparams.next.mods | caseAccessor))
+      val vparamAccessors = derivedVparamss match {
+        case first :: rest =>
+          first.map(_.withMods(originalVparams.next.mods | caseAccessor)) ++
+          rest.flatten.map(_.withMods(originalVparams.next.mods))
+        case _ =>
+          Nil
+      }
       cpy.TypeDef(cdef)(
         name = className,
         rhs = cpy.Template(impl)(constr, parents1, self1,
@@ -551,7 +557,7 @@ object desugar {
    *   val/var/lazy val p = e  ==>  val/var/lazy val x_1 = (e: @unchecked) match (case p => (x_1))
    *
    *   in case there are zero or more than one variables in pattern
-   *   val/var/lazy p = e  ==>  private synthetic [lazy] val t$ = (e: @unchecked) match (case p => (x_1, ..., x_N))
+   *   val/var/lazy p = e  ==>  private[this] synthetic [lazy] val t$ = (e: @unchecked) match (case p => (x_1, ..., x_N))
    *                   val/var/def x_1 = t$._1
    *                   ...
    *                   val/var/def x_N = t$._N
@@ -559,7 +565,7 @@ object desugar {
    *  ValDef or DefDef.
    */
   def makePatDef(original: Tree, mods: Modifiers, pat: Tree, rhs: Tree)(implicit ctx: Context): Tree = pat match {
-    case VarPattern(named, tpt) =>
+    case IdPattern(named, tpt) =>
       derivedValDef(original, named, tpt, rhs, mods)
     case _ =>
       val rhsUnchecked = makeAnnotated("scala.unchecked", rhs)
@@ -580,7 +586,8 @@ object desugar {
           derivedValDef(original, named, tpt, matchExpr, mods)
         case _ =>
           val tmpName = ctx.freshName().toTermName
-          val patMods = mods & (AccessFlags | Lazy) | Synthetic
+          val patMods =
+            mods & Lazy | Synthetic | (if (ctx.owner.isClass) PrivateLocal else EmptyFlags)
           val firstDef =
             ValDef(tmpName, TypeTree(), matchExpr)
               .withPos(pat.pos.union(rhs.pos)).withMods(patMods)
@@ -816,7 +823,7 @@ object desugar {
        *  Otherwise this gives { case pat => body }
        */
       def makeLambda(pat: Tree, body: Tree): Tree = pat match {
-        case VarPattern(named, tpt) =>
+        case IdPattern(named, tpt) =>
           Function(derivedValDef(pat, named, tpt, EmptyTree, Modifiers(Param)) :: Nil, body)
         case _ =>
           makeCaseLambda(CaseDef(pat, EmptyTree, body) :: Nil, unchecked = false)
@@ -898,7 +905,9 @@ object desugar {
       }
 
       def isIrrefutableGenFrom(gen: GenFrom): Boolean =
-        gen.isInstanceOf[IrrefutableGenFrom] || isIrrefutable(gen.pat, gen.expr)
+        gen.isInstanceOf[IrrefutableGenFrom] ||
+        IdPattern.unapply(gen.pat).isDefined ||
+        isIrrefutable(gen.pat, gen.expr)
 
       /** rhs.name with a pattern filter on rhs unless `pat` is irrefutable when
        *  matched against `rhs`.
@@ -991,12 +1000,12 @@ object desugar {
         else Apply(ref(tupleTypeRef.classSymbol.companionModule.valRef), ts)
       case WhileDo(cond, body) =>
         // { <label> def while$(): Unit = if (cond) { body; while$() } ; while$() }
-        val call = Apply(Ident(nme.WHILE_PREFIX), Nil)
+        val call = Apply(Ident(nme.WHILE_PREFIX), Nil).withPos(tree.pos)
         val rhs = If(cond, Block(body, call), unitLiteral)
         labelDefAndCall(nme.WHILE_PREFIX, rhs, call)
       case DoWhile(body, cond) =>
         // { label def doWhile$(): Unit = { body; if (cond) doWhile$() } ; doWhile$() }
-        val call = Apply(Ident(nme.DO_WHILE_PREFIX), Nil)
+        val call = Apply(Ident(nme.DO_WHILE_PREFIX), Nil).withPos(tree.pos)
         val rhs = Block(body, If(cond, call, unitLiteral))
         labelDefAndCall(nme.DO_WHILE_PREFIX, rhs, call)
       case ForDo(enums, body) =>
@@ -1062,9 +1071,9 @@ object desugar {
     TypeDef(tpnme.REFINE_CLASS, impl).withFlags(Trait)
   }
 
- /** If tree is a variable pattern, return its name and type, otherwise return None.
+ /** If tree is of the form `id` or `id: T`, return its name and type, otherwise return None.
    */
-  private object VarPattern {
+  private object IdPattern {
     def unapply(tree: Tree)(implicit ctx: Context): Option[VarInfo] = tree match {
       case id: Ident => Some(id, TypeTree())
       case Typed(id: Ident, tpt) => Some((id, tpt))

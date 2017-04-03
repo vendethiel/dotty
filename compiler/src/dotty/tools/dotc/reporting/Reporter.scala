@@ -63,7 +63,7 @@ trait Reporting { this: Context =>
            |This can be achieved by adding the import clause 'import $fqname'
            |or by setting the compiler option -language:$feature.
            |See the Scala docs for value $fqname for a discussion
-           |why the feature $req be explicitly enabled."""
+           |why the feature $req be explicitly enabled.""".stripMargin
       }
     }
 
@@ -170,22 +170,6 @@ trait Reporting { this: Context =>
         finalize("<missing>", s" (with exception $ex)")
         throw ex
     }
-  }
-
-  /** Implements a fold that applies the function `f` to the result of `op` if
-    * there are no new errors in the reporter
-    *
-    * @param op operation checked for errors
-    * @param f  function applied to result of op
-    * @return   either the result of `op` if it had errors or the result of `f`
-    *           applied to it
-    */
-  def withNoError[A, B >: A](op: => A)(f: A => B): B = {
-    val before = reporter.errorCount
-    val op0 = op
-
-    if (reporter.errorCount > before) op0
-    else f(op0)
   }
 }
 

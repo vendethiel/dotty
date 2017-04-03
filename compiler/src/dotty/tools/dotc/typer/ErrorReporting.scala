@@ -28,31 +28,22 @@ object ErrorReporting {
 
   def cyclicErrorMsg(ex: CyclicReference)(implicit ctx: Context) = {
     val cycleSym = ex.denot.symbol
-    def errorMsg(msg: String, cx: Context): String =
+    def errorMsg(msg: Message, cx: Context): Message =
       if (cx.mode is Mode.InferringReturnType) {
         cx.tree match {
-          case tree: untpd.ValOrDefDef =>
-              // Dotty deviation: Was Trees.ValOrDefDef[_], but this gives ValOrDefDef[Nothing] instead of
-              // ValOrDefDel[Null]. Scala handles it, but it looks accidental because bounds propagation
-              // fails if the parameter is invariant or cotravariant.
-              // See test pending/pos/boundspropagation.scala
-            val treeSym = ctx.symOfContextTree(tree)
-            if (treeSym.exists && treeSym.name == cycleSym.name && treeSym.owner == cycleSym.owner) {
-              val result = if (cycleSym is Method) " result" else ""
-              em"overloaded or recursive $cycleSym needs$result type"
-            }
-            else errorMsg(msg, cx.outer)
+          case tree: untpd.DefDef if !tree.tpt.typeOpt.exists =>
+            OverloadedOrRecursiveMethodNeedsResultType(tree.name)
+          case tree: untpd.ValDef if !tree.tpt.typeOpt.exists =>
+            RecursiveValueNeedsResultType(tree.name)
           case _ =>
             errorMsg(msg, cx.outer)
         }
       } else msg
 
-      if (cycleSym.is(Implicit, butNot = Method) && cycleSym.owner.isTerm)
-        em"""cyclic reference involving implicit $cycleSym
-            |This happens when the right hand-side of $cycleSym's definition involves an implicit search.
-            |To avoid the error, give $cycleSym an explicit type."""
-      else
-        errorMsg(ex.show, ctx)
+    if (cycleSym.is(Implicit, butNot = Method) && cycleSym.owner.isTerm)
+      CyclicReferenceInvolvingImplicit(cycleSym)
+    else
+      errorMsg(ex.toMessage, ctx)
   }
 
   def wrongNumberOfTypeArgs(fntpe: Type, expectedArgs: List[TypeParamInfo], actual: List[untpd.Tree], pos: Position)(implicit ctx: Context) =
@@ -111,11 +102,23 @@ object ErrorReporting {
       errorTree(tree, typeMismatchMsg(normalize(tree.tpe, pt), pt, implicitFailure.postscript))
 
     /** A subtype log explaining why `found` does not conform to `expected` */
-    def whyNoMatchStr(found: Type, expected: Type) =
-      if (ctx.settings.explaintypes.value)
+    def whyNoMatchStr(found: Type, expected: Type) = {
+      def dropJavaMethod(tp: Type): Type = tp match {
+        case tp: PolyType =>
+          tp.derivedPolyType(resType = dropJavaMethod(tp.resultType))
+        case tp: JavaMethodType =>
+          MethodType(tp.paramNames, tp.paramTypes, dropJavaMethod(tp.resultType))
+        case tp => tp
+      }
+      val found1 = dropJavaMethod(found)
+      val expected1 = dropJavaMethod(expected)
+      if ((found1 eq found) != (expected eq expected1) && (found1 <:< expected1))
+        "\n (Note that Scala's and Java's representation of this type differs)"
+      else if (ctx.settings.explaintypes.value)
         "\n" + ctx.typerState.show + "\n" + TypeComparer.explained((found <:< expected)(_))
       else
         ""
+    }
 
     def typeMismatchMsg(found: Type, expected: Type, postScript: String = "") = {
       // replace constrained polyparams and their typevars by their bounds where possible

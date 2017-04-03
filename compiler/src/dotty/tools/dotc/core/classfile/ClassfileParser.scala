@@ -198,8 +198,8 @@ class ClassfileParser(
          */
         def stripOuterParamFromConstructor() = innerClasses.get(currentClassName) match {
           case Some(entry) if !isStatic(entry.jflags) =>
-            val mt @ MethodType(paramnames, paramtypes) = denot.info
-            denot.info = mt.derivedMethodType(paramnames.tail, paramtypes.tail, mt.resultType)
+            val mt @ MethodTpe(paramNames, paramTypes, resultType) = denot.info
+            denot.info = mt.derivedMethodType(paramNames.tail, paramTypes.tail, resultType)
           case _ =>
         }
 
@@ -207,9 +207,9 @@ class ClassfileParser(
          *  and make constructor type polymorphic in the type parameters of the class
          */
         def normalizeConstructorInfo() = {
-          val mt @ MethodType(paramnames, paramtypes) = denot.info
+          val mt @ MethodType(paramNames) = denot.info
           val rt = classRoot.typeRef appliedTo (classRoot.typeParams map (_.typeRef))
-          denot.info = mt.derivedMethodType(paramnames, paramtypes, rt)
+          denot.info = mt.derivedMethodType(paramNames, mt.paramTypes, rt)
           addConstructorTypeParams(denot)
         }
 
@@ -339,7 +339,7 @@ class ClassfileParser(
           }
           index += 1
           val restype = sig2type(tparams, skiptvs)
-          JavaMethodType(paramnames.toList, paramtypes.toList)(_ => restype)
+          JavaMethodType(paramnames.toList, paramtypes.toList, restype)
         case 'T' =>
           val n = subName(';'.==).toTypeName
           index += 1
@@ -661,7 +661,7 @@ class ClassfileParser(
     for (entry <- innerClasses.values) {
       // create a new class member for immediate inner classes
       if (entry.outerName == currentClassName) {
-        val file = ctx.platform.classPath.findSourceFile(entry.externalName.toString) getOrElse {
+        val file = ctx.platform.classPath.findBinaryFile(entry.externalName.toString) getOrElse {
           throw new AssertionError(entry.externalName)
         }
         enterClassAndModule(entry, file, entry.jflags)
@@ -806,7 +806,7 @@ class ClassfileParser(
     def classSymbol(externalName: Name)(implicit ctx: Context): Symbol = {
       /** Return the symbol of `innerName`, having the given `externalName`. */
       def innerSymbol(externalName: Name, innerName: Name, static: Boolean): Symbol = {
-        def getMember(sym: Symbol, name: Name): Symbol =
+        def getMember(sym: Symbol, name: Name)(implicit ctx: Context): Symbol =
           if (static)
             if (sym == classRoot.symbol) staticScope.lookup(name)
             else sym.companionModule.info.member(name).symbol

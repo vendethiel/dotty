@@ -19,7 +19,7 @@ import io.AbstractFile
 import util.common._
 import typer.Checking.checkNonCyclic
 import PickleBuffer._
-import scala.reflect.internal.pickling.PickleFormat._
+import PickleFormat._
 import Decorators._
 import TypeApplications._
 import classfile.ClassfileParser
@@ -55,8 +55,8 @@ object Scala2Unpickler {
    *  to `RepeatedParamClass` types.
    */
   def arrayToRepeated(tp: Type)(implicit ctx: Context): Type = tp match {
-    case tp @ MethodType(paramNames, paramTypes) =>
-      val lastArg = paramTypes.last
+    case tp: MethodType =>
+      val lastArg = tp.paramTypes.last
       assert(lastArg isRef defn.ArrayClass)
       val elemtp0 :: Nil = lastArg.baseArgInfos(defn.ArrayClass)
       val elemtp = elemtp0 match {
@@ -66,8 +66,8 @@ object Scala2Unpickler {
           elemtp0
       }
       tp.derivedMethodType(
-        paramNames,
-        paramTypes.init :+ defn.RepeatedParamType.appliedTo(elemtp),
+        tp.paramNames,
+        tp.paramTypes.init :+ defn.RepeatedParamType.appliedTo(elemtp),
         tp.resultType)
     case tp: PolyType =>
       tp.derivedPolyType(tp.paramNames, tp.paramBounds, arrayToRepeated(tp.resultType))
@@ -932,9 +932,10 @@ class Scala2Unpickler(bytes: Array[Byte], classRoot: ClassDenotation, moduleClas
   protected def deferredAnnot(end: Int)(implicit ctx: Context): Annotation = {
     val start = readIndex
     val atp = readTypeRef()
+    val phase = ctx.phase
     Annotation.deferred(
-      atp.typeSymbol, implicit ctx1 =>
-        atReadPos(start, () => readAnnotationContents(end)(ctx1.withPhase(ctx.phase))))
+      atp.typeSymbol, implicit ctx =>
+        atReadPos(start, () => readAnnotationContents(end)(ctx.withPhase(phase))))
   }
 
   /* Read an abstract syntax tree */

@@ -8,7 +8,7 @@ import dotc.CompilationUnit
 import dotc.config.Printers.dottydoc
 import dotc.core.Contexts.Context
 import dotc.core.Comments.ContextDocstrings
-import dotc.core.Types.NoType
+import dotc.core.Types.{PolyType, NoType}
 import dotc.core.Phases.Phase
 import dotc.core.Symbols.{ Symbol, NoSymbol }
 
@@ -92,8 +92,16 @@ class DocASTPhase extends Phase {
         val sym = t.symbol
         if (sym.is(Flags.Synthetic | Flags.Param))
           NonEntity
-        else
-          TypeAliasImpl(sym, annotations(sym), flags(t), t.name.show.split("\\$\\$").last, path(sym), alias(t.rhs.tpe))
+        else {
+          val tparams = t.rhs.tpe match {
+            case tp: PolyType => tp.paramRefs.zip(tp.variances).map { case (tp, variance) =>
+              val varianceSym = if (variance == 1) "+" else if (variance == -1) "-" else ""
+              varianceSym + tp.paramName.show
+            }
+            case _ => Nil
+          }
+          TypeAliasImpl(sym, annotations(sym), flags(t), t.name.show.split("\\$\\$").last, path(sym), alias(t.rhs.tpe), tparams)
+        }
 
       /** trait */
       case t @ TypeDef(n, rhs) if t.symbol.is(Flags.Trait) =>
@@ -226,7 +234,7 @@ class DocASTPhase extends Phase {
 
   override def run(implicit ctx: Context): Unit = {
     currentRun += 1
-    ctx.docbase.echo(s"Compiling ($currentRun/$totalRuns): ${ctx.compilationUnit.source.file.name}")
+    ctx.echo(s"Compiling ($currentRun/$totalRuns): ${ctx.compilationUnit.source.file.name}")
     collect(ctx.compilationUnit.tpdTree) // Will put packages in `packages` var
   }
 
@@ -237,8 +245,7 @@ class DocASTPhase extends Phase {
 
     // (2) Set parents of entities, needed for linking
     for {
-      parentName <- rootPackages(packages)
-      parent = packages(parentName)
+      parent <- rootPackages(packages)
       child  <- parent.members
     } setParent(child, to = parent)
 

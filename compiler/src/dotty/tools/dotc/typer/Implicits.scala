@@ -29,12 +29,18 @@ import reporting.diagnostic.MessageContainer
 import Inferencing.fullyDefinedType
 import Trees._
 import Hashable._
+import util.Property
 import config.Config
 import config.Printers.{implicits, implicitsDetailed, typr}
 import collection.mutable
 
 /** Implicit resolution */
 object Implicits {
+
+  /** A reference to an implicit value to be made visible on the next nested call to
+   *  inferImplicitArg with a by-name expected type.
+   */
+  val DelayedImplicit = new Property.Key[TermRef]
 
   /** An eligible implicit candidate, consisting of an implicit reference and a nesting level */
   case class Candidate(ref: TermRef, level: Int)
@@ -76,11 +82,29 @@ object Implicits {
           case tpw: TermRef =>
             false // can't discard overloaded refs
           case tpw =>
-            //if (ctx.typer.isApplicable(tp, argType :: Nil, resultType))
-            //  println(i"??? $tp is applicable to $this / typeSymbol = ${tpw.typeSymbol}")
-            !tpw.derivesFrom(defn.FunctionClass(1)) ||
-            ref.symbol == defn.Predef_conforms //
-              // as an implicit conversion, Predef.$conforms is a no-op, so exclude it
+            // Only direct instances of Function1 and direct or indirect instances of <:< are eligible as views.
+            // However, Predef.$conforms is not eligible, because it is a no-op.
+            //
+            // In principle, it would be cleanest if only implicit methods qualified
+            // as implicit conversions. We could achieve that by having standard conversions like
+            // this in Predef:
+            //
+            //    implicit def convertIfConforms[A, B](x: A)(implicit ev: A <:< B): B = ev(a)
+            //    implicit def convertIfConverter[A, B](x: A)(implicit ev: ImplicitConverter[A, B]): B = ev(a)
+            //
+            // (Once `<:<` inherits from `ImplicitConverter` we only need the 2nd one.)
+            // But clauses like this currently slow down implicit search a lot, because
+            // they are eligible for all pairs of types, and therefore are tried too often.
+            // We emulate instead these conversions directly in the search.
+            // The reason for leaving out `Predef_conforms` is that we know it adds
+            // nothing since it only relates subtype with supertype.
+            //
+            // We keep the old behavior under -language:Scala2.
+            val isFunctionInS2 = ctx.scala2Mode && tpw.derivesFrom(defn.FunctionClass(1))
+            val isImplicitConverter = tpw.derivesFrom(defn.Predef_ImplicitConverter)
+            val isConforms =
+              tpw.derivesFrom(defn.Predef_Conforms) && ref.symbol != defn.Predef_conforms
+            !(isFunctionInS2 || isImplicitConverter || isConforms)
         }
 
         def discardForValueType(tpw: Type): Boolean = tpw match {
@@ -202,7 +226,7 @@ object Implicits {
     }
 
     override def toString = {
-      val own = s"(implicits: ${refs mkString ","})"
+      val own = i"(implicits: $refs%, %)"
       if (isOuterMost) own else own + "\n " + outerImplicits
     }
 
@@ -220,7 +244,7 @@ object Implicits {
   }
 
   /** The result of an implicit search */
-  abstract class SearchResult extends Showable {
+  sealed abstract class SearchResult extends Showable {
     def toText(printer: Printer): Text = printer.toText(this)
   }
 
@@ -490,9 +514,15 @@ trait Implicits { self: Typer =>
         || (to isRef defn.UnitClass)
         || (from.tpe isRef defn.NothingClass)
         || (from.tpe isRef defn.NullClass)
+        || !(ctx.mode is Mode.ImplicitsEnabled)
         || (from.tpe eq NoPrefix)) NoImplicitMatches
-    else
-      try inferImplicit(to.stripTypeVar.widenExpr, from, from.pos)
+    else {
+      def adjust(to: Type) = to.stripTypeVar.widenExpr match {
+        case SelectionProto(name, memberProto, compat, true) =>
+          SelectionProto(name, memberProto, compat, privateOK = false)
+        case tp => tp
+      }
+      try inferImplicit(adjust(to), from, from.pos)
       catch {
         case ex: AssertionError =>
           implicits.println(s"view $from ==> $to")
@@ -500,6 +530,7 @@ trait Implicits { self: Typer =>
           implicits.println(TypeComparer.explained(implicit ctx => from.tpe <:< to))
           throw ex
       }
+    }
   }
 
   /** Find an implicit argument for parameter `formal`.
@@ -537,27 +568,56 @@ trait Implicits { self: Typer =>
       else EmptyTree
     }
 
-    inferImplicit(formal, EmptyTree, pos) match {
+    /** The context to be used when resolving a by-name implicit argument.
+     *  This makes any implicit stored under `DelayedImplicit` visible and
+     *  stores in turn the given `lazyImplicit` as new `DelayedImplicit`.
+     */
+    def lazyImplicitCtx(lazyImplicit: Symbol): Context = {
+      val lctx = ctx.fresh
+      for (delayedRef <- ctx.property(DelayedImplicit))
+        lctx.setImplicits(new ContextualImplicits(delayedRef :: Nil, ctx.implicits)(ctx))
+      lctx.setProperty(DelayedImplicit, lazyImplicit.termRef)
+    }
+
+    /** formalValue: The value type for which an implicit is searched
+     *  lazyImplicit: An implicit symbol to install for nested by-name resolutions
+     *  argCtx      : The context to be used for searching the implicit argument
+     */
+    val (formalValue, lazyImplicit, argCtx) = formal match {
+      case ExprType(fv) =>
+        val lazyImplicit = ctx.newLazyImplicit(fv)
+        (fv, lazyImplicit, lazyImplicitCtx(lazyImplicit))
+      case _ => (formal, NoSymbol, ctx)
+    }
+
+    inferImplicit(formalValue, EmptyTree, pos)(argCtx) match {
       case SearchSuccess(arg, _, _, _) =>
-        arg
+        def refersToLazyImplicit = arg.existsSubTree {
+          case id: Ident => id.symbol == lazyImplicit
+          case _ => false
+        }
+        if (lazyImplicit.exists && refersToLazyImplicit)
+          Block(ValDef(lazyImplicit.asTerm, arg).withPos(pos) :: Nil, ref(lazyImplicit))
+        else
+          arg
       case ambi: AmbiguousImplicits =>
         error(where => s"ambiguous implicits: ${ambi.explanation} of $where")
         EmptyTree
       case failure: SearchFailure =>
-        val arg = synthesizedClassTag(formal, pos)
+        val arg = synthesizedClassTag(formalValue, pos)
         if (!arg.isEmpty) arg
         else {
           var msgFn = (where: String) =>
             em"no implicit argument of type $formal found for $where" + failure.postscript
           for {
-            notFound <- formal.typeSymbol.getAnnotation(defn.ImplicitNotFoundAnnot)
+            notFound <- formalValue.typeSymbol.getAnnotation(defn.ImplicitNotFoundAnnot)
             Trees.Literal(Constant(raw: String)) <- notFound.argument(0)
           } {
             msgFn = where =>
               err.implicitNotFoundString(
                 raw,
-                formal.typeSymbol.typeParams.map(_.name.unexpandedName.toString),
-                formal.argInfos)
+                formalValue.typeSymbol.typeParams.map(_.name.unexpandedName.toString),
+                formalValue.argInfos)
           }
           error(msgFn)
           EmptyTree

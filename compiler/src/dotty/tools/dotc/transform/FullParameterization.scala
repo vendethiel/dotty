@@ -12,8 +12,6 @@ import NameOps._
 import ast._
 import ast.Trees._
 
-import scala.reflect.internal.util.Collections
-
 /** Provides methods to produce fully parameterized versions of instance methods,
  *  where the `this` of the enclosing class is abstracted out in an extra leading
  *  `$this` parameter and type parameters of the class become additional type
@@ -101,13 +99,15 @@ trait FullParameterization {
     }
     val ctparams = if (abstractOverClass) clazz.typeParams else Nil
     val ctnames = ctparams.map(_.name.unexpandedName)
+    val ctvariances = ctparams.map(_.variance)
 
     /** The method result type */
     def resultType(mapClassParams: Type => Type) = {
       val thisParamType = mapClassParams(clazz.classInfo.selfType)
       val firstArgType = if (liftThisType) thisParamType & clazz.thisType else thisParamType
-      MethodType(nme.SELF :: Nil, firstArgType :: Nil)(mt =>
-        mapClassParams(origResult).substThisUnlessStatic(clazz, MethodParam(mt, 0)))
+      MethodType(nme.SELF :: Nil)(
+          mt => firstArgType :: Nil,
+          mt => mapClassParams(origResult).substThisUnlessStatic(clazz, MethodParam(mt, 0)))
     }
 
     /** Replace class type parameters by the added type parameters of the polytype `pt` */
@@ -122,14 +122,14 @@ trait FullParameterization {
 
     info match {
       case info: PolyType =>
-        PolyType(info.paramNames ++ ctnames)(
+        PolyType(info.paramNames ++ ctnames, info.variances ++ ctvariances)(
           pt =>
             (info.paramBounds.map(mapClassParams(_, pt).bounds) ++
              mappedClassBounds(pt)).mapConserve(_.subst(info, pt).bounds),
           pt => resultType(mapClassParams(_, pt)).subst(info, pt))
       case _ =>
         if (ctparams.isEmpty) resultType(identity)
-        else PolyType(ctnames)(mappedClassBounds, pt => resultType(mapClassParams(_, pt)))
+        else PolyType(ctnames, ctvariances)(mappedClassBounds, pt => resultType(mapClassParams(_, pt)))
     }
   }
 
@@ -233,8 +233,8 @@ trait FullParameterization {
       fun.appliedToArgss(originalDef.vparamss.nestedMap(vparam => ref(vparam.symbol)))
     else {
       // this type could have changed on forwarding. Need to insert a cast.
-      val args = Collections.map2(originalDef.vparamss, fun.tpe.paramTypess)((vparams, paramTypes) =>
-        Collections.map2(vparams, paramTypes)((vparam, paramType) => {
+      val args = (originalDef.vparamss, fun.tpe.paramTypess).zipped.map((vparams, paramTypes) =>
+        (vparams, paramTypes).zipped.map((vparam, paramType) => {
           assert(vparam.tpe <:< paramType.widen) // type should still conform to widened type
           ref(vparam.symbol).ensureConforms(paramType)
         })
@@ -253,10 +253,10 @@ object FullParameterization {
   def memberSignature(info: Type)(implicit ctx: Context): Signature = info match {
     case info: PolyType =>
       memberSignature(info.resultType)
-    case info @ MethodType(nme.SELF :: Nil, _) =>
-      info.resultType.ensureMethodic.signature
-    case info @ MethodType(nme.SELF :: otherNames, thisType :: otherTypes) =>
-      info.derivedMethodType(otherNames, otherTypes, info.resultType).signature
+    case MethodTpe(nme.SELF :: Nil, _, restpe) =>
+      restpe.ensureMethodic.signature
+    case info @ MethodTpe(nme.SELF :: otherNames, thisType :: otherTypes, restpe) =>
+      info.derivedMethodType(otherNames, otherTypes, restpe).signature
     case _ =>
       Signature.NotAMethod
   }

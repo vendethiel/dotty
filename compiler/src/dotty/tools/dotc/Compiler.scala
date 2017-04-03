@@ -46,12 +46,15 @@ class Compiler {
       List(new PostTyper),          // Additional checks and cleanups after type checking
       List(new sbt.ExtractAPI),     // Sends a representation of the API of classes to sbt via callbacks
       List(new Pickler),            // Generate TASTY info
-      List(new FirstTransform      // Some transformations to put trees into a canonical form
-           //,new CheckReentrant
-      ),     // Internal use only: Check that compiled program has no data races involving global vars
+      List(new FirstTransform,      // Some transformations to put trees into a canonical form
+           new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
       List(new RefChecks,           // Various checks mostly related to abstract members and overriding
            new CheckStatic,         // Check restrictions that apply to @static members
+      List(new FirstTransform),     // Some transformations to put trees into a canonical form
+           // new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
+      List(new CheckStatic,         // Check restrictions that apply to @static members
            new ElimRepeated,        // Rewrite vararg parameters and arguments
+           new RefChecks,           // Various checks mostly related to abstract members and overriding
            new NormalizeFlags,      // Rewrite some definition flags
            new ExtensionMethods,    // Expand methods of value classes with extension methods
            new ExpandSAMs,          // Expand single abstract method closures to anonymous classes
@@ -97,12 +100,12 @@ class Compiler {
            new ElimStaticThis,      // Replace `this` references to static objects by global identifiers
            new Flatten,             // Lift all inner classes to package scope
            new RestoreScopes),      // Repair scopes rendered invalid by moving definitions in prior phases of the group
-      List(new ExpandPrivate,       // Widen private definitions accessed from nested classes
+      List(new MoveStatics,         // Move static methods to companion classes
+           new ExpandPrivate,       // Widen private definitions accessed from nested classes
            new SelectStatic,        // get rid of selects that would be compiled into GetStatic
            new CollectEntryPoints,  // Find classes with main methods
            new CollectSuperCalls,   // Find classes that are called with super
            new DropInlined,         // Drop Inlined nodes, since backend has no use for them
-           new MoveStatics,         // Move static methods to companion classes
            new LabelDefs),          // Converts calls to labels to jumps
       List(new GenBCode)            // Generate JVM bytecode
     )
@@ -134,7 +137,7 @@ class Compiler {
       .setMode(Mode.ImplicitsEnabled)
       .setTyperState(new MutableTyperState(ctx.typerState, ctx.typerState.reporter, isCommittable = true))
       .setFreshNames(new FreshNameCreator.Default)
-  ctx.initialize()(start) // re-initialize the base context with start
+    ctx.initialize()(start) // re-initialize the base context with start
     def addImport(ctx: Context, refFn: () => TermRef) =
       ctx.fresh.setImportInfo(ImportInfo.rootImport(refFn)(ctx))
     (start.setRunInfo(new RunInfo(start)) /: defn.RootImportFns)(addImport)

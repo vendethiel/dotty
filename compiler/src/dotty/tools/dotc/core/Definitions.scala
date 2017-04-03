@@ -9,7 +9,7 @@ import scala.annotation.{ switch, meta }
 import scala.collection.{ mutable, immutable }
 import PartialFunction._
 import collection.mutable
-import scala.reflect.api.{ Universe => ApiUniverse }
+import util.common.alwaysZero
 
 object Definitions {
 
@@ -152,7 +152,7 @@ class Definitions {
                     resultTypeFn: PolyType => Type, flags: FlagSet = EmptyFlags) = {
     val tparamNames = tpnme.syntheticTypeParamNames(typeParamCount)
     val tparamBounds = tparamNames map (_ => TypeBounds.empty)
-    val ptype = PolyType(tparamNames)(_ => tparamBounds, resultTypeFn)
+    val ptype = PolyType(tparamNames, tparamNames.map(alwaysZero))(_ => tparamBounds, resultTypeFn)
     enterMethod(cls, name, ptype, flags)
   }
 
@@ -299,6 +299,8 @@ class Definitions {
   lazy val ScalaPredefModuleRef = ctx.requiredModuleRef("scala.Predef")
   def ScalaPredefModule(implicit ctx: Context) = ScalaPredefModuleRef.symbol
 
+    lazy val Predef_ConformsR = ScalaPredefModule.requiredClass("$less$colon$less").typeRef
+    def Predef_Conforms(implicit ctx: Context) = Predef_ConformsR.symbol
     lazy val Predef_conformsR = ScalaPredefModule.requiredMethodRef("$conforms")
     def Predef_conforms(implicit ctx: Context) = Predef_conformsR.symbol
     lazy val Predef_classOfR = ScalaPredefModule.requiredMethodRef("classOf")
@@ -336,6 +338,8 @@ class Definitions {
   def DottyPredefModule(implicit ctx: Context) = DottyPredefModuleRef.symbol
 
     def Predef_eqAny(implicit ctx: Context) = DottyPredefModule.requiredMethod(nme.eqAny)
+    lazy val Predef_ImplicitConverterR = DottyPredefModule.requiredClass("ImplicitConverter").typeRef
+    def Predef_ImplicitConverter(implicit ctx: Context) = Predef_ImplicitConverterR.symbol
 
   lazy val DottyArraysModuleRef = ctx.requiredModuleRef("dotty.runtime.Arrays")
   def DottyArraysModule(implicit ctx: Context) = DottyArraysModuleRef.symbol
@@ -351,6 +355,7 @@ class Definitions {
     enterCompleteClassSymbol(
       ScalaPackageClass, tpnme.Singleton, PureInterfaceCreationFlags | Final,
       List(AnyClass.typeRef), EmptyScope)
+  def SingletonType = SingletonClass.typeRef
 
   lazy val SeqType: TypeRef = ctx.requiredClassRef("scala.collection.Seq")
   def SeqClass(implicit ctx: Context) = SeqType.symbol.asClass
@@ -498,7 +503,7 @@ class Definitions {
       case List(pt) => (pt isRef StringClass)
       case _ => false
     }).symbol.asTerm
-  lazy val JavaSerializableClass     = ctx.requiredClass("java.lang.Serializable")
+  lazy val JavaSerializableClass     = ctx.requiredClass("java.io.Serializable")
   lazy val ComparableClass           = ctx.requiredClass("java.lang.Comparable")
 
   // in scalac modified to have Any as parent
@@ -552,6 +557,8 @@ class Definitions {
 
   lazy val EqType = ctx.requiredClassRef("scala.Eq")
   def EqClass(implicit ctx: Context) = EqType.symbol.asClass
+
+  lazy val XMLTopScopeModuleRef = ctx.requiredModuleRef("scala.xml.TopScope")
 
   // Annotation base classes
   lazy val AnnotationType              = ctx.requiredClassRef("scala.annotation.Annotation")
@@ -661,13 +668,9 @@ class Definitions {
       FunctionType(args.length, isImplicit).appliedTo(args ::: resultType :: Nil)
     def unapply(ft: Type)(implicit ctx: Context) = {
       val tsym = ft.typeSymbol
-      val isImplicitFun = isImplicitFunctionClass(tsym)
-      if (isImplicitFun || isFunctionClass(tsym)) {
-        val targs = ft.argInfos
-        val numArgs = targs.length - 1
-        if (numArgs >= 0 && FunctionType(numArgs, isImplicitFun).symbol == tsym)
-          Some(targs.init, targs.last, isImplicitFun)
-        else None
+      if (isFunctionClass(tsym)) {
+        val targs = ft.dealias.argInfos
+        Some(targs.init, targs.last, tsym.name.isImplicitFunction)
       }
       else None
     }
@@ -720,20 +723,17 @@ class Definitions {
   lazy val TupleType = mkArityArray("scala.Tuple", MaxTupleArity, 2)
   lazy val ProductNType = mkArityArray("scala.Product", MaxTupleArity, 0)
 
-  def FunctionClass(n: Int)(implicit ctx: Context) =
-    if (n < MaxImplementedFunctionArity) FunctionClassPerRun()(ctx)(n)
+  def FunctionClass(n: Int, isImplicit: Boolean = false)(implicit ctx: Context) =
+    if (isImplicit) ctx.requiredClass("scala.ImplicitFunction" + n.toString)
+    else if (n <= MaxImplementedFunctionArity) FunctionClassPerRun()(ctx)(n)
     else ctx.requiredClass("scala.Function" + n.toString)
 
     lazy val Function0_applyR = ImplementedFunctionType(0).symbol.requiredMethodRef(nme.apply)
     def Function0_apply(implicit ctx: Context) = Function0_applyR.symbol
 
-  def ImplicitFunctionClass(n: Int)(implicit ctx: Context) =
-    ctx.requiredClass("scala.ImplicitFunction" + n.toString)
-
   def FunctionType(n: Int, isImplicit: Boolean = false)(implicit ctx: Context): TypeRef =
-    if (isImplicit && !ctx.erasedTypes) ImplicitFunctionClass(n).typeRef
-    else if (n < MaxImplementedFunctionArity) ImplementedFunctionType(n)
-    else FunctionClass(n).typeRef
+    if (n <= MaxImplementedFunctionArity && (!isImplicit || ctx.erasedTypes)) ImplementedFunctionType(n)
+    else FunctionClass(n, isImplicit).typeRef
 
   private lazy val TupleTypes: Set[TypeRef] = TupleType.toSet
   private lazy val ProductTypes: Set[TypeRef] = ProductNType.toSet
@@ -757,13 +757,60 @@ class Definitions {
   def isBottomType(tp: Type) =
     tp.derivesFrom(NothingClass) || tp.derivesFrom(NullClass)
 
-  def isFunctionClass(cls: Symbol) = isVarArityClass(cls, tpnme.Function)
-  def isImplicitFunctionClass(cls: Symbol) = isVarArityClass(cls, tpnme.ImplicitFunction)
-  /** Is a class that will be erased to FunctionXXL */
-  def isXXLFunctionClass(cls: Symbol) = cls.name.functionArity > MaxImplementedFunctionArity
+  /** Is a function class.
+   *   - FunctionN for N >= 0
+   *   - ImplicitFunctionN for N >= 0
+   */
+  def isFunctionClass(cls: Symbol) = scalaClassName(cls).isFunction
+
+  /** Is an implicit function class.
+   *   - ImplicitFunctionN for N >= 0
+   */
+  def isImplicitFunctionClass(cls: Symbol) = scalaClassName(cls).isImplicitFunction
+
+  /** Is a class that will be erased to FunctionXXL
+   *   - FunctionN for N >= 22
+   *   - ImplicitFunctionN for N >= 22
+   */
+  def isXXLFunctionClass(cls: Symbol) = scalaClassName(cls).functionArity > MaxImplementedFunctionArity
+
+  /** Is a synthetic function class
+   *    - FunctionN for N > 22
+   *    - ImplicitFunctionN for N >= 0
+   */
+  def isSyntheticFunctionClass(cls: Symbol) = scalaClassName(cls).isSyntheticFunction
+
   def isAbstractFunctionClass(cls: Symbol) = isVarArityClass(cls, tpnme.AbstractFunction)
   def isTupleClass(cls: Symbol) = isVarArityClass(cls, tpnme.Tuple)
   def isProductClass(cls: Symbol) = isVarArityClass(cls, tpnme.Product)
+
+  /** Returns the erased class of the function class `cls`
+   *    - FunctionN for N > 22 becomes FunctionXXL
+   *    - FunctionN for 22 > N >= 0 remains as FunctionN
+   *    - ImplicitFunctionN for N > 22 becomes FunctionXXL
+   *    - ImplicitFunctionN for 22 > N >= 0 becomes FunctionN
+   *    - anything else becomes a NoSymbol
+   */
+  def erasedFunctionClass(cls: Symbol): Symbol = {
+    val arity = scalaClassName(cls).functionArity
+    if (arity > 22) defn.FunctionXXLClass
+    else if (arity >= 0) defn.FunctionClass(arity)
+    else NoSymbol
+  }
+
+  /** Returns the erased type of the function class `cls`
+   *    - FunctionN for N > 22 becomes FunctionXXL
+   *    - FunctionN for 22 > N >= 0 remains as FunctionN
+   *    - ImplicitFunctionN for N > 22 becomes FunctionXXL
+   *    - ImplicitFunctionN for 22 > N >= 0 becomes FunctionN
+   *    - anything else becomes a NoType
+   */
+  def erasedFunctionType(cls: Symbol): Type = {
+    val arity = scalaClassName(cls).functionArity
+    if (arity > 22) defn.FunctionXXLType
+    else if (arity >= 0) defn.FunctionType(arity)
+    else NoType
+  }
 
   val predefClassNames: Set[Name] =
     Set("Predef$", "DeprecatedPredef", "LowPriorityImplicits").map(_.toTypeName)
@@ -835,16 +882,13 @@ class Definitions {
   def isFunctionType(tp: Type)(implicit ctx: Context) = {
     val arity = functionArity(tp)
     val sym = tp.dealias.typeSymbol
-    arity >= 0 && (
-      isFunctionClass(sym) && tp.isRef(FunctionType(arity, isImplicit = false).typeSymbol) ||
-      isImplicitFunctionClass(sym) && tp.isRef(FunctionType(arity, isImplicit = true).typeSymbol)
-    )
+    arity >= 0 && isFunctionClass(sym) && tp.isRef(FunctionType(arity, sym.name.isImplicitFunction).typeSymbol)
   }
 
   def functionArity(tp: Type)(implicit ctx: Context) = tp.dealias.argInfos.length - 1
 
   def isImplicitFunctionType(tp: Type)(implicit ctx: Context) =
-    isFunctionType(tp) && tp.dealias.typeSymbol.name.startsWith(tpnme.ImplicitFunction)
+    isFunctionType(tp) && tp.dealias.typeSymbol.name.isImplicitFunction
 
   // ----- primitive value class machinery ------------------------------------------
 
@@ -892,13 +936,6 @@ class Definitions {
   /** The type of the boxed class corresponding to primitive value type `tp`. */
   def boxedType(tp: Type)(implicit ctx: Context): TypeRef = boxedTypes(scalaClassName(tp))
 
-  def wrapArrayMethodName(elemtp: Type): TermName = {
-    val cls = elemtp.classSymbol
-    if (cls.isPrimitiveValueClass) nme.wrapXArray(cls.name)
-    else if (cls.derivesFrom(ObjectClass) && !cls.isPhantomClass) nme.wrapRefArray
-    else nme.genericWrapArray
-  }
-
   type PrimitiveClassEnc = Int
 
   val ByteEnc = 2
@@ -918,9 +955,6 @@ class Definitions {
 
   // ----- Initialization ---------------------------------------------------
 
-  private def maxImplemented(name: Name) =
-    if (name `startsWith` tpnme.Function) MaxImplementedFunctionArity else 0
-
   /** Give the scala package a scope where a FunctionN trait is automatically
    *  added when someone looks for it.
    */
@@ -930,7 +964,7 @@ class Definitions {
     val newDecls = new MutableScope(oldDecls) {
       override def lookupEntry(name: Name)(implicit ctx: Context): ScopeEntry = {
         val res = super.lookupEntry(name)
-        if (res == null && name.isTypeName && name.functionArity > maxImplemented(name))
+        if (res == null && name.isTypeName && name.isSyntheticFunction)
           newScopeEntry(newFunctionNTrait(name.asTypeName))
         else res
       }

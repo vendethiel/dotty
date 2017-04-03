@@ -16,7 +16,9 @@ import SymUtils._
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Phases.Phase
 import util.Property
+
 import collection.mutable
+import scala.annotation.tailrec
 
 /** This phase adds outer accessors to classes and traits that need them.
  *  Compared to Scala 2.x, it tries to minimize the set of classes
@@ -60,7 +62,8 @@ class ExplicitOuter extends MiniPhaseTransform with InfoTransformer { thisTransf
   /** Convert a selection of the form `qual.C_<OUTER>` to an outer path from `qual` to `C` */
   override def transformSelect(tree: Select)(implicit ctx: Context, info: TransformerInfo) =
     if (tree.name.isOuterSelect)
-      outer.path(tree.tpe.widen.classSymbol, tree.qualifier).ensureConforms(tree.tpe)
+      outer.path(start = tree.qualifier, count = tree.name.outerSelectHops)
+        .ensureConforms(tree.tpe)
     else tree
 
   /** First, add outer accessors if a class does not have them yet and it references an outer this.
@@ -327,9 +330,9 @@ object ExplicitOuter {
     /** If `cls` has an outer parameter add one to the method type `tp`. */
     def addParam(cls: ClassSymbol, tp: Type): Type =
       if (hasOuterParam(cls)) {
-        val mt @ MethodType(pnames, ptypes) = tp
+        val mt @ MethodTpe(pnames, ptypes, restpe) = tp
         mt.derivedMethodType(
-          nme.OUTER :: pnames, cls.owner.enclosingClass.typeRef :: ptypes, mt.resultType)
+          nme.OUTER :: pnames, cls.owner.enclosingClass.typeRef :: ptypes, restpe)
       } else tp
 
     /** If function in an apply node is a constructor that needs to be passed an
@@ -354,24 +357,32 @@ object ExplicitOuter {
       } else Nil
     }
 
-    /** The path of outer accessors that references `toCls.this` starting from
-     *  the context owner's this node.
+    /** A path of outer accessors starting from node `start`. `start` defaults to the
+     *  context owner's this node. There are two alternative conditions that determine
+     *  where the path ends:
+     *
+     *   - if the initial `count` parameter is non-negative: where the number of
+     *     outer accessors reaches count.
+     *   - if the initial `count` parameter is negative: where the class symbol of
+     *     the type of the reached tree matches `toCls`.
      */
-    def path(toCls: Symbol, start: Tree = This(ctx.owner.lexicallyEnclosingClass.asClass)): Tree = try {
-      def loop(tree: Tree): Tree = {
+    def path(start: Tree = This(ctx.owner.lexicallyEnclosingClass.asClass),
+             toCls: Symbol = NoSymbol,
+             count: Int = -1): Tree = try {
+      @tailrec def loop(tree: Tree, count: Int): Tree = {
         val treeCls = tree.tpe.widen.classSymbol
         val outerAccessorCtx = ctx.withPhaseNoLater(ctx.lambdaLiftPhase) // lambdalift mangles local class names, which means we cannot reliably find outer acessors anymore
         ctx.log(i"outer to $toCls of $tree: ${tree.tpe}, looking for ${outerAccName(treeCls.asClass)(outerAccessorCtx)} in $treeCls")
-        if (treeCls == toCls) tree
+        if (count == 0 || count < 0 && treeCls == toCls) tree
         else {
           val acc = outerAccessor(treeCls.asClass)(outerAccessorCtx)
           assert(acc.exists,
               i"failure to construct path from ${ctx.owner.ownersIterator.toList}%/% to `this` of ${toCls.showLocated};\n${treeCls.showLocated} does not have an outer accessor")
-          loop(tree.select(acc).ensureApplied)
+          loop(tree.select(acc).ensureApplied, count - 1)
         }
       }
       ctx.log(i"computing outerpath to $toCls from ${ctx.outersIterator.map(_.owner).toList}")
-      loop(start)
+      loop(start, count)
     } catch {
       case ex: ClassCastException =>
         throw new ClassCastException(i"no path exists from ${ctx.owner.enclosingClass} to $toCls")
@@ -380,7 +391,7 @@ object ExplicitOuter {
     /** The outer parameter definition of a constructor if it needs one */
     def paramDefs(constr: Symbol): List[ValDef] =
       if (constr.isConstructor && hasOuterParam(constr.owner.asClass)) {
-        val MethodType(outerName :: _, outerType :: _) = constr.info
+        val MethodTpe(outerName :: _, outerType :: _, _) = constr.info
         val outerSym = ctx.newSymbol(constr, outerName, Param, outerType)
         ValDef(outerSym) :: Nil
       }

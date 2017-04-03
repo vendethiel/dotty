@@ -30,11 +30,10 @@ object Message {
   * Instead use the `persist` method to create an instance that does not keep a
   * reference to these contexts.
   *
-  * @param errorId a unique number identifying the message, this will later be
+  * @param errorId a unique id identifying the message, this will later be
   *                used to reference documentation online
   */
-abstract class Message(val errorId: Int) { self =>
-  import messages._
+abstract class Message(val errorId: ErrorMessageID) { self =>
 
   /** The `msg` contains the diagnostic message e.g:
     *
@@ -116,17 +115,17 @@ class ExtendMessage(_msg: () => Message)(f: String => String) { self =>
 }
 
 /** The fallback `Message` containing no explanation and having no `kind` */
-class NoExplanation(val msg: String) extends Message(NoExplanation.ID) {
+class NoExplanation(val msg: String) extends Message(ErrorMessageID.NoExplanationID) {
   val explanation = ""
   val kind = ""
+
+  override def toString(): String = s"NoExplanation($msg)"
 }
 
 /** The extractor for `NoExplanation` can be used to check whether any error
   * lacks an explanation
   */
 object NoExplanation {
-  final val ID = -1
-
   def unapply(m: Message): Option[Message] =
     if (m.explanation == "") Some(m)
     else None

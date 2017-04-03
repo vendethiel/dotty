@@ -4,6 +4,7 @@
 
 package dotty.partest
 
+import dotty.tools.FatalError
 import scala.reflect.io.AbstractFile
 import scala.tools.partest._
 import scala.tools.partest.nest._
@@ -89,18 +90,18 @@ extends SuiteRunner(testSourcePath, fileManager, updateCheck, failed, javaCmdPat
   }
 
   /** Some tests require a limitation of resources, tests which are compiled
-    * with one or more of the flags in this list will be run with
-    * `limitedThreads`. This is necessary because some test flags require a lot
-    * of memory when running the compiler and may exhaust the available memory
-    * when run in parallel with too many other tests.
-    *
-    * This number could be increased on the CI, but might fail locally if
-    * scaled too extreme - override with:
-    *
-    * ```
-    * -Ddotty.tests.limitedThreads=X
-    * ```
-    */
+   *  with one or more of the flags in this list will be run with
+   *  `limitedThreads`. This is necessary because some test flags require a lot
+   *  of memory when running the compiler and may exhaust the available memory
+   *  when run in parallel with too many other tests.
+   *
+   *  This number could be increased on the CI, but might fail locally if
+   *  scaled too extreme - override with:
+   *
+   *  ```
+   *  -Ddotty.tests.limitedThreads=X
+   *  ```
+   */
   def limitResourceFlags = List("-Ytest-pickler")
   private val limitedThreads = sys.props.get("dotty.tests.limitedThreads").getOrElse("2")
 
@@ -294,8 +295,6 @@ class DPTestRunner(testFile: File, suiteRunner: DPSuiteRunner) extends nest.Runn
   // override to add the check for nr of compilation errors if there's a
   // target.nerr file
   override def runNegTest() = runInContext {
-    import scala.reflect.internal.FatalError
-
     sealed abstract class NegTestState
     // Don't get confused, the neg test passes when compilation fails for at
     // least one round (optionally checking the number of compiler errors and

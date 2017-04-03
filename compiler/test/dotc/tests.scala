@@ -85,7 +85,6 @@ class tests extends CompilerTest {
   val negDir        = testsDir + "neg/"
   val runDir        = testsDir + "run/"
   val newDir        = testsDir + "new/"
-  val replDir       = testsDir + "repl/"
   val javaDir       = testsDir + "pos-java-interop/"
 
   val sourceDir = "./src/"
@@ -153,6 +152,7 @@ class tests extends CompilerTest {
   @Test def pos_anonClassSubtyping = compileFile(posDir, "anonClassSubtyping", twice)
   @Test def pos_extmethods = compileFile(posDir, "extmethods", twice)
   @Test def pos_companions = compileFile(posDir, "companions", twice)
+  @Test def posVarargsT1625 = compileFiles(posDir + "varargsInMethodsT1625/")
 
   @Test def pos_all = compileFiles(posDir) // twice omitted to make tests run faster
 
@@ -160,7 +160,6 @@ class tests extends CompilerTest {
 
   @Test def rewrites = compileFile(posScala2Dir, "rewrites", "-rewrite" :: scala2mode)
 
-  @Test def pos_859 = compileFile(posSpecialDir, "i859", scala2mode)(allowDeepSubtypes)
   @Test def pos_t8146a = compileFile(posSpecialDir, "t8146a")(allowDeepSubtypes)
 
   @Test def pos_t5545 = {
@@ -173,20 +172,20 @@ class tests extends CompilerTest {
   @Test def pos_utf16 = compileFile(posSpecialDir, "utf16encoded", explicitUTF16)
 
   @Test def new_all = compileFiles(newDir, twice)
-  @Test def repl_all = replFiles(replDir)
 
   @Test def neg_all = compileFiles(negDir, verbose = true, compileSubDirs = false)
   @Test def neg_typedIdents() = compileDir(negDir, "typedIdents")
 
-  val negCustomArgs = negDir + "customArgs/"
+  @Test def negVarargsT1625 = compileFiles(negDir + "varargsInMethodsT1625/")
 
-  @Test def neg_cli_error = compileFile(negCustomArgs, "cliError", List("-thisOptionDoesNotExist"))
+  val negCustomArgs = negDir + "customArgs/"
 
   @Test def neg_typers() = compileFile(negCustomArgs, "typers")(allowDoubleBindings)
   @Test def neg_overrideClass = compileFile(negCustomArgs, "overrideClass", scala2mode)
   @Test def neg_autoTupling = compileFile(negCustomArgs, "autoTuplingTest", args = "-language:noAutoTupling" :: Nil)
   @Test def neg_i1050 = compileFile(negCustomArgs, "i1050", List("-strict"))
   @Test def neg_i1240 = compileFile(negCustomArgs, "i1240")(allowDoubleBindings)
+  @Test def neg_i2002 = compileFile(negCustomArgs, "i2002")(allowDoubleBindings)
 
   val negTailcallDir = negDir + "tailcall/"
   @Test def neg_tailcall_t1672b = compileFile(negTailcallDir, "t1672b")
@@ -204,18 +203,6 @@ class tests extends CompilerTest {
 
   private val stdlibFiles: List[String] = StdLibSources.whitelisted
 
-  @Test def checkWBLists = {
-    val stdlibFilesBlackListed = StdLibSources.blacklisted
-
-    val duplicates = stdlibFilesBlackListed.groupBy(x => x).filter(_._2.size > 1).filter(_._2.size > 1)
-    val msg = duplicates.map(x => s"'${x._1}' appears ${x._2.size} times").mkString(s"Duplicate entries in ${StdLibSources.blacklistFile}:\n", "\n", "\n")
-    assertTrue(msg, duplicates.isEmpty)
-
-    val filesNotInStdLib = stdlibFilesBlackListed.toSet -- StdLibSources.all
-    val msg2 = filesNotInStdLib.map(x => s"'$x'").mkString(s"Entries in ${StdLibSources.blacklistFile} where not found:\n", "\n", "\n")
-    assertTrue(msg2, filesNotInStdLib.isEmpty)
-  }
-
   @Test def compileStdLib = compileList("compileStdLib", stdlibFiles, "-migration" :: "-Yno-inline" :: scala2mode)
   @Test def compileMixed = compileLine(
       """../tests/pos/B.scala
@@ -226,6 +213,11 @@ class tests extends CompilerTest {
         |../scala-scala/src/library/scala/collection/SeqLike.scala
         |../scala-scala/src/library/scala/collection/generic/GenSeqFactory.scala""".stripMargin)
   @Test def compileIndexedSeq = compileLine("../scala-scala/src/library/scala/collection/immutable/IndexedSeq.scala")
+  @Test def compileParSetLike = compileLine("../scala-scala/src/library/scala/collection/parallel/mutable/ParSetLike.scala")
+  @Test def compileParSetSubset = compileLine(
+      """../scala-scala/src/library/scala/collection/parallel/mutable/ParSetLike.scala
+        |../scala-scala/src/library/scala/collection/parallel/mutable/ParSet.scala
+        |../scala-scala/src/library/scala/collection/mutable/SetLike.scala""".stripMargin)(scala2mode ++ defaultOptions)
 
   @Test def dotty = {
     dottyBootedLib
@@ -357,7 +349,6 @@ class tests extends CompilerTest {
 
   @Test def tasty_dotc_util = compileDir(dotcDir, "util", testPickling)
   @Test def tasty_tools_io = compileDir(toolsDir, "io", testPickling)
-  @Test def tasty_tests = compileDir(testsDir, "tasty", testPickling)
 
   @Test def tasty_bootstrap = {
     val logging = if (false) List("-Ylog-classpath", "-verbose") else Nil

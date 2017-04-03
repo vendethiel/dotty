@@ -27,7 +27,7 @@ import transform.TypeUtils._
 object Inliner {
   import tpd._
 
-  /** Adds accessors accessors for all non-public term members accessed
+  /** Adds accessors for all non-public term members accessed
    *  from `tree`. Non-public type members are currently left as they are.
    *  This means that references to a private type will lead to typing failures
    *  on the code when it is inlined. Less than ideal, but hard to do better (see below).
@@ -190,7 +190,8 @@ object Inliner {
           val inlineCtx = ctx
           sym.updateAnnotation(LazyBodyAnnotation { _ =>
             implicit val ctx = inlineCtx
-            ctx.withNoError(treeExpr(ctx))(makeInlineable)
+            val body = treeExpr(ctx)
+            if (ctx.reporter.hasErrors) body else makeInlineable(body)
           })
         }
     }
@@ -233,8 +234,10 @@ object Inliner {
    *            and body that replace it.
    */
   def inlineCall(tree: Tree, pt: Type)(implicit ctx: Context): Tree =
-    if (enclosingInlineds.length < ctx.settings.xmaxInlines.value)
-      new Inliner(tree, bodyToInline(tree.symbol)).inlined(pt)
+    if (enclosingInlineds.length < ctx.settings.xmaxInlines.value) {
+      val body = bodyToInline(tree.symbol) // can typecheck the tree and thereby produce errors
+      if (ctx.reporter.hasErrors) tree else new Inliner(tree, body).inlined(pt)
+    }
     else errorTree(
       tree,
       i"""|Maximal number of successive inlines (${ctx.settings.xmaxInlines.value}) exceeded,
@@ -396,24 +399,29 @@ class Inliner(call: tpd.Tree, rhs: tpd.Tree)(implicit ctx: Context) {
     def classOf(selfSym: Symbol) = selfSym.info.widen.classSymbol
 
     // The name of the outer selector that computes the rhs of `selfSym`
-    def outerSelector(selfSym: Symbol): TermName = classOf(selfSym).name.toTermName ++ nme.OUTER_SELECT
+    def outerSelector(n: Int): TermName = n.toString.toTermName ++ nme.OUTER_SELECT
 
     // The total nesting depth of the class represented by `selfSym`.
     def outerLevel(selfSym: Symbol): Int = classOf(selfSym).ownersIterator.length
 
-    // All needed this-proxies, sorted by nesting depth of the classes they represent (innermost first)
-    val accessedSelfSyms = thisProxy.values.toList.map(_.symbol).sortBy(-outerLevel(_))
+    // All needed this-proxies, paired-with and sorted-by nesting depth of
+    // the classes they represent (innermost first)
+    val sortedProxies = thisProxy.toList.map {
+      case (cls, proxy) => (outerLevel(cls), proxy.symbol)
+    } sortBy (-_._1)
 
     // Compute val-definitions for all this-proxies and append them to `bindingsBuf`
     var lastSelf: Symbol = NoSymbol
-    for (selfSym <- accessedSelfSyms) {
+    var lastLevel: Int = 0
+    for ((level, selfSym) <- sortedProxies) {
       val rhs =
         if (!lastSelf.exists)
           prefix
         else
-          untpd.Select(ref(lastSelf), outerSelector(selfSym)).withType(selfSym.info)
+          untpd.Select(ref(lastSelf), outerSelector(lastLevel - level)).withType(selfSym.info)
       bindingsBuf += ValDef(selfSym.asTerm, rhs)
       lastSelf = selfSym
+      lastLevel = level
     }
 
     // The type map to apply to the inlined tree. This maps references to this-types
@@ -449,16 +457,17 @@ class Inliner(call: tpd.Tree, rhs: tpd.Tree)(implicit ctx: Context) {
       case _ => tree
     }}
 
-    // The complete translation maps referenves to this and parameters to
+    val inlineCtx = inlineContext(call)
+    // The complete translation maps references to `this` and parameters to
     // corresponding arguments or proxies on the type and term level. It also changes
     // the owner from the inlined method to the current owner.
-    val inliner = new TreeTypeMap(typeMap, treeMap, meth :: Nil, ctx.owner :: Nil)
+    val inliner = new TreeTypeMap(typeMap, treeMap, meth :: Nil, ctx.owner :: Nil)(inlineCtx)
 
     val expansion = inliner(rhs.withPos(call.pos))
     ctx.traceIndented(i"inlining $call\n, BINDINGS =\n${bindingsBuf.toList}%\n%\nEXPANSION =\n$expansion", inlining, show = true) {
 
       // The final expansion runs a typing pass over the inlined tree. See InlineTyper for details.
-      val expansion1 = InlineTyper.typed(expansion, pt)(inlineContext(call))
+      val expansion1 = InlineTyper.typed(expansion, pt)(inlineCtx)
 
       /** Does given definition bind a closure that will be inlined? */
       def bindsDeadClosure(defn: ValOrDefDef) = Ident(defn.symbol.termRef) match {

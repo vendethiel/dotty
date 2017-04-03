@@ -12,7 +12,7 @@ import core._
 import Flags._
 import Contexts._
 import Names._
-import ast.Positioned
+import ast.{Positioned, Trees, untpd}
 import ast.Trees._
 import Decorators._
 import StdNames._
@@ -20,6 +20,7 @@ import util.Positions._
 import Constants._
 import ScriptParsers._
 import Comments._
+
 import scala.annotation.{tailrec, switch}
 import util.DotClass
 import rewrite.Rewrites.patch
@@ -110,7 +111,8 @@ object Parsers {
       */
     def syntaxError(msg: => Message, offset: Int = in.offset): Unit =
       if (offset > lastErrorOffset) {
-        syntaxError(msg, Position(offset))
+        val length = if (in.name != null) in.name.show.length else 0
+        syntaxError(msg, Position(offset, offset + length))
         lastErrorOffset = in.offset
       }
 
@@ -249,11 +251,6 @@ object Parsers {
         lastErrorOffset = in.offset
       } // DEBUG
 
-    private def expectedMsg(token: Int): String =
-      expectedMessage(showToken(token))
-    private def expectedMessage(what: String): String =
-      s"$what expected but ${showToken(in.token)} found"
-
     /** Consume one token of the specified type, or
       * signal an error if it is not there.
       *
@@ -262,7 +259,7 @@ object Parsers {
     def accept(token: Int): Int = {
       val offset = in.offset
       if (in.token != token) {
-        syntaxErrorOrIncomplete(expectedMsg(token))
+        syntaxErrorOrIncomplete(ExpectedTokenButFound(token, in.token, in.name))
       }
       if (in.token == token) in.nextToken()
       offset
@@ -408,14 +405,13 @@ object Parsers {
 
     var opStack: List[OpInfo] = Nil
 
-    def checkAssoc(offset: Int, op: Name, leftAssoc: Boolean) =
-      if (isLeftAssoc(op) != leftAssoc)
-        syntaxError(
-          "left- and right-associative operators with same precedence may not be mixed", offset)
+    def checkAssoc(offset: Token, op1: Name, op2: Name, op2LeftAssoc: Boolean): Unit =
+      if (isLeftAssoc(op1) != op2LeftAssoc)
+        syntaxError(MixedLeftAndRightAssociativeOps(op1, op2, op2LeftAssoc), offset)
 
-    def reduceStack(base: List[OpInfo], top: Tree, prec: Int, leftAssoc: Boolean): Tree = {
+    def reduceStack(base: List[OpInfo], top: Tree, prec: Int, leftAssoc: Boolean, op2: Name): Tree = {
       if (opStack != base && precedence(opStack.head.operator.name) == prec)
-        checkAssoc(opStack.head.offset, opStack.head.operator.name, leftAssoc)
+        checkAssoc(opStack.head.offset, opStack.head.operator.name, op2, leftAssoc)
       def recur(top: Tree): Tree = {
         if (opStack == base) top
         else {
@@ -449,20 +445,20 @@ object Parsers {
       var top = first
       while (isIdent && in.name != notAnOperator) {
         val op = if (isType) typeIdent() else termIdent()
-        top = reduceStack(base, top, precedence(op.name), isLeftAssoc(op.name))
+        top = reduceStack(base, top, precedence(op.name), isLeftAssoc(op.name), op.name)
         opStack = OpInfo(top, op, in.offset) :: opStack
         newLineOptWhenFollowing(canStartOperand)
         if (maybePostfix && !canStartOperand(in.token)) {
           val topInfo = opStack.head
           opStack = opStack.tail
-          val od = reduceStack(base, topInfo.operand, 0, true)
+          val od = reduceStack(base, topInfo.operand, 0, true, in.name)
           return atPos(startOffset(od), topInfo.offset) {
             PostfixOp(od, topInfo.operator)
           }
         }
         top = operand()
       }
-      reduceStack(base, top, 0, true)
+      reduceStack(base, top, 0, true, in.name)
     }
 
 /* -------- IDENTIFIERS AND LITERALS ------------------------------------------- */
@@ -474,7 +470,7 @@ object Parsers {
         in.nextToken()
         name
       } else {
-        syntaxErrorOrIncomplete(expectedMsg(IDENTIFIER))
+        syntaxErrorOrIncomplete(ExpectedTokenButFound(IDENTIFIER, in.token, in.name))
         nme.ERROR
       }
 
@@ -810,7 +806,7 @@ object Parsers {
     private def simpleTypeRest(t: Tree): Tree = in.token match {
       case HASH => simpleTypeRest(typeProjection(t))
       case LBRACKET => simpleTypeRest(atPos(startOffset(t)) {
-        AppliedTypeTree(t, typeArgs(namedOK = true, wildOK = true)) })
+        AppliedTypeTree(t, typeArgs(namedOK = false, wildOK = true)) })
       case _ => t
     }
 
@@ -998,20 +994,22 @@ object Parsers {
       else {
         val saved = placeholderParams
         placeholderParams = Nil
+
+        def wrapPlaceholders(t: Tree) = try
+          if (placeholderParams.isEmpty) t
+          else new WildcardFunction(placeholderParams.reverse, t)
+        finally placeholderParams = saved
+
         val t = expr1(location)
         if (in.token == ARROW) {
-          placeholderParams = saved
-          closureRest(start, location, convertToParams(t))
+          placeholderParams = Nil // don't interpret `_' to the left of `=>` as placeholder
+          wrapPlaceholders(closureRest(start, location, convertToParams(t)))
         }
         else if (isWildcard(t)) {
           placeholderParams = placeholderParams ::: saved
           t
         }
-        else
-          try
-            if (placeholderParams.isEmpty) t
-            else new WildcardFunction(placeholderParams.reverse, t)
-          finally placeholderParams = saved
+        else wrapPlaceholders(t)
       }
     }
 
@@ -1055,7 +1053,7 @@ object Parsers {
             case Block(Nil, EmptyTree) =>
               assert(handlerStart != -1)
               syntaxError(
-                new EmptyCatchBlock(body),
+                EmptyCatchBlock(body),
                 Position(handlerStart, endOffset(handler))
               )
             case _ =>
@@ -1610,6 +1608,7 @@ object Parsers {
      *  LocalModifier  ::= abstract | final | sealed | implicit | lazy
      */
     def modifiers(allowed: BitSet = modifierTokens, start: Modifiers = Modifiers()): Modifiers = {
+      @tailrec
       def loop(mods: Modifiers): Modifiers = {
         if (allowed contains in.token) {
           val isAccessMod = accessModifierTokens contains in.token
@@ -1666,7 +1665,7 @@ object Parsers {
  /* -------- PARAMETERS ------------------------------------------- */
 
     /** ClsTypeParamClause::=  `[' ClsTypeParam {`,' ClsTypeParam} `]'
-     *  ClsTypeParam      ::=  {Annotation} [{Modifier} type] [`+' | `-']
+     *  ClsTypeParam      ::=  {Annotation} [`+' | `-']
      *                         id [HkTypeParamClause] TypeParamBounds
      *
      *  DefTypeParamClause::=  `[' DefTypeParam {`,' DefTypeParam} `]'
@@ -1682,25 +1681,17 @@ object Parsers {
       def typeParam(): TypeDef = {
         val isConcreteOwner = ownerKind == ParamOwner.Class || ownerKind == ParamOwner.Def
         val start = in.offset
-        var mods = annotsAsMods()
-        if (ownerKind == ParamOwner.Class) {
-          mods = modifiers(start = mods)
-          mods =
-            atPos(start, in.offset) {
-              if (in.token == TYPE) {
-                val mod = atPos(in.skipToken()) { Mod.Type() }
-                (mods | Param | ParamAccessor).withAddedMod(mod)
-              } else {
-                if (mods.hasFlags) syntaxError(TypeParamsTypeExpected(mods, ident()))
-                mods | Param | PrivateLocal
-              }
-            }
-        }
-        else mods = atPos(start) (mods | Param)
-        if (ownerKind != ParamOwner.Def) {
-          if (isIdent(nme.raw.PLUS)) mods |= Covariant
-          else if (isIdent(nme.raw.MINUS)) mods |= Contravariant
-          if (mods is VarianceFlags) in.nextToken()
+        val mods = atPos(start) {
+          annotsAsMods() | {
+            if (ownerKind == ParamOwner.Class) Param | PrivateLocal
+            else Param
+          } | {
+            if (ownerKind != ParamOwner.Def)
+              if (isIdent(nme.raw.PLUS)) { in.nextToken(); Covariant }
+              else if (isIdent(nme.raw.MINUS)) { in.nextToken(); Contravariant }
+              else EmptyFlags
+            else EmptyFlags
+          }
         }
         atPos(start, nameStart) {
           val name =
@@ -1809,6 +1800,10 @@ object Parsers {
           case EOF        => incompleteInputError(AuxConstructorNeedsNonImplicitParameter())
           case _          => syntaxError(AuxConstructorNeedsNonImplicitParameter(), start)
         }
+      }
+      val listOfErrors = checkVarArgsRules(result)
+      listOfErrors.foreach { vparam =>
+        syntaxError(VarArgsParamMustComeLast(), vparam.tpt.pos)
       }
       result
     }
@@ -1928,6 +1923,21 @@ object Parsers {
           ValDef(name, tpt, rhs).withMods(mods).setComment(docstring)
         } case _ =>
           PatDef(mods, lhs, tpt, rhs)
+      }
+    }
+
+
+
+    private def checkVarArgsRules(vparamss: List[List[untpd.ValDef]]): List[untpd.ValDef] = {
+      def isVarArgs(tpt: Trees.Tree[Untyped]): Boolean = tpt match {
+        case PostfixOp(_, op) if op.name == nme.raw.STAR => true
+        case _ => false
+      }
+
+      vparamss.flatMap { params =>
+        if (params.nonEmpty) {
+          params.init.filter(valDef => isVarArgs(valDef.tpt))
+        } else List()
       }
     }
 
@@ -2060,7 +2070,7 @@ object Parsers {
       val name = ident().toTypeName
       val constr = atPos(in.lastOffset) {
         val tparams = typeParamClauseOpt(ParamOwner.Class)
-        val cmods = constrModsOpt()
+        val cmods = constrModsOpt(name)
         val vparamss = paramClauses(name, mods is Case)
 
         makeConstructor(tparams, vparamss).withMods(cmods)
@@ -2073,11 +2083,11 @@ object Parsers {
     /** ConstrMods        ::=  AccessModifier
      *                      |  Annotation {Annotation} (AccessModifier | `this')
      */
-    def constrModsOpt(): Modifiers = {
+    def constrModsOpt(owner: Name): Modifiers = {
       val mods = modifiers(accessModifierTokens, annotsAsMods())
       if (mods.hasAnnotations && !mods.hasFlags)
         if (in.token == THIS) in.nextToken()
-        else syntaxError("`private', `protected', or `this' expected")
+        else syntaxError(AnnotatedPrimaryConstructorRequiresModifierOrThis(owner), mods.annotations.last.pos)
       mods
     }
 

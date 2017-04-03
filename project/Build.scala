@@ -10,7 +10,9 @@ import org.scalajs.sbtplugin.ScalaJSPlugin
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbt.Package.ManifestAttributes
 
-object DottyBuild extends Build {
+object Build {
+
+  projectChecks()
 
   val scalacVersion = "2.11.5" // Do not rename, this is grepped in bin/common.
 
@@ -45,6 +47,9 @@ object DottyBuild extends Build {
   // Spawns a repl with the correct classpath
   lazy val repl = inputKey[Unit]("run the REPL with correct classpath")
 
+  // Run tests with filter
+  lazy val filterTest = inputKey[Unit]("runs integration test with the supplied filter")
+
   // Used to compile files similar to ./bin/dotc script
   lazy val dotc =
     inputKey[Unit]("run the compiler using the correct classpath, or the user supplied classpath")
@@ -56,32 +61,28 @@ object DottyBuild extends Build {
   // Compiles the documentation and static site
   lazy val genDocs = inputKey[Unit]("run dottydoc to generate static documentation site")
 
-  /** Dottydoc deps */
-  lazy val dottydocDeps = SettingKey[Seq[ModuleID]](
-    "dottydocDeps",
-    "dottydoc dependencies, should be moved to a dottydoc sbt subproject eventually"
+  // Shorthand for compiling a docs site
+  lazy val dottydoc = inputKey[Unit]("run dottydoc")
+
+  // Used in build.sbt
+  val thisBuildSettings = Seq(
+    scalaVersion in Global := scalacVersion,
+    version in Global := dottyVersion,
+    organization in Global := dottyOrganization,
+    organizationName in Global := "LAMP/EPFL",
+    organizationHomepage in Global := Some(url("http://lamp.epfl.ch")),
+    homepage in Global := Some(url("https://github.com/lampepfl/dotty")),
+
+    // scalac options
+    scalacOptions in Global ++= Seq(
+      "-feature",
+      "-deprecation",
+      "-encoding", "UTF8",
+      "-language:existentials,higherKinds,implicitConversions"
+    ),
+
+    javacOptions in Global ++= Seq("-Xlint:unchecked", "-Xlint:deprecation")
   )
-
-  override def settings: Seq[Setting[_]] = {
-    super.settings ++ Seq(
-      scalaVersion in Global := scalacVersion,
-      version in Global := dottyVersion,
-      organization in Global := dottyOrganization,
-      organizationName in Global := "LAMP/EPFL",
-      organizationHomepage in Global := Some(url("http://lamp.epfl.ch")),
-      homepage in Global := Some(url("https://github.com/lampepfl/dotty")),
-
-      // scalac options
-      scalacOptions in Global ++= Seq(
-        "-feature",
-        "-deprecation",
-        "-encoding", "UTF8",
-        "-language:existentials,higherKinds,implicitConversions"
-      ),
-
-      javacOptions in Global ++= Seq("-Xlint:unchecked", "-Xlint:deprecation")
-    )
-  }
 
   /** Enforce 2.11.5. Do not let it be upgraded by dependencies. */
   private val overrideScalaVersionSetting =
@@ -105,7 +106,12 @@ object DottyBuild extends Build {
       (dottyOrganization % "dotty-sbt-bridge" % scalaVersion.value % "component").sources(),
 
     // sbt gets very unhappy if two projects use the same target
-    target := baseDirectory.value / ".." / "out" / name.value
+    target := baseDirectory.value / ".." / "out" / name.value,
+
+    // The non-bootstrapped dotty-library is not necessary when bootstrapping dotty
+    autoScalaLibrary := false,
+    // ...but scala-library is
+    libraryDependencies += "org.scala-lang" % "scala-library" % scalacVersion
   )
 
   /** Projects -------------------------------------------------------------- */
@@ -121,11 +127,13 @@ object DottyBuild extends Build {
   //   this is only necessary for compatibility with sbt which currently hardcodes the "dotty" artifact name
   lazy val dotty = project.in(file(".")).
     // FIXME: we do not aggregate `bin` because its tests delete jars, thus breaking other tests
-    aggregate(`dotty-interfaces`, `dotty-library`, `dotty-compiler`, dottySbtBridgeRef,
-      `scala-library`, `scala-compiler`, `scala-reflect`, `scalap`).
+    aggregate(`dotty-interfaces`, `dotty-library`, `dotty-compiler`, `dotty-doc`, dottySbtBridgeRef,
+      `scala-library`, `scala-compiler`, `scala-reflect`, scalap).
     dependsOn(`dotty-compiler`).
     dependsOn(`dotty-library`).
     settings(
+      triggeredMessage in ThisBuild := Watched.clearWhenTriggered,
+
       addCommandAlias("run", "dotty-compiler/run") ++
       addCommandAlias(
         "partest",
@@ -169,6 +177,63 @@ object DottyBuild extends Build {
     ).
     settings(publishing)
 
+  lazy val `dotty-doc` = project.in(file("doc-tool")).
+    dependsOn(`dotty-compiler`, `dotty-compiler` % "test->test").
+    settings(sourceStructure).
+    settings(
+      baseDirectory in (Compile, run) := baseDirectory.value / "..",
+      baseDirectory in (Test, run) := baseDirectory.value,
+
+      connectInput in run := true,
+      outputStrategy := Some(StdoutOutput),
+
+      javaOptions ++= (javaOptions in `dotty-compiler`).value,
+      fork in run := true,
+      fork in Test := true,
+      parallelExecution in Test := false,
+
+      genDocs := Def.inputTaskDyn {
+        val dottyLib = (packageAll in `dotty-compiler`).value("dotty-library")
+        val dottyInterfaces = (packageAll in `dotty-compiler`).value("dotty-interfaces")
+        val otherDeps = (dependencyClasspath in Compile).value.map(_.data).mkString(":")
+        val sources =
+          (unmanagedSources in (Compile, compile)).value ++
+          (unmanagedSources in (`dotty-compiler`, Compile)).value
+        val args: Seq[String] = Seq(
+          "-siteroot", "docs",
+          "-project", "Dotty",
+          "-classpath", s"$dottyLib:$dottyInterfaces:$otherDeps"
+        )
+        (runMain in Compile).toTask(
+          s""" dotty.tools.dottydoc.Main ${args.mkString(" ")} ${sources.mkString(" ")}"""
+        )
+      }.evaluated,
+
+      dottydoc := Def.inputTaskDyn {
+        val args: Seq[String] = spaceDelimited("<arg>").parsed
+        val dottyLib = (packageAll in `dotty-compiler`).value("dotty-library")
+        val dottyInterfaces = (packageAll in `dotty-compiler`).value("dotty-interfaces")
+        val otherDeps = (dependencyClasspath in Compile).value.map(_.data).mkString(":")
+        val cp: Seq[String] = Seq("-classpath", s"$dottyLib:$dottyInterfaces:$otherDeps")
+        (runMain in Compile).toTask(s""" dotty.tools.dottydoc.Main ${cp.mkString(" ")} """ + args.mkString(" "))
+      }.evaluated,
+
+      libraryDependencies ++= Seq(
+        "com.novocode" % "junit-interface" % "0.11" % "test",
+        "com.vladsch.flexmark" % "flexmark" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-gfm-tasklist" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-gfm-tables" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-autolink" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-anchorlink" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-emoji" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-gfm-strikethrough" % "0.11.1",
+        "com.vladsch.flexmark" % "flexmark-ext-yaml-front-matter" % "0.11.1",
+        "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.8.6",
+        "nl.big-o" % "liqp" % "0.6.7"
+      )
+    ).
+    settings(publishing)
+
   lazy val `dotty-bot` = project.in(file("bot")).
     settings(sourceStructure).
     settings(
@@ -196,6 +261,7 @@ object DottyBuild extends Build {
 
   // Settings shared between dotty-compiler and dotty-compiler-bootstrapped
   lazy val dottyCompilerSettings = Seq(
+
       // set system in/out for repl
       connectInput in run := true,
       outputStrategy := Some(StdoutOutput),
@@ -212,35 +278,58 @@ object DottyBuild extends Build {
       //http://stackoverflow.com/questions/10472840/how-to-attach-sources-to-sbt-managed-dependencies-in-scala-ide#answer-11683728
       com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys.withSource := true,
 
-      dottydocDeps := Seq(
-        "com.vladsch.flexmark" % "flexmark" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-gfm-tasklist" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-gfm-tables" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-autolink" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-anchorlink" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-emoji" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-gfm-strikethrough" % "0.11.1",
-        "com.vladsch.flexmark" % "flexmark-ext-yaml-front-matter" % "0.11.1",
-        "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.8.6",
-        "nl.big-o" % "liqp" % "0.6.7"
-      ),
-
       // get libraries onboard
-      partestDeps := Seq(scalaCompiler,
-                         "org.scala-lang" % "scala-reflect" % scalacVersion,
-                         "org.scala-lang" % "scala-library" % scalacVersion % "test"),
-      libraryDependencies ++= partestDeps.value,
-      libraryDependencies ++= dottydocDeps.value,
-      libraryDependencies ++= Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1",
-                                  "org.scala-lang.modules" %% "scala-partest" % "1.0.11" % "test",
+      resolvers += Resolver.typesafeIvyRepo("releases"), // For org.scala-sbt:interface
+      libraryDependencies ++= Seq(scalaCompiler,
+                                  "org.scala-sbt" % "interface" % sbtVersion.value,
+                                  "org.scala-lang.modules" %% "scala-xml" % "1.0.1",
                                   "com.novocode" % "junit-interface" % "0.11" % "test",
-                                  "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value),
+                                  "org.scala-lang" % "scala-reflect" % scalacVersion,
+                                  "org.scala-lang" % "scala-library" % scalacVersion % "test"),
+
+      // start partest specific settings:
+      libraryDependencies += "org.scala-lang.modules" %% "scala-partest" % "1.0.11" % "test",
+      testOptions in Test += Tests.Cleanup({ () => partestLockFile.delete }),
+      // this option is needed so that partest doesn't run
+      partestDeps := Seq(
+        scalaCompiler,
+        "org.scala-lang" % "scala-reflect" % scalacVersion,
+        "org.scala-lang" % "scala-library" % scalacVersion % "test"
+      ),
+      lockPartestFile := {
+        // When this file is present, running `test` generates the files for
+        // partest. Otherwise it just executes the tests directly.
+        val lockDir = partestLockFile.getParentFile
+        lockDir.mkdirs
+        // Cannot have concurrent partests as they write to the same directory.
+        if (lockDir.list.size > 0)
+          throw new RuntimeException("ERROR: sbt partest: another partest is already running, pid in lock file: " + lockDir.list.toList.mkString(" "))
+        partestLockFile.createNewFile
+        partestLockFile.deleteOnExit
+      },
+      runPartestRunner := Def.inputTaskDyn {
+        // Magic! This is both an input task and a dynamic task. Apparently
+        // command line arguments get passed to the last task in an aliased
+        // sequence (see partest alias below), so this works.
+        val args = Def.spaceDelimited("<arg>").parsed
+        val jars = List(
+          (packageBin in Compile).value.getAbsolutePath,
+          packageAll.value("dotty-library"),
+          packageAll.value("dotty-interfaces")
+        ) ++ getJarPaths(partestDeps.value, ivyPaths.value.ivyHome)
+        val dottyJars  =
+          s"""-dottyJars ${jars.length + 2} dotty.jar dotty-lib.jar ${jars.mkString(" ")}"""
+        // Provide the jars required on the classpath of run tests
+        runTask(Test, "dotty.partest.DPConsoleRunner", dottyJars + " " + args.mkString(" "))
+      }.evaluated,
+      // end partest specific settings
+
       // enable improved incremental compilation algorithm
       incOptions := incOptions.value.withNameHashing(true),
 
       // For convenience, change the baseDirectory when running the compiler
       baseDirectory in (Compile, run) := baseDirectory.value / "..",
-      // .. but not when running partest
+      // .. but not when running test
       baseDirectory in (Test, run) := baseDirectory.value,
 
       repl := Def.inputTaskDyn {
@@ -251,32 +340,24 @@ object DottyBuild extends Build {
         )
       }.evaluated,
 
-      genDocs := Def.inputTaskDyn {
-        val dottyLib = packageAll.value("dotty-library")
-        val dottyInterfaces = packageAll.value("dotty-interfaces")
-        val otherDeps = (dependencyClasspath in Compile).value.map(_.data).mkString(":")
-        val sources = (managedSources in (Compile, compile)).value ++ (unmanagedSources in (Compile, compile)).value
-        val args: Seq[String] = Seq(
-          "-siteroot", "docs",
-          "-project", "Dotty",
-          "-classpath", s"$dottyLib:$dottyInterfaces:$otherDeps"
-        )
-        (runMain in Compile).toTask(
-          s""" dotty.tools.dottydoc.Main ${args.mkString(" ")} ${sources.mkString(" ")}"""
+      filterTest := Def.inputTaskDyn {
+        val args: Seq[String] = spaceDelimited("<arg>").parsed
+        testOptions := Seq()
+        (testOnly in Test).toTask(
+          " dotty.tools.dotc.CompilationTests -- -Ddotty.partest.filter=" + args.head
         )
       }.evaluated,
 
       // Override run to be able to run compiled classfiles
       dotr := {
         val args: Seq[String] = spaceDelimited("<arg>").parsed
-        val java: String = Process("which" :: "java" :: Nil) !!
-        val scalaLib = (dependencyClasspath in Runtime, packageAll)
-          .map { (attList, _) =>
-            attList
-              .map(_.data.getAbsolutePath)
-              .find(_.contains("scala-library"))
-              .toList.mkString(":")
-          }.value
+        val java: String = Process("which" :: "java" :: Nil).!!
+        val attList = (dependencyClasspath in Runtime).value
+        val _  = packageAll.value
+        val scalaLib = attList
+          .map(_.data.getAbsolutePath)
+          .find(_.contains("scala-library"))
+          .toList.mkString(":")
 
         if (java == "")
           println("Couldn't find java executable on path, please install java to a default location")
@@ -284,7 +365,7 @@ object DottyBuild extends Build {
           println("Couldn't find scala-library on classpath, please run using script in bin dir instead")
         } else {
           val dottyLib = packageAll.value("dotty-library")
-          s"""$java -classpath .:$dottyLib:$scalaLib ${args.mkString(" ")}""" !
+          s"""$java -classpath .:$dottyLib:$scalaLib ${args.mkString(" ")}""".!
         }
       },
       run := Def.inputTaskDyn {
@@ -307,34 +388,6 @@ object DottyBuild extends Build {
         TestFrameworks.JUnit, "-a", "-v",
         "--run-listener=dotty.tools.ContextEscapeDetector"
       ),
-      testOptions in Test += Tests.Cleanup({ () => partestLockFile.delete }),
-
-      lockPartestFile := {
-        // When this file is present, running `test` generates the files for
-        // partest. Otherwise it just executes the tests directly.
-        val lockDir = partestLockFile.getParentFile
-        lockDir.mkdirs
-        // Cannot have concurrent partests as they write to the same directory.
-        if (lockDir.list.size > 0)
-          throw new RuntimeException("ERROR: sbt partest: another partest is already running, pid in lock file: " + lockDir.list.toList.mkString(" "))
-        partestLockFile.createNewFile
-        partestLockFile.deleteOnExit
-      },
-      runPartestRunner <<= Def.inputTaskDyn {
-        // Magic! This is both an input task and a dynamic task. Apparently
-        // command line arguments get passed to the last task in an aliased
-        // sequence (see partest alias below), so this works.
-        val args = Def.spaceDelimited("<arg>").parsed
-        val jars = List(
-          (packageBin in Compile).value.getAbsolutePath,
-          packageAll.value("dotty-library"),
-          packageAll.value("dotty-interfaces")
-        ) ++ getJarPaths(partestDeps.value, ivyPaths.value.ivyHome)
-        val dottyJars  =
-          s"""-dottyJars ${jars.length + 2} dotty.jar dotty-lib.jar ${jars.mkString(" ")}"""
-        // Provide the jars required on the classpath of run tests
-        runTask(Test, "dotty.partest.DPConsoleRunner", dottyJars + " " + args.mkString(" "))
-      },
 
       /* Add the sources of scalajs-ir.
        * To guarantee that dotty can bootstrap without depending on a version
@@ -379,7 +432,10 @@ object DottyBuild extends Build {
 
       // http://grokbase.com/t/gg/simple-build-tool/135ke5y90p/sbt-setting-jvm-boot-paramaters-for-scala
       // packageAll should always be run before tests
-      javaOptions <++= (dependencyClasspath in Runtime, packageAll) map { (attList, pA) =>
+      javaOptions ++= {
+        val attList = (dependencyClasspath in Runtime).value
+        val pA = packageAll.value
+
         // put needed dependencies on classpath:
         val path = for {
           file <- attList.map(_.data)
@@ -393,7 +449,7 @@ object DottyBuild extends Build {
             // FIXME: should go away when xml literal parsing is removed
             path.contains("scala-xml") ||
             // needed for the xsbti interface
-            path.contains("sbt-interface")
+            path.contains("org.scala-sbt/interface/")
         } yield "-Xbootclasspath/p:" + path
 
         val ci_build = // propagate if this is a ci build
@@ -419,6 +475,31 @@ object DottyBuild extends Build {
       }
   )
 
+  // Partest tasks
+  lazy val partestDeps =
+    SettingKey[Seq[ModuleID]]("partestDeps", "Finds jars for partest dependencies")
+  lazy val runPartestRunner =
+    InputKey[Unit]("runPartestRunner", "Runs partest")
+  lazy val lockPartestFile =
+    TaskKey[Unit]("lockPartestFile", "Creates the lock file at ./tests/locks/partest-<pid>.lock")
+  lazy val partestLockFile =
+    new File("." + File.separator + "tests" + File.separator + "locks" + File.separator + s"partest-$pid.lock")
+
+  def pid = java.lang.Long.parseLong(java.lang.management.ManagementFactory.getRuntimeMXBean().getName().split("@")(0))
+
+  def getJarPaths(modules: Seq[ModuleID], ivyHome: Option[File]): Seq[String] = ivyHome match {
+    case Some(home) =>
+      modules.map({ module =>
+        val file = Path(home) / Path("cache") /
+          Path(module.organization) / Path(module.name) / Path("jars") /
+          Path(module.name + "-" + module.revision + ".jar")
+        if (!file.isFile) throw new RuntimeException("ERROR: sbt getJarPaths: dependency jar not found: " + file)
+        else file.jfile.getAbsolutePath
+      })
+    case None => throw new RuntimeException("ERROR: sbt getJarPaths: ivyHome not defined")
+  }
+  // end partest tasks
+
   lazy val `dotty-compiler` = project.in(file("compiler")).
     dependsOn(`dotty-interfaces`).
     dependsOn(`dotty-library`).
@@ -426,17 +507,6 @@ object DottyBuild extends Build {
     settings(dottyCompilerSettings).
     settings(
       overrideScalaVersionSetting,
-
-      // necessary evil: dottydoc currently needs to be included in the dotty
-      // project, for sbt integration
-      // FIXME: note part of dottyCompilerSettings because the doc-tool does not
-      // compile with dotty
-      unmanagedResourceDirectories in Compile := Seq((resourceDirectory in Compile).value),
-      unmanagedResourceDirectories in Compile += baseDirectory.value / ".." / "doc-tool" / "resources",
-      unmanagedSourceDirectories in Compile := Seq((scalaSource in Compile).value),
-      unmanagedSourceDirectories in Compile += baseDirectory.value / ".." / "doc-tool" / "src",
-      unmanagedSourceDirectories in Test := Seq((scalaSource in Test).value),
-      unmanagedSourceDirectories in Test += baseDirectory.value / ".." / "doc-tool" / "test",
 
       // Disable scaladoc generation, it's way too slow and we'll replace it
       // by dottydoc anyway. We still publish an empty -javadoc.jar to make
@@ -528,9 +598,9 @@ object DottyBuild extends Build {
       },
       publishLocal := (publishLocal.dependsOn(cleanSbtBridge)).value,
       description := "sbt compiler bridge for Dotty",
-      resolvers += Resolver.typesafeIvyRepo("releases"),
+      resolvers += Resolver.typesafeIvyRepo("releases"), // For org.scala-sbt stuff
       libraryDependencies ++= Seq(
-        "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
+        "org.scala-sbt" % "interface" % sbtVersion.value,
         "org.scala-sbt" % "api" % sbtVersion.value % "test",
         "org.specs2" %% "specs2" % "2.3.11" % "test"
       ),
@@ -625,7 +695,7 @@ object DottyInjectedPlugin extends AutoPlugin {
       /* Make sure jsDependencyManifest runs after compile, otherwise compile
        * might remove the entire directory afterwards.
        */
-      jsDependencyManifest <<= jsDependencyManifest.dependsOn(compile)
+      jsDependencyManifest := jsDependencyManifest.dependsOn(compile).value
     )))
 
   lazy val `dotty-bench` = project.in(file("bench")).
@@ -645,7 +715,10 @@ object DottyInjectedPlugin extends AutoPlugin {
       parallelExecution in Test := false,
 
       // http://grokbase.com/t/gg/simple-build-tool/135ke5y90p/sbt-setting-jvm-boot-paramaters-for-scala
-      javaOptions <++= (dependencyClasspath in Runtime, packageBin in Compile) map { (attList, bin) =>
+      javaOptions ++= {
+        val attList = (dependencyClasspath in Runtime).value
+        val bin = (packageBin in Compile).value
+
         // put the Scala {library, reflect, compiler} in the classpath
         val path = for {
           file <- attList.map(_.data)
@@ -698,7 +771,7 @@ object DottyInjectedPlugin extends AutoPlugin {
       libraryDependencies := Seq("org.scala-lang" % "scala-reflect" % scalaVersion.value)
     ).
     settings(publishing)
-  lazy val `scalap` = project.
+  lazy val scalap = project.
     settings(
       crossPaths := false,
       libraryDependencies := Seq("org.scala-lang" % "scalap" % scalaVersion.value)
@@ -761,26 +834,6 @@ object DottyInjectedPlugin extends AutoPlugin {
        </developers>
      )
    )
-
-  // Partest tasks
-  lazy val lockPartestFile = TaskKey[Unit]("lockPartestFile", "Creates the lock file at ./tests/locks/partest-<pid>.lock")
-  lazy val partestLockFile = new File("." + File.separator + "tests" + File.separator + "locks" + File.separator + s"partest-$pid.lock")
-  def pid = java.lang.Long.parseLong(java.lang.management.ManagementFactory.getRuntimeMXBean().getName().split("@")(0))
-
-  lazy val runPartestRunner = InputKey[Unit]("runPartestRunner", "Runs partest")
-
-  lazy val partestDeps = SettingKey[Seq[ModuleID]]("partestDeps", "Finds jars for partest dependencies")
-  def getJarPaths(modules: Seq[ModuleID], ivyHome: Option[File]): Seq[String] = ivyHome match {
-    case Some(home) =>
-      modules.map({ module =>
-        val file = Path(home) / Path("cache") /
-          Path(module.organization) / Path(module.name) / Path("jars") /
-          Path(module.name + "-" + module.revision + ".jar")
-        if (!file.isFile) throw new RuntimeException("ERROR: sbt getJarPaths: dependency jar not found: " + file)
-        else file.jfile.getAbsolutePath
-      })
-    case None => throw new RuntimeException("ERROR: sbt getJarPaths: ivyHome not defined")
-  }
 
   // Compile with dotty
   lazy val compileWithDottySettings = {
@@ -875,5 +928,16 @@ object DottyInjectedPlugin extends AutoPlugin {
         sbt.inc.Analysis.Empty
       }
     ))
+  }
+
+  private def projectChecks(): Unit = {
+    val scalaScala = new File("scala-scala")
+    if (!scalaScala.exists()) {
+      println(
+        s"""[WARNING] Missing `dotty/scala-scala` library
+           |You can clone the library with:
+           |  > git clone -b dotty-library https://github.com/DarkDimius/scala.git ${scalaScala.getAbsolutePath}
+        """.stripMargin)
+    }
   }
 }

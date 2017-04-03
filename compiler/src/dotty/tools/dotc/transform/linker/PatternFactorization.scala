@@ -53,7 +53,7 @@ trait PatternFactorization extends MiniPhaseTransform {
           val fallbackMatch = transformMatch(Match(selector, fallbackCases))
           val fallbackName = ctx.freshName("fallback").toTermName
           val fallbackSym =
-            ctx.newSymbol(ctx.owner, fallbackName, Flags.Synthetic | Flags.Label, MethodType(Nil, Nil)(x => fallbackMatch.tpe))
+            ctx.newSymbol(ctx.owner, fallbackName, Flags.Synthetic | Flags.Label, MethodType(Nil)(_ => Nil, x => fallbackMatch.tpe))
           Some(DefDef(fallbackSym, fallbackMatch))
         } else {
           None

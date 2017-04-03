@@ -10,6 +10,7 @@ import dotc.transform.ExplicitOuter._
 import dotc.transform.ValueClasses._
 import util.DotClass
 import Definitions.MaxImplementedFunctionArity
+import scala.annotation.tailrec
 
 /** Erased types are:
  *
@@ -44,7 +45,7 @@ object TypeErasure {
       val sym = tp.symbol
       sym.isClass &&
       sym != defn.AnyClass && sym != defn.ArrayClass &&
-      !defn.isXXLFunctionClass(sym) && !defn.isImplicitFunctionClass(sym)
+      !defn.isSyntheticFunctionClass(sym)
     case _: TermRef =>
       true
     case JavaArrayType(elem) =>
@@ -215,13 +216,13 @@ object TypeErasure {
   }
 
   /** The erased least upper bound is computed as follows
-   *  - if both argument are arrays of objects, an array of the lub of the element types
+   *  - if both argument are arrays of objects, an array of the erased lub of the element types
    *  - if both arguments are arrays of same primitives, an array of this primitive
    *  - if one argument is array of primitives and the other is array of objects, Object
    *  - if one argument is an array, Object
    *  - otherwise a common superclass or trait S of the argument classes, with the
    *    following two properties:
-   *      S is minimal: no other common superclass or trait derives from S]
+   *      S is minimal: no other common superclass or trait derives from S
    *      S is last   : in the linearization of the first argument type `tp1`
    *                    there are no minimal common superclasses or traits that
    *                    come after S.
@@ -244,12 +245,16 @@ object TypeErasure {
         case JavaArrayType(_) => defn.ObjectType
         case _ =>
           val cls2 = tp2.classSymbol
-          def loop(bcs: List[ClassSymbol], bestSoFar: ClassSymbol): ClassSymbol = bcs match {
+          @tailrec def loop(bcs: List[ClassSymbol], bestSoFar: ClassSymbol): ClassSymbol = bcs match {
             case bc :: bcs1 =>
-              if (cls2.derivesFrom(bc))
-                if (!bc.is(Trait) && bc != defn.AnyClass) bc
-                else loop(bcs1, if (bestSoFar.derivesFrom(bc)) bestSoFar else bc)
-              else
+              if (cls2.derivesFrom(bc)) {
+                val newBest = if (bestSoFar.derivesFrom(bc)) bestSoFar else bc
+
+                if (!bc.is(Trait) && bc != defn.AnyClass)
+                  newBest
+                else
+                  loop(bcs1, newBest)
+              } else
                 loop(bcs1, bestSoFar)
             case nil =>
               bestSoFar
@@ -358,8 +363,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       if (!sym.isClass) this(tp.info)
       else if (semiEraseVCs && isDerivedValueClass(sym)) eraseDerivedValueClassRef(tp)
       else if (sym == defn.ArrayClass) apply(tp.appliedTo(TypeBounds.empty)) // i966 shows that we can hit a raw Array type.
-      else if (defn.isXXLFunctionClass(sym)) defn.FunctionXXLType
-      else if (defn.isImplicitFunctionClass(sym)) apply(defn.FunctionType(sym.name.functionArity))
+      else if (defn.isSyntheticFunctionClass(sym)) defn.erasedFunctionType(sym)
       else eraseNormalClassRef(tp)
     case tp: RefinedType =>
       val parent = tp.parent
@@ -370,7 +374,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
     case SuperType(thistpe, supertpe) =>
       SuperType(this(thistpe), this(supertpe))
     case ExprType(rt) =>
-      defn.FunctionClass(0).typeRef
+      defn.FunctionType(0)
     case AndType(tp1, tp2) =>
       erasedGlb(this(tp1), this(tp2), isJava)
     case OrType(tp1, tp2) =>
@@ -496,8 +500,8 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
           val erasedVCRef = eraseDerivedValueClassRef(tp)
           if (erasedVCRef.exists) return sigName(erasedVCRef)
         }
-        if (defn.isImplicitFunctionClass(sym))
-          sigName(defn.FunctionType(sym.name.functionArity))
+        if (defn.isSyntheticFunctionClass(sym))
+          sigName(defn.erasedFunctionType(sym))
         else
           normalizeClass(sym.asClass).fullName.asTypeName
       case defn.ArrayOf(elem) =>

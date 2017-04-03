@@ -4,9 +4,11 @@ package printing
 import core._
 import Texts._, Types._, Flags._, Names._, Symbols._, NameOps._, Constants._, Denotations._
 import Contexts.Context, Scopes.Scope, Denotations.Denotation, Annotations.Annotation
+import TypeApplications.AppliedType
 import StdNames.{nme, tpnme}
 import ast.Trees._, ast._
 import typer.Implicits._
+import typer.ImportInfo
 import config.Config
 import java.lang.Integer.toOctalString
 import config.Config.summarizeDepth
@@ -118,10 +120,11 @@ class PlainPrinter(_ctx: Context) extends Printer {
   }
 
   /** The longest sequence of refinement types, starting at given type
-   *  and following parents.
+   *  and following parents, but stopping at applied types.
    */
   private def refinementChain(tp: Type): List[Type] =
     tp :: (tp match {
+      case AppliedType(_, _) => Nil
       case tp: RefinedType => refinementChain(tp.parent.stripTypeVar)
       case _ => Nil
     })
@@ -177,7 +180,8 @@ class PlainPrinter(_ctx: Context) extends Printer {
           varianceString(variance) ~ name.toString ~ toText(bounds)
         changePrec(GlobalPrec) {
           "[" ~ Text((tp.variances, tp.paramNames, tp.paramBounds).zipped.map(paramText), ", ") ~
-          "] => " ~ toTextGlobal(tp.resultType)
+          "]" ~ (" => " provided !tp.resultType.isInstanceOf[MethodType]) ~
+          toTextGlobal(tp.resultType)
         }
       case tp: PolyParam =>
         polyParamNameString(tp) ~ polyHash(tp.binder)
@@ -479,7 +483,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
           else
             Text()
 
-        nodeName ~ "(" ~ elems ~ tpSuffix ~ ")" ~ node.pos.toString
+        nodeName ~ "(" ~ elems ~ tpSuffix ~ ")" ~ (node.pos.toString provided ctx.settings.Yprintpos.value)
       case _ =>
         tree.fallbackToText(this)
     }
@@ -501,6 +505,17 @@ class PlainPrinter(_ctx: Context) extends Printer {
     case _ =>
       "?Unknown Implicit Result?"
   }
+
+  def toText(importInfo: ImportInfo): Text = {
+    val siteStr = importInfo.site.show
+    val exprStr = if (siteStr endsWith ".type") siteStr dropRight 5 else siteStr
+    val selectorStr = importInfo.selectors match {
+      case Ident(name) :: Nil => name.show
+      case _ => "{...}"
+    }
+    s"import $exprStr.$selectorStr"
+  }
+
 
   private var maxSummarized = Int.MaxValue
 

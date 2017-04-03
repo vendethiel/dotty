@@ -712,8 +712,11 @@ object Trees {
     override def toList: List[Tree[T]] = flatten(trees)
     override def toString = if (isEmpty) "EmptyTree" else "Thicket(" + trees.mkString(", ") + ")"
     override def withPos(pos: Position): this.type = {
-      val newTrees = trees.map(_.withPos(pos))
-      new Thicket[T](newTrees).asInstanceOf[this.type]
+      val newTrees = trees.mapConserve(_.withPos(pos))
+      if (trees eq newTrees)
+        this
+      else
+        new Thicket[T](newTrees).asInstanceOf[this.type]
     }
     override def pos = (NoPosition /: trees) ((pos, t) => pos union t.pos)
     override def foreachInThicket(op: Tree[T] => Unit): Unit =
@@ -1077,6 +1080,13 @@ object Trees {
     /** Hook to indicate that a transform of some subtree should be skipped */
     protected def skipTransform(tree: Tree)(implicit ctx: Context): Boolean = false
 
+    /** For untyped trees, this is just the identity.
+     *  For typed trees, a context derived form `ctx` that records `call` as the
+     *  innermost enclosing call for which the inlined version is currently
+     *  processed.
+     */
+    protected def inlineContext(call: Tree)(implicit ctx: Context): Context = ctx
+
     abstract class TreeMap(val cpy: TreeCopier = inst.cpy) {
 
       def transform(tree: Tree)(implicit ctx: Context): Tree =
@@ -1121,7 +1131,7 @@ object Trees {
           case SeqLiteral(elems, elemtpt) =>
             cpy.SeqLiteral(tree)(transform(elems), transform(elemtpt))
           case Inlined(call, bindings, expansion) =>
-            cpy.Inlined(tree)(call, transformSub(bindings), transform(expansion))
+            cpy.Inlined(tree)(call, transformSub(bindings), transform(expansion)(inlineContext(call)))
           case TypeTree() =>
             tree
           case SingletonTypeTree(ref) =>
@@ -1225,7 +1235,7 @@ object Trees {
           case SeqLiteral(elems, elemtpt) =>
             this(this(x, elems), elemtpt)
           case Inlined(call, bindings, expansion) =>
-            this(this(x, bindings), expansion)
+            this(this(x, bindings), expansion)(inlineContext(call))
           case TypeTree() =>
             x
           case SingletonTypeTree(ref) =>
