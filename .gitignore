@@ -55,3 +55,4 @@ testlogs/
 local/
 compiler/test/debug/Gen.jar
 
+*-pickling.txt
