@@ -118,21 +118,21 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
    */
   type Optimization = (Context) => (String, ErasureCompatibility, Visitor, Transformer)
 
-  private lazy val _optimizations: Seq[Optimization] = Seq(
-    inlineCaseIntrinsics
-    ,removeUnnecessaryNullChecks
-    ,inlineOptions
-    ,inlineLabelsCalledOnce
-    ,valify
-    ,devalify
-    ,jumpjump
-    ,dropGoodCasts
-    ,dropNoEffects
-    ,inlineLocalObjects // followCases needs to be fixed, see ./tests/pos/rbtree.scala
-    /*, varify*/  // varify could stop other transformations from being applied. postponed.
+  private lazy val _optimizations: Seq[Optimization] =
+    inlineCaseIntrinsics ::
+    removeUnnecessaryNullChecks :: // 2
+    inlineOptions ::
+    inlineLabelsCalledOnce :: // 2
+    valify :: // breaks Ycheck
+    devalify :: // 2
+    jumpjump ::
+    dropGoodCasts :: // 2
+    dropNoEffects ::
+    //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
+    ////*, varify*/  // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
-    ,constantFold
-  )
+    constantFold ::
+    Nil
 
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
     val ctx0 = ctx
@@ -407,7 +407,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
     ("constantFold", BeforeAndAfterErasure, NoVisitor, transformer)
   }
 
-  /** Inline" case classes as vals, this essentially (local) implements multi
+  /** Inline case classes as vals, this essentially (local) implements multi
    *  parameter value classes. The main motivation is to get ride of all the
    *  intermediate tuples coming from pattern matching expressions.
    */
@@ -564,7 +564,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
       t match {
         case Apply(x, _) if (x.symbol == defn.Boolean_! || x.symbol == defn.Boolean_||) => List.empty
         case Apply(fun @ Select(x, _), y) if (fun.symbol == defn.Boolean_&&) => recur(x) ++ recur(y.head)
-        case TypeApply(fun @Select(x, _), List(tp)) if fun.symbol eq defn.Any_isInstanceOf =>
+        case TypeApply(fun @ Select(x, _), List(tp)) if fun.symbol eq defn.Any_isInstanceOf =>
           if (x.symbol.exists && !x.symbol.owner.isClass && !x.symbol.is(Flags.Method|Flags.Mutable))
             (x.symbol, tp.tpe) :: Nil
           else Nil
@@ -685,7 +685,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
       case t: Tree =>
     }
 
-    @inline def isNullLiteral(tree: Tree) = tree match {
+    def isNullLiteral(tree: Tree) = tree match {
       case literal: Literal =>
         literal.const.tag == Constants.NullTag
       case _ => false
@@ -752,7 +752,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
       case Select(qual, _) if !t.symbol.is(Flags.Mutable | Flags.Lazy) && (!t.symbol.is(Flags.Method) || t.symbol.isGetter) =>
         keepOnlySideEffects(qual)
       case Block(List(t: DefDef), s: Closure) => EmptyTree
-      case bl@Block(stats, expr) =>
+      case bl @ Block(stats, expr) =>
         val stats1 = stats.mapConserve(keepOnlySideEffects)
         val stats2 = if (stats1 ne stats) stats1.filter(x=>x ne EmptyTree) else stats1
         val expr2: tpd.Tree = expr match {

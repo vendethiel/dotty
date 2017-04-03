@@ -46,10 +46,6 @@ class Compiler {
       List(new PostTyper),          // Additional checks and cleanups after type checking
       List(new sbt.ExtractAPI),     // Sends a representation of the API of classes to sbt via callbacks
       List(new Pickler),            // Generate TASTY info
-      List(new FirstTransform,      // Some transformations to put trees into a canonical form
-           new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
-      List(new RefChecks,           // Various checks mostly related to abstract members and overriding
-           new CheckStatic,         // Check restrictions that apply to @static members
       List(new FirstTransform),     // Some transformations to put trees into a canonical form
            // new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
       List(new CheckStatic,         // Check restrictions that apply to @static members
@@ -62,8 +58,8 @@ class Compiler {
            new LiftTry,             // Put try expressions that might execute on non-empty stacks into their own methods
            new ClassOf),            // Expand `Predef.classOf` calls.
       List(new TryCatchPatterns,    // Compile cases in try/catch
-           new PatternConstantsFactorization, // extract common constant matches from patterns
-           new PatternTypeFactorization,      // extract common type matches from patterns
+           // new PatternConstantsFactorization, // extract common constant matches from patterns
+           // new PatternTypeFactorization,      // extract common type matches from patterns
 
            new PatternMatcher,      // Compile pattern matches
            new ExplicitOuter,       // Add accessors to outer classes from nested ones.
