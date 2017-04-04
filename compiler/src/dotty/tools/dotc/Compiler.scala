@@ -46,8 +46,8 @@ class Compiler {
       List(new PostTyper),          // Additional checks and cleanups after type checking
       List(new sbt.ExtractAPI),     // Sends a representation of the API of classes to sbt via callbacks
       List(new Pickler),            // Generate TASTY info
-      List(new FirstTransform),     // Some transformations to put trees into a canonical form
-           // new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
+      List(new FirstTransform,     // Some transformations to put trees into a canonical form
+           new CheckReentrant),     // Internal use only: Check that compiled program has no data races involving global vars
       List(new CheckStatic,         // Check restrictions that apply to @static members
            new ElimRepeated,        // Rewrite vararg parameters and arguments
            new RefChecks,           // Various checks mostly related to abstract members and overriding
@@ -75,7 +75,7 @@ class Compiler {
            new ElimByName,          // Expand by-name parameters and arguments
            new AugmentScala2Traits, // Expand traits defined in Scala 2.11 to simulate old-style rewritings
            new ResolveSuper,        // Implement super accessors and add forwarders to trait methods
-           new Simplify,            // Perform local optimizations, simplified versions of what linker does.
+           // new Simplify,            // Perform local optimizations, simplified versions of what linker does.
            new PrimitiveForwarders, // Add forwarders to trait methods that have a mismatch between generic and primitives
            new ArrayConstructors),  // Intercept creation of (non-generic) arrays and intrinsify.
       List(new Erasure),            // Rewrite types to JVM model, erasing all type parameters, abstract types and refinements.

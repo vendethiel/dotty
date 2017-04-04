@@ -123,7 +123,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
     removeUnnecessaryNullChecks :: // 2
     inlineOptions ::
     inlineLabelsCalledOnce :: // 2
-    valify :: // breaks Ycheck
+    // valify :: // breaks Ycheck
     devalify :: // 2
     jumpjump ::
     dropGoodCasts :: // 2
