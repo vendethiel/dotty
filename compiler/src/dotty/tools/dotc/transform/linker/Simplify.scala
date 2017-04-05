@@ -119,19 +119,19 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
   type Optimization = (Context) => (String, ErasureCompatibility, Visitor, Transformer)
 
   private lazy val _optimizations: Seq[Optimization] =
-    inlineCaseIntrinsics ::
-    removeUnnecessaryNullChecks :: // 2
-    inlineOptions ::
-    inlineLabelsCalledOnce :: // 2
+    // inlineCaseIntrinsics ::
+    // removeUnnecessaryNullChecks :: // 2
+    // inlineOptions ::
+    // inlineLabelsCalledOnce :: // 2
     // valify :: // breaks Ycheck
-    devalify :: // 2
-    jumpjump ::
-    dropGoodCasts :: // 2
+    // devalify :: // 2
+    // jumpjump ::
+    // dropGoodCasts :: // 2
     dropNoEffects ::
-    // inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
+    //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
     ////*, varify*/  // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
-    constantFold ::
+    // constantFold ::
     Nil
 
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
@@ -160,8 +160,8 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
                 nextTransformer(ctx)(super.transform(tree)(innerCtx))
               }
             }.transform(rhs0)
-//            if (rhst ne rhs0)
-//              println(s"${tree.symbol} after ${name} became ${rhst.show}")
+           // if (rhst ne rhs0)
+           //   println(s"${tree.symbol} after ${name} became ${rhst.show}")
             rhs0 = rhst
           }
           names = names.tail
@@ -734,8 +734,10 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
 
   private def keepOnlySideEffects(t: Tree)(implicit ctx: Context): Tree = {
     t match {
-      case t: Literal => EmptyTree
-      case t: This => EmptyTree
+      case t: Literal =>
+        EmptyTree
+      case t: This =>
+        EmptyTree
       case Typed(exp, tpe) =>
         keepOnlySideEffects(exp)
       case t @ If(cond, thenp, elsep) =>
@@ -747,11 +749,12 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
           elsep = nelsep.orElse(if (elsep.isInstanceOf[Literal]) elsep else  tpd.unitLiteral))
       case Select(rec, _) if (t.symbol.isGetter && !t.symbol.is(Flags.Mutable)) ||
         (t.symbol.owner.derivesFrom(defn.ProductClass) && t.symbol.owner.is(Flags.CaseClass) && t.symbol.name.isProductAccessorName) ||
-        (t.symbol.is(Flags.CaseAccessor) && !t.symbol.is(Flags.Mutable))=>
+        (t.symbol.is(Flags.CaseAccessor) && !t.symbol.is(Flags.Mutable)) =>
         keepOnlySideEffects(rec) // accessing a field of a product
       case Select(qual, _) if !t.symbol.is(Flags.Mutable | Flags.Lazy) && (!t.symbol.is(Flags.Method) || t.symbol.isGetter) =>
         keepOnlySideEffects(qual)
-      case Block(List(t: DefDef), s: Closure) => EmptyTree
+      case Block(List(t: DefDef), s: Closure) =>
+        EmptyTree
       case bl @ Block(stats, expr) =>
         val stats1 = stats.mapConserve(keepOnlySideEffects)
         val stats2 = if (stats1 ne stats) stats1.filter(x=>x ne EmptyTree) else stats1
@@ -815,7 +818,6 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
 
   /** Removes side effect free statements in blocks. */
   val dropNoEffects: Optimization = { implicit ctx: Context =>
-
     val transformer: Transformer = () => localCtx => {
       case Block(Nil, expr) => expr
       case a: Block  =>

@@ -297,7 +297,7 @@ object CompilationTests {
 
   private val yCheckOptions = Array("-Ycheck:tailrec,resolveSuper,mixin,restoreScopes,labelDef")
 
-  val defaultOptions = noCheckOptions ++ checkOptions ++ yCheckOptions ++ classPath
+  val defaultOptions = noCheckOptions ++ checkOptions ++ yCheckOptions ++ classPath ++ Array("-optimise")
   val allowDeepSubtypes = defaultOptions diff Array("-Yno-deep-subtypes")
   val allowDoubleBindings = defaultOptions diff Array("-Yno-double-bindings")
   val picklingOptions = defaultOptions ++ Array(
