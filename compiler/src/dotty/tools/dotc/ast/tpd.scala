@@ -472,14 +472,14 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
 
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = {
-      // ta.assignType(untpd.cpy.Apply(tree)(fun, args), fun, args)
+      ta.assignType(untpd.cpy.Apply(tree)(fun, args), fun, args)
       // ø
-      val untyped = untpd.cpy.Apply(tree)(fun, args)
-      val typed   = ta.assignType(untyped, fun, args)
-      if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
-        typed
-      else
-        tree.asInstanceOf[Apply]
+      // val untyped = untpd.cpy.Apply(tree)(fun, args)
+      // val typed   = ta.assignType(untyped, fun, args)
+      // if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
+      //   typed
+      // else
+      //   tree.asInstanceOf[Apply]
     }
       // Note: Reassigning the original type if `fun` and `args` have the same types as before
       // does not work here: The computed type depends on the widened function type, not
@@ -487,14 +487,14 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       // same but its widened type might change.
 
     override def TypeApply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): TypeApply = {
-      // ta.assignType(untpd.cpy.TypeApply(tree)(fun, args), fun, args)
+      ta.assignType(untpd.cpy.TypeApply(tree)(fun, args), fun, args)
       // ø
-      val untyped = untpd.cpy.TypeApply(tree)(fun, args)
-      val typed   = ta.assignType(untyped, fun, args)
-      if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
-        typed
-      else
-        tree.asInstanceOf[TypeApply]
+      // val untyped = untpd.cpy.TypeApply(tree)(fun, args)
+      // val typed   = ta.assignType(untyped, fun, args)
+      // if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
+      //   typed
+      // else
+      //   tree.asInstanceOf[TypeApply]
     }
     // FIXME
       // Same remark as for Apply
@@ -531,14 +531,15 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     }
 
     override def Closure(tree: Tree)(env: List[Tree], meth: Tree, tpt: Tree)(implicit ctx: Context): Closure = {
-      // ta.assignType(untpd.cpy.Closure(tree)(env, meth, tpt), meth, tpt)
+      ta.assignType(untpd.cpy.Closure(tree)(env, meth, tpt), meth, tpt)
       // ø
-      val untyped = untpd.cpy.Closure(tree)(env, meth, tpt)
-      val typed   = ta.assignType(untyped, meth, tpt)
-      if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
-        typed
-      else
-        tree.asInstanceOf[Closure]
+      // Without the .toString hacks, picking tests fail only with these changes.
+      // val untyped = untpd.cpy.Closure(tree)(env, meth, tpt)
+      // val typed   = ta.assignType(untyped, meth, tpt)
+      // if (untyped.ne(tree) || tree.tpe.toString != typed.tpe.toString)
+      //   typed
+      // else
+      //   tree.asInstanceOf[Closure]
     }
       // Same remark as for Apply
 
