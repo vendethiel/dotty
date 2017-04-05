@@ -128,7 +128,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
     jumpjump ::
     dropGoodCasts :: // 2
     dropNoEffects ::
-    //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
+    // inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
     ////*, varify*/  // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
     constantFold ::
