@@ -44,7 +44,7 @@ object BenchTests extends OnlineRegressionReport {
     override val defaultOutputDir: String = outputDir
   }
 
-  implicit val defaultOptions = List("-d", outputDir)
+  implicit val defaultOptions = List("-Xprint:all", "-d", outputDir)
   val scala2mode = List("-language:Scala2")
 
   val dottyDir = "../compiler/src/dotty/"

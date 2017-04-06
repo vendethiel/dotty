@@ -119,19 +119,19 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
   type Optimization = (Context) => (String, ErasureCompatibility, Visitor, Transformer)
 
   private lazy val _optimizations: Seq[Optimization] =
-    // inlineCaseIntrinsics ::
-    // removeUnnecessaryNullChecks :: // 2
-    // inlineOptions ::
-    // inlineLabelsCalledOnce :: // 2
-    // valify :: // breaks Ycheck
-    // devalify :: // 2
-    // jumpjump ::
-    // dropGoodCasts :: // 2
-    dropNoEffects ::
+    // inlineCaseIntrinsics        :: // MANY FAILS
+    removeUnnecessaryNullChecks :: // 2 OK!!!
+    inlineOptions               :: // OK!!!!!
+    // inlineLabelsCalledOnce      :: // 2 name error, needs the new label def phase?
+    // valify                      :: // breaks Ycheck
+    // devalify                    :: // 2 (also breaks Ycheck?)
+    jumpjump                    :: // OK!!!!!
+    dropGoodCasts               :: // 2 OK!!!!
+    dropNoEffects               :: // ONE TEST FAILING
     //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
-    ////*, varify*/  // varify could stop other transformations from being applied. postponed.
+    //// varify             :: // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
-    // constantFold ::
+    constantFold                :: // OK!!!!
     Nil
 
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
