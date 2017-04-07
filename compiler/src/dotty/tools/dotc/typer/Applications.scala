@@ -817,7 +817,17 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       case _                                             => tree.withType(TryDynamicCallType)
     }
     if (typedFn.tpe eq TryDynamicCallType) tryDynamicTypeApply()
-    else assignType(cpy.TypeApply(tree)(typedFn, typedArgs), typedFn, typedArgs)
+    else {
+      val tpdTree = assignType(cpy.TypeApply(tree)(typedFn, typedArgs), typedFn, typedArgs)
+      // expand def macros after type checking
+      if (macros.isDefMacro(typedFn.symbol) && !pt.isInstanceOf[ApplyingProto]) {
+        if (ctx.macrosEnabled)
+          typed(macros.expandDefMacro(tpdTree), pt)
+        else
+          errorTree(tpdTree, s"can't expand the macro ${typedFn.symbol.show}, make sure `scala.gestalt` is in -classpath")
+      }
+      else tpdTree
+    }
   }
 
   /** Rewrite `new Array[T](....)` if T is an unbounded generic to calls to newGenericArray.
