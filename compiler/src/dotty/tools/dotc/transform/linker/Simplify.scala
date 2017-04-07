@@ -120,18 +120,18 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
 
   private lazy val _optimizations: Seq[Optimization] =
     inlineCaseIntrinsics        :: // MANY FAILS Assertion failed: Cannot emit primitive conversion from Ljava/lang/Object; to I
-    removeUnnecessaryNullChecks :: // 2 OK!!!
-    inlineOptions               :: // 1 OK!!!!!
+    // removeUnnecessaryNullChecks :: // 2 OK!!!
+    // inlineOptions               :: // 1 OK!!!!!
     // inlineLabelsCalledOnce      :: // 2 name error, needs the new label def phase?
     // valify                      :: // breaks Ycheck
     // devalify                    :: // 2 (also breaks Ycheck?)
-    jumpjump                    :: // 1 OK!!!!!
-    dropGoodCasts               :: // 2 OK!!!!
-    dropNoEffects               :: // 1 OK!!!!
+    // jumpjump                    :: // 1 OK!!!!!
+    // dropGoodCasts               :: // 2 OK!!!!
+    // dropNoEffects               :: // 1 OK!!!!
     //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
     //// varify             :: // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
-    constantFold                :: // 1 OK!!!!
+    // constantFold                :: // 1 OK!!!!
     Nil
 
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
@@ -202,10 +202,12 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
         rollInArgs(argss.tail, tpd.New(a.tpe.dealias, argss.head))
       case a: Apply if a.symbol.is(Flags.Synthetic) && a.symbol.owner.is(Flags.Module) &&
         (a.symbol.name == nme.unapply) && a.symbol.owner.companionClass.is(Flags.CaseClass) =>
+
         if (!a.symbol.owner.is(Flags.Scala2x)) {
           if (a.tpe.derivesFrom(defn.BooleanClass)) Literal(Constant(true))
           else a.args.head
-        } else if (a.tpe.derivesFrom(defn.OptionClass) && a.args.head.tpe.derivesFrom(a.symbol.owner.companionClass)) {
+        }
+        else if (a.tpe.derivesFrom(defn.OptionClass) && a.args.head.tpe.derivesFrom(a.symbol.owner.companionClass)) {
           // todo: if args is an expression, this will evaluate it multiple times
           // todo: if the static type is right, it does not mean it's not null
           val accessors = a.args.head.tpe.widenDealias.classSymbol.caseAccessors.filter(_.is(Flags.Method))

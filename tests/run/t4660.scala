@@ -1,11 +1,10 @@
 object Test {
   def main(args: Array[String]): Unit = {
-    val traversable = 1 to 20 map (_.toString)
-    def normalize(m: Map[Char, Traversable[String]]) = m.map { case (k,v) => (k, v.toList) }
+    // val m = Map.empty[Int, List[String]]
+    // m.map { case (k, v) => ??? }
 
-    val groupedFromView   = traversable.view.groupBy(_(0))
-    val groupedFromStrict = traversable.groupBy(_(0))
+    val tt = (Int, List.empty[String])
 
-    assert(normalize(groupedFromView) == normalize(groupedFromStrict))
+    val l: Int = tt._1
   }
 }
