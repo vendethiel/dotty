@@ -108,7 +108,7 @@ package object macros {
    *  Macro definition is transformed from:
    *
    *    class macros {
-   *      inline def f[T](a: A)(b: B): C = meta {
+   *      def f[T](a: A)(b: B): C = meta {
    *        body
    *      }
    *    }

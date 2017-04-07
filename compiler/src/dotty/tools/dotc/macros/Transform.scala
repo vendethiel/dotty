@@ -12,6 +12,8 @@ import StdNames._
 import Flags._
 import typer.ErrorReporting._
 import Constants._
+import reporting.diagnostic.NoExplanation
+import reporting.diagnostic.Message._
 import config.Printers.{ macros => debug }
 
 /** Transform macros definitions
@@ -19,7 +21,7 @@ import config.Printers.{ macros => debug }
  *  Macro definition is transformed from:
  *
  *    class macros {
- *      inline def f[T](a: A)(b: B): C = meta {
+ *      def f[T](a: A)(b: B): C = meta {
  *        body
  *      }
  *    }
@@ -100,6 +102,8 @@ private[macros] object Transform {
      // modify macros body and flags
     val macrosNew = macros.map { m =>
       val mdef = cpy.DefDef(m)(rhs = Ident("???".toTermName))
+      if (mdef.mods.is(Inline))
+        ctx.warning(new NoExplanation("inline ignored on macro definition"), mdef.pos)
       mdef.withMods((mdef.mods | Macro) &~ Inline )
     }
 
@@ -109,19 +113,17 @@ private[macros] object Transform {
 
   def getMacros(tmpl: Template)(implicit ctx: Context): List[DefDef] = tmpl.body.filter {
     case mdef : DefDef =>
-      val rhsValid = mdef.rhs match {
+      mdef.rhs match {
         case Apply(Ident(nme.meta), _) => true
         case _ => false
       }
-
-      mdef.mods.is(Inline) && rhsValid
     case _ => false
   }.asInstanceOf[List[DefDef]]
 
 
   /** Create macro implementation method
    *
-   *     inline def f[T](a: A)(b: B): C = meta { body }
+   *     def f[T](a: A)(b: B): C = meta { body }
    *
    *  will be implemented by
    *
