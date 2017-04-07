@@ -132,6 +132,8 @@ object StdNames {
     val TRAIT_SETTER_SEPARATOR: N     = "$_setter_$"
     val DIRECT_SUFFIX: N              = "$direct"
     val LAZY_IMPLICIT_PREFIX: N       = "$lazy_implicit$"
+    val DOLLAR_VALUES: N              = "$values"
+    val DOLLAR_NEW: N                 = "$new"
 
     // value types (and AnyRef) are all used as terms as well
     // as (at least) arguments to the @specialize annotation.
@@ -395,6 +397,7 @@ object StdNames {
     val elem: N                 = "elem"
     val emptyValDef: N          = "emptyValDef"
     val ensureAccessible : N    = "ensureAccessible"
+    val enumTag: N              = "enumTag"
     val eq: N                   = "eq"
     val equalsNumChar : N       = "equalsNumChar"
     val equalsNumNum : N        = "equalsNumNum"
@@ -500,6 +503,7 @@ object StdNames {
     val staticModule : N        = "staticModule"
     val staticPackage : N       = "staticPackage"
     val synchronized_ : N       = "synchronized"
+    val tag: N                  = "tag"
     val tail: N                 = "tail"
     val `then` : N              = "then"
     val this_ : N               = "this"
@@ -524,7 +528,7 @@ object StdNames {
     val updateDynamic: N        = "updateDynamic"
     val value: N                = "value"
     val valueOf : N             = "valueOf"
-    val values : N              = "values"
+    val values: N               = "values"
     val view_ : N               = "view"
     val wait_ : N               = "wait"
     val withFilter: N           = "withFilter"
@@ -719,9 +723,6 @@ object StdNames {
       case _  => termName("_" + j)
     }
 
-    def syntheticParamNames(num: Int): List[TermName] =
-      (0 until num).map(syntheticParamName)(breakOut)
-
     def localDummyName(clazz: Symbol)(implicit ctx: Context): TermName =
       LOCALDUMMY_PREFIX ++ clazz.name ++ ">"
 
@@ -743,9 +744,6 @@ object StdNames {
     protected implicit def fromString(s: String): TypeName = typeName(s)
 
     def syntheticTypeParamName(i: Int): TypeName = "X" + i
-
-    def syntheticTypeParamNames(num: Int): List[TypeName] =
-      (0 until num).map(syntheticTypeParamName)(breakOut)
 
     final val Conforms = encode("<:<")
 
@@ -847,5 +845,4 @@ object StdNames {
   val tpnme = new ScalaTypeNames
   val jnme = new JavaTermNames
   val jtpnme = new JavaTypeNames
-
 }

@@ -163,26 +163,31 @@ object SymDenotations {
       setFlag(flags & mask)
     }
 
+    private def isCurrent(fs: FlagSet) =
+      fs <= (
+        if (myInfo.isInstanceOf[SymbolLoader]) FromStartFlags
+        else AfterLoadFlags)
+
     /** Has this denotation one of the flags in `fs` set? */
     final def is(fs: FlagSet)(implicit ctx: Context) = {
-      (if (fs <= FromStartFlags) myFlags else flags) is fs
+      (if (isCurrent(fs)) myFlags else flags) is fs
     }
 
     /** Has this denotation one of the flags in `fs` set, whereas none of the flags
      *  in `butNot` are set?
      */
     final def is(fs: FlagSet, butNot: FlagSet)(implicit ctx: Context) =
-      (if (fs <= FromStartFlags && butNot <= FromStartFlags) myFlags else flags) is (fs, butNot)
+      (if (isCurrent(fs) && isCurrent(butNot)) myFlags else flags) is (fs, butNot)
 
     /** Has this denotation all of the flags in `fs` set? */
     final def is(fs: FlagConjunction)(implicit ctx: Context) =
-      (if (fs <= FromStartFlags) myFlags else flags) is fs
+      (if (isCurrent(fs)) myFlags else flags) is fs
 
     /** Has this denotation all of the flags in `fs` set, whereas none of the flags
      *  in `butNot` are set?
      */
     final def is(fs: FlagConjunction, butNot: FlagSet)(implicit ctx: Context) =
-      (if (fs <= FromStartFlags && butNot <= FromStartFlags) myFlags else flags) is (fs, butNot)
+      (if (isCurrent(fs) && isCurrent(butNot)) myFlags else flags) is (fs, butNot)
 
     /** The type info.
      *  The info is an instance of TypeType iff this is a type denotation
@@ -1141,14 +1146,13 @@ object SymDenotations {
       case tp: NamedType => hasSkolems(tp.prefix)
       case tp: RefinedType => hasSkolems(tp.parent) || hasSkolems(tp.refinedInfo)
       case tp: RecType => hasSkolems(tp.parent)
-      case tp: PolyType => tp.paramBounds.exists(hasSkolems) || hasSkolems(tp.resType)
-      case tp: MethodType => tp.paramTypes.exists(hasSkolems) || hasSkolems(tp.resType)
+      case tp: TypeBounds => hasSkolems(tp.lo) || hasSkolems(tp.hi)
+      case tp: TypeVar => hasSkolems(tp.inst)
       case tp: ExprType => hasSkolems(tp.resType)
       case tp: HKApply => hasSkolems(tp.tycon) || tp.args.exists(hasSkolems)
+      case tp: LambdaType => tp.paramInfos.exists(hasSkolems) || hasSkolems(tp.resType)
       case tp: AndOrType => hasSkolems(tp.tp1) || hasSkolems(tp.tp2)
-      case tp: TypeBounds => hasSkolems(tp.lo) || hasSkolems(tp.hi)
       case tp: AnnotatedType => hasSkolems(tp.tpe)
-      case tp: TypeVar => hasSkolems(tp.inst)
       case _ => false
     }
 
