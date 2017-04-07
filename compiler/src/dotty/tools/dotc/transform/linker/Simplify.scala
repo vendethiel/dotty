@@ -119,7 +119,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
   type Optimization = (Context) => (String, ErasureCompatibility, Visitor, Transformer)
 
   private lazy val _optimizations: Seq[Optimization] =
-    // inlineCaseIntrinsics        :: // MANY FAILS
+    // inlineCaseIntrinsics        :: // MANY FAILS Assertion failed: Cannot emit primitive conversion from Ljava/lang/Object; to I
     removeUnnecessaryNullChecks :: // 2 OK!!!
     inlineOptions               :: // OK!!!!!
     // inlineLabelsCalledOnce      :: // 2 name error, needs the new label def phase?
@@ -127,7 +127,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
     // devalify                    :: // 2 (also breaks Ycheck?)
     jumpjump                    :: // OK!!!!!
     dropGoodCasts               :: // 2 OK!!!!
-    dropNoEffects               :: // ONE TEST FAILING
+    dropNoEffects               :: // ONE TEST FAILING ../tests/run/lazy-traits.scala
     //// inlineLocalObjects :: // followCases needs to be fixed, see ./tests/pos/rbtree.scala
     //// varify             :: // varify could stop other transformations from being applied. postponed.
     //, bubbleUpNothing
@@ -747,11 +747,11 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
         else cpy.If(t)(
           thenp = nthenp.orElse(if (thenp.isInstanceOf[Literal]) thenp else  tpd.unitLiteral),
           elsep = nelsep.orElse(if (elsep.isInstanceOf[Literal]) elsep else  tpd.unitLiteral))
-      case Select(rec, _) if (t.symbol.isGetter && !t.symbol.is(Flags.Mutable)) ||
+      case Select(rec, _) if t.symbol.isGetter && !t.symbol.is(Flags.Mutable | Flags.Lazy) ||
         (t.symbol.owner.derivesFrom(defn.ProductClass) && t.symbol.owner.is(Flags.CaseClass) && t.symbol.name.isProductAccessorName) ||
         (t.symbol.is(Flags.CaseAccessor) && !t.symbol.is(Flags.Mutable)) =>
         keepOnlySideEffects(rec) // accessing a field of a product
-      case Select(qual, _) if !t.symbol.is(Flags.Mutable | Flags.Lazy) && (!t.symbol.is(Flags.Method) || t.symbol.isGetter) =>
+      case Select(qual, _) if !t.symbol.is(Flags.Mutable | Flags.Lazy) && !t.symbol.is(Flags.Method) =>
         keepOnlySideEffects(qual)
       case Block(List(t: DefDef), s: Closure) =>
         EmptyTree
