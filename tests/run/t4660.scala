@@ -3,7 +3,7 @@ object Test {
     // val m = Map.empty[Int, List[String]]
     // m.map { case (k, v) => ??? }
 
-    val tt = (Int, List.empty[String])
+    // val tt = (Int, List.empty[String])
 
     val l: Int = tt._1
   }
