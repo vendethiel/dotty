@@ -134,6 +134,16 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
     // constantFold                :: // 1 OK!!!!
     Nil
 
+  override def transformValDef(tree: tpd.ValDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
+    if(tree.name.toString == "t2") {
+      println
+      println("VALDEF!!!")
+      println(tree.rhs.tpe)
+      println(tree.rhs.tpe.show)
+    }
+    tree
+  }
+
   override def transformDefDef(tree: tpd.DefDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
     val ctx0 = ctx
     if (optimize && !tree.symbol.is(Flags.Label)) {
@@ -199,7 +209,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
           case head :: tail => rollInArgs(tail, fun.appliedToArgs(head))
           case _ => fun
         }
-        rollInArgs(argss.tail, tpd.New(a.tpe.dealias, argss.head))
+        rollInArgs(argss.tail, tpd.New(a.tpe, argss.head))
       case a: Apply if a.symbol.is(Flags.Synthetic) && a.symbol.owner.is(Flags.Module) &&
         (a.symbol.name == nme.unapply) && a.symbol.owner.companionClass.is(Flags.CaseClass) =>
 
@@ -214,12 +224,17 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
           val fields = accessors.map(x => a.args.head.select(x).ensureApplied)
           val tplType = a.tpe.baseArgTypes(defn.OptionClass).head
 
-          if (fields.tail.nonEmpty) {
+          val out = if (fields.tail.nonEmpty) {
             val tplAlloc = tpd.New(tplType, fields)
-            tpd.New(a.tpe.dealias.translateParameterized(defn.OptionClass, defn.SomeClass), tplAlloc :: Nil)
+            tpd.New(a.tpe.translateParameterized(defn.OptionClass, defn.SomeClass), tplAlloc :: Nil)
           } else { // scalac does not have Tuple1
-            tpd.New(a.tpe.dealias.translateParameterized(defn.OptionClass, defn.SomeClass), fields.head :: Nil)
+            tpd.New(a.tpe.translateParameterized(defn.OptionClass, defn.SomeClass), fields.head :: Nil)
           }
+          println
+          println("INLINECASEINTRINSICS")
+          println(out.tpe)
+          println(out.tpe.show)
+          out
         }
         else a
       case a: Apply if (a.symbol.name == nme.unapplySeq) && a.symbol.owner.derivesFrom(SeqFactoryClass) && a.symbol.extendedOverriddenSymbols.isEmpty =>
@@ -236,7 +251,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
 
         val recv = reciever(a)
         if (recv.typeSymbol.is(Flags.Module))
-          tpd.New(a.tpe.dealias.translateParameterized(defn.OptionClass, defn.SomeClass), a.args.head :: Nil)
+          tpd.New(a.tpe.translateParameterized(defn.OptionClass, defn.SomeClass), a.args.head :: Nil)
         else a
       case t => t
     }
@@ -779,7 +794,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
         if (!denot.info.finalResultType.derivesFrom(defn.UnitClass)) {
           val newLabelType = app.symbol.info match {
             case mt: MethodType =>
-              mt.derivedMethodType(mt.paramNames, mt.paramTypes, defn.UnitType)
+              mt.derivedLambdaType(mt.paramNames, mt.paramInfos, defn.UnitType)
             case et: ExprType =>
               et.derivedExprType(defn.UnitType)
           }
@@ -869,7 +884,7 @@ class Simplify extends MiniPhaseTransform with IdentityDenotTransformer {
       case a: Apply =>
         defined.get(a.symbol) match {
           case None => a
-          case Some(defDef) if a.symbol.is(Flags.Label) && timesUsed.getOrElse(a.symbol, 0) == 1 && a.symbol.info.paramTypess == List(Nil)=>
+          case Some(defDef) if a.symbol.is(Flags.Label) && timesUsed.getOrElse(a.symbol, 0) == 1 && a.symbol.info.paramInfoss == List(Nil)=>
             //println(s"Inlining ${defDef.name}")
             defDef.rhs.changeOwner(defDef.symbol, localCtx.owner)
           case Some(defDef) if defDef.rhs.isInstanceOf[Literal] =>
