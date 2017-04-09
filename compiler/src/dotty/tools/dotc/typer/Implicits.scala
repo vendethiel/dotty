@@ -631,12 +631,12 @@ trait Implicits { self: Typer =>
 
         // expand def macros
         val arg1 = arg match {
-          case tapply: TypeApply =>
+          case tapply: GenericApply[_] =>
             if (macros.isDefMacro(tapply.symbol)) {
               if (ctx.macrosEnabled) {
                 // instantiate tvars as much as possible before macro expansion
-                fullyDefinedType(arg.tpe, s"can't instantiate some type var in ${arg.show}", pos)
-                val tpdFn = tapply.fun.tpe.widen.asInstanceOf[PolyType]
+                if (tapply.isInstanceOf[TypeApply])
+                  fullyDefinedType(arg.tpe, s"can't instantiate some type var in ${arg.show}", pos)
                 typed(macros.expandDefMacro(tapply), formal)
               }
               else
