@@ -40,10 +40,10 @@ object Names {
    *  3. Names are intended to be encoded strings. @see dotc.util.NameTransformer.
    *     The encoding will be applied when converting a string to a name.
    */
-  abstract class Name extends DotClass with PreName {
+  abstract class Name extends DotClass with PreName { self =>
 
     /** A type for names of the same kind as this name */
-    type ThisName <: Name
+    type ThisName <: Name { type ThisName = self.ThisName }
 
     /** Is this name a type name? */
     def isTypeName: Boolean
