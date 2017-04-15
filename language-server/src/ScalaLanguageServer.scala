@@ -1,3 +1,7 @@
+package dotty.tools
+package dotc
+package interactive
+
 import java.net.URI
 import java.nio.file._
 import java.util.function._
@@ -379,7 +383,7 @@ object ScalaLanguageServer {
   import ast.tpd._
 
   def nameRange(p: SourcePosition, name: Name): Range = {
-    val nameLength = name.stripModuleClassSuffix.length
+    val nameLength = name.stripModuleClassSuffix.toString.length
     val (beginName, endName) =
       if (p.pos.isSynthetic)
         (p.pos.end - nameLength, p.pos.end)
