@@ -1,3 +1,7 @@
+package dotty.tools
+package dotc
+package interactive
+
 import java.net.URI
 import java.nio.file._
 import java.util.function._

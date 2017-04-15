@@ -1,3 +1,7 @@
+package dotty.tools
+package dotc
+package interactive
+
 import java.util.function.Consumer
 
 import java.io._

@@ -1,3 +1,7 @@
+package dotty.tools
+package dotc
+package interactive
+
 import java.net.URI
 import java.nio.file._
 import java.util.function._
@@ -22,6 +26,7 @@ import dotty.tools.dotc.{ Main => DottyMain }
 import dotty.tools.dotc.interfaces
 import dotty.tools.dotc.reporting._
 import dotty.tools.dotc.reporting.diagnostic._
+import dotty.tools.dotc.classpath.ClassPathEntries
 
 import scala.collection._
 import scala.collection.JavaConverters._
@@ -76,9 +81,7 @@ class ServerDriver(settings: List[String]) extends Driver {
     if (className.toString == "scala.annotation.internal.SourceFile")
       None // No SourceFile annotation on SourceFile itself
     else {
-      val clsd =
-        if (className.contains('.')) ctx.base.staticRef(className)
-        else ctx.definitions.EmptyPackageClass.info.decl(className)
+      val clsd = ctx.base.staticRef(className)
       clsd match {
         case clsd: ClassDenotation =>
           clsd.info // force denotation
@@ -104,13 +107,16 @@ class ServerDriver(settings: List[String]) extends Driver {
   }
 
   lazy val tastyClasses = {
-    def classNames(cp: ClassPath): IndexedSeq[TypeName] =
-      cp.classes
-        .filter(cls => cls.binary match {
+    def classNames(cp: ClassPath, packageName: String): Seq[String] = {
+      val ClassPathEntries(pkgs, classReps) = cp.list(packageName)
+
+      classReps
+        .filter(classRep => classRep.binary match {
           case None =>
             true
           case Some(binFile) =>
             // FIXME: need a better way to check if classfile has tasty section
+            // FIXME: doesn't work with jars
             val tastyFile =
               if (binFile.toString.endsWith("$.class"))
                 AbstractFile.getFile(binFile.toString.dropRight("$.class".length) ++ ".class")
@@ -119,10 +125,11 @@ class ServerDriver(settings: List[String]) extends Driver {
             tastyFile != null &&
             new classfile.ClassfileParser(tastyFile, null, null)(ctx).hasTasty
         })
-        .map(cls => cls.name.toTypeName) ++
-      cp.packages.flatMap(pkg => classNames(pkg).map(name => s"${pkg.name}.$name".toTypeName))
+        .map(classRep => (packageName ++ (if (packageName != "") "." else "") ++ classRep.name)) ++
+        pkgs.flatMap(pkg => classNames(cp, pkg.name))
+    }
 
-    classNames(ctx.platform.classPath)
+    classNames(ctx.platform.classPath, "")
   }
 
   def trees = {
@@ -130,10 +137,10 @@ class ServerDriver(settings: List[String]) extends Driver {
     println("openClasses: " + openClasses)
     val otherClasses = tastyClasses.filter(tastyCls =>
       !sourceClasses.exists(sourceCls =>
-        tastyCls.stripModuleClassSuffix == sourceCls.stripModuleClassSuffix))
+        tastyCls.toTypeName.stripModuleClassSuffix.toString == sourceCls.stripModuleClassSuffix.toString))
 
     (sourceClasses.flatMap(c => tree(c, fromSource = true)) ++
-      otherClasses.flatMap(c => tree(c, fromSource = false))).toList
+      otherClasses.flatMap(c => tree(c.toTypeName, fromSource = false))).toList
   }
 
   def topLevelClassNames(tree: Tree): List[TypeName] = {
