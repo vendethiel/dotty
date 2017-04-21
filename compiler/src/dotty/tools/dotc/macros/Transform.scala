@@ -128,9 +128,9 @@ private[macros] object Transform {
    *  will be implemented by
    *
    *    @static
-   *    def f(toolbox: Toolbox, prefix: toolbox.Tree)
+   *    def f(toolbox: Toolbox, prefix: toolbox.TermTree)
    *         (T: toolbox.TypeTree)
-   *         (a: toolbox.Tree)(b: toolbox.Tree): toolbox.Tree = body
+   *         (a: toolbox.TermTree)(b: toolbox.TermTree): toolbox.Tree = body
    *
    *  with `this` replaced by `prefix` in `body`
    *
@@ -140,17 +140,18 @@ private[macros] object Transform {
 
     val tb = Ident("toolbox".toTermName)
     val treeType = Select(tb, "Tree".toTypeName)
+    val termType = Select(tb, "TermTree".toTypeName)
     val typeType = Select(tb, "TypeTree".toTypeName)
 
     val toolboxType = if (isAnnotMacroDef) "StructToolbox" else "TypeToolbox"
     val toolbox = ValDef("toolbox".toTermName, Ident(toolboxType.toTypeName), EmptyTree).withFlags(TermParam)
-    val prefix = ValDef("prefix".toTermName, treeType, EmptyTree).withFlags(TermParam)
+    val prefix = ValDef("prefix".toTermName, termType, EmptyTree).withFlags(TermParam)
     val typeParams = for (tdef: TypeDef <- defn.tparams)
       yield ValDef(tdef.name.toTermName, typeType, EmptyTree).withFlags(TermParam)
 
     val termParams = for (params <- defn.vparamss)
       yield params.map { case vdef: ValDef =>
-        ValDef(vdef.name.toTermName, treeType, EmptyTree).withFlags(TermParam)
+        ValDef(vdef.name.toTermName, if (isAnnotMacroDef) treeType else termType, EmptyTree).withFlags(TermParam)
       }
 
     val params =
