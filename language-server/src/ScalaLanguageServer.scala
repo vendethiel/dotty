@@ -148,8 +148,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
-    val ensime = scala.io.Source.fromURL(params.getRootUri + "/.ensime").mkString
-
     var configs: List[IDEConfig] = Nil
 
     val ideConfigStr = scala.io.Source.fromURL(params.getRootUri + "/.dotty-ide").mkString
