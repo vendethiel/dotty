@@ -31,9 +31,6 @@ import dotty.tools.dotc.classpath.ClassPathEntries
 import scala.collection._
 import scala.collection.JavaConverters._
 
-// Not needed with Scala 2.12
-import scala.compat.java8.FunctionConverters._
-
 import dotty.tools.FatalError
 import dotty.tools.io._
 import scala.io.Codec

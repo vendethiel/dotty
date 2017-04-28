@@ -33,9 +33,6 @@ import scala.collection.JavaConverters._
 
 import scala.util.control.NonFatal
 
-// Not needed with Scala 2.12
-import scala.compat.java8.FunctionConverters._
-
 import dotty.tools.FatalError
 import dotty.tools.io._
 import scala.io.Codec
@@ -134,7 +131,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   def computeAsync[R](fun: CancelChecker => R): CompletableFuture[R] =
     CompletableFutures.computeAsync({(cancelToken: CancelChecker) =>
       // We do not support any concurrent use of the compiler currently.
-      synchronized {
+      this.synchronized {
         cancelToken.checkCanceled()
         try {
           fun(cancelToken)
@@ -144,7 +141,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
             throw ex
         }
       }
-    }.asJava)
+    })
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
