@@ -678,6 +678,8 @@ class Definitions {
   def Toolbox(implicit ctx: Context) = ToolboxType.symbol.asClass
   def toolbox(implicit ctx: Context) = GestaltPackage.requiredValue("toolbox".toTermName)
 
+  def WeakTypeTag(implicit ctx: Context) = Toolbox.info.member("WeakTypeTag".toTypeName).symbol
+
   // convenient one-parameter method types
   def methOfAny(tp: Type) = MethodType(List(AnyType), tp)
   def methOfAnyVal(tp: Type) = MethodType(List(AnyValType), tp)

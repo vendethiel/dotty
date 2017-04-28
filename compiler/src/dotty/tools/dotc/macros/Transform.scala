@@ -149,9 +149,17 @@ private[macros] object Transform {
     val typeParams = for (tdef: TypeDef <- defn.tparams)
       yield ValDef(tdef.name.toTermName, typeType, EmptyTree).withFlags(TermParam)
 
+    def paramType(vdef: ValDef): Tree = vdef.tpt match {
+      case AppliedTypeTree(f @ Ident(tpnme.WeakTypeTag), _) => AppliedTypeTree(f, Ident(tpnme.Nothing))
+      case AppliedTypeTree(f @ Select(_, tpnme.WeakTypeTag), _) => AppliedTypeTree(f, Ident(tpnme.Nothing))
+      case _ =>
+        if (isAnnotMacroDef) treeType
+        else termType
+    }
+
     val termParams = for (params <- defn.vparamss)
       yield params.map { case vdef: ValDef =>
-        ValDef(vdef.name.toTermName, if (isAnnotMacroDef) treeType else termType, EmptyTree).withFlags(TermParam)
+        ValDef(vdef.name.toTermName, paramType(vdef), EmptyTree).withFlags(TermParam)
       }
 
     val params =
