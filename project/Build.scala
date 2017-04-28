@@ -753,7 +753,7 @@ object DottyInjectedPlugin extends AutoPlugin {
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
         "org.scala-lang.modules" %% "scala-java8-compat" % "0.8.0",
-        "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0-SNAPSHOT"
+        "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0.M7"
       ),
       javaOptions := (javaOptions in `dotty-compiler`).value
     )
