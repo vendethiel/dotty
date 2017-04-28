@@ -34,7 +34,6 @@ class CompilerNonBootstrapped(val context: Context) extends Shared{
 }
 trait UseNonBootstrappedCompiler extends Shared with cbt.CustomDotty{
   override def dottyCompiler = compilerNonBootstrapped
-  override def dottyLibrary = libraryNonBootstrapped
 }
 
 class LibraryBootstrapped(val context: Context) extends UseNonBootstrappedCompiler{
@@ -42,7 +41,7 @@ class LibraryBootstrapped(val context: Context) extends UseNonBootstrappedCompil
   override def projectDirectory = dottyHome / "library"
   override def target = projectDirectory / "target" / "bootstrapped"
   override def dependencies = Resolver( mavenCentral ).bind(
-    MavenDependency("org.scala-lang","scala-reflect","2.11.5")
+    MavenDependency("org.scala-lang","scala-reflect","2.11.5") // <- after rebase, this goes away
   )
 }
 
@@ -63,7 +62,6 @@ class CompilerBootstrapped(val context: Context) extends UseNonBootstrappedCompi
 
 trait UseBootstrappedCompiler extends Shared with cbt.CustomDotty{
   override def dottyCompiler = compilerBootstrapped
-  override def dottyLibrary = libraryBootstrapped
 }
 
 class CompilerBootstrappedTest(val context: Context) extends UseBootstrappedCompiler{ outer =>
@@ -84,11 +82,24 @@ class CompilerBootstrappedTest(val context: Context) extends UseBootstrappedComp
   override def flatClassLoader = true // required so junit finds the tests
 
   override def run = {
-    System.setProperty("dotty.tests.classes.compiler",compilerBootstrapped.jar.get.toString)
-    System.setProperty("dotty.tests.classes.library",libraryBootstrapped.jar.get.toString)
-    System.setProperty("dotty.tests.classes.interfaces",interfaces.jar.get.toString)
+    //System.setProperty("dotty.tests.classes.compiler",compilerBootstrapped.jar.get.toString)
+    //System.setProperty("dotty.tests.classes.library",libraryBootstrapped.jar.get.toString)
+    //System.setProperty("dotty.tests.classes.interfaces",interfaces.jar.get.toString)
 
-    runMain( "org.junit.runner.JUnitCore", Seq("dotc.tests") )
+    val java_exe = new File(System.getProperty("java.home")) / "bin" / "java"
+    lib.runWithIO(
+      Seq(java_exe.string, "-cp", classpath.string) ++ Seq(
+          "-Ddotty.tests.classes.interfaces=" + interfaces.jar.get.toString,
+          "-Ddotty.tests.classes.library=" + libraryBootstrapped.jar.get.toString,
+          "-Ddotty.tests.classes.compiler=" + compilerBootstrapped.jar.get.toString
+      ) ++ (
+        for {
+          file <- compilerBootstrapped.dependencyClasspath.files
+        } yield "-Xbootclasspath/p:" + file.getAbsolutePath
+      ) ++ Seq(
+        "org.junit.runner.JUnitCore", "dotc.tests"
+      )
+    )
   }
 }
 
