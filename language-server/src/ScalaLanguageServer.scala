@@ -7,6 +7,8 @@ import java.nio.file._
 import java.util.function._
 import java.util.concurrent.CompletableFuture
 
+import com.fasterxml.jackson.databind.ObjectMapper
+
 import org.eclipse.lsp4j
 import org.eclipse.lsp4j.jsonrpc.{CancelChecker, CompletableFutures}
 import org.eclipse.lsp4j.jsonrpc.messages.{Either => JEither}
@@ -44,13 +46,7 @@ import core.Decorators._
 
 import ast.Trees._
 
-case class IDEConfig(
-  id: String,
-  sources: Seq[JFile],
-  scalacArgs: Seq[String],
-  depCp: Seq[JFile],
-  target: JFile
-)
+import com.felixmulder.dotty.plugin.IDEConfig
 
 class ScalaLanguageServer extends LanguageServer with LanguageClientAware { thisServer =>
   import ast.tpd._
@@ -74,7 +70,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       case List(config) =>
         drivers(config)
       case _ =>
-        assert(false, s"${uri} matched ${matchingConfigs}")
+        assert(false, s"${uri.getRawPath} matched ${matchingConfigs}, all configs: ${drivers.keys.map(_.sources.toList.map(_.getAbsolutePath))}")
         ???
     }
   }
@@ -145,31 +141,10 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
-    var configs: List[IDEConfig] = Nil
+    val jsonConfig = scala.io.Source.fromURL(params.getRootUri + "/.dotty-ide").mkString
 
-    val ideConfigStr = scala.io.Source.fromURL(params.getRootUri + "/.dotty-ide").mkString
-    val ideConfig = scala.xml.XML.loadString(ideConfigStr)
-    ideConfig.descendant foreach { node =>
-      val id = node.attribute("id").get.head.toString
-      val sources = node.attribute("sources").get.head.toString.split(",").toSeq.map(new JFile(_))
-      val scalacArgs = node.attribute("scalacArgs").get.head.toString.split(",").toSeq
-      val depCp = node.attribute("depCp").get.head.toString.split(",").toSeq.map(new JFile(_))
-      val target = new JFile(node.attribute("target").get.head.toString)
-      configs = IDEConfig(id, sources, scalacArgs, depCp, target) :: configs
-    }
-    println("configs: " + configs.mkString("\n"))
-    /*
-    classPath = """:compile-deps (.*)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)) match {
-      case Some(deps) =>
-        """"(.*?)"""".r.unanchored.findAllMatchIn(deps).map(_.group(1)).mkString(":")
-      case None =>
-        //println("XX#: " + ensime + "###")
-        ""
-«    }
-    target = """:targets \("(.*)"\)""".r.unanchored.findFirstMatchIn(ensime).map(_.group(1)).get
-    println("classPath: " + classPath)
-    println("target: " + target)
-    */
+    val configs: List[IDEConfig] = (new ObjectMapper).readValue(new JFile(new URI(params.getRootUri + "/.dotty-ide")), classOf[Array[IDEConfig]]).toList
+    println("configs: " + configs)
 
     val defaultFlags = List(/*"-Yplain-printer","-Ydebug",*/ "-Yprintpos", "-Ystop-after:frontend", "-language:Scala2", "-rewrite")
     for (config <- configs) {

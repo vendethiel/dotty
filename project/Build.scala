@@ -752,7 +752,9 @@ object DottyInjectedPlugin extends AutoPlugin {
       fork in run := true,
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
-        "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0.M7"
+        "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0.M7",
+        // "com.google.code.gson" % "gson" % "2.8.0"
+        "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.6"
       ),
       javaOptions := (javaOptions in `dotty-compiler`).value
     )
