@@ -326,7 +326,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val changes = poss.groupBy(pos => toUri(pos.source).toString).mapValues(_.map(pos => new TextEdit(nameRange(pos, sym.name), newName)).asJava)
 
-      new WorkspaceEdit(changes.asJava, null)
+      new WorkspaceEdit(changes.asJava)
     }
     override def resolveCodeLens(params: CodeLens): CompletableFuture[CodeLens] = null
     override def resolveCompletionItem(params: CompletionItem): CompletableFuture[CompletionItem] = null
