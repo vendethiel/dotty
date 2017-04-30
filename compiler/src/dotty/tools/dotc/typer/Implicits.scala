@@ -612,7 +612,7 @@ trait Implicits { self: Typer =>
     }
 
     /** Don't synthesize implicit TypeTags, let macro expansion does the job */
-    if (formal.isRef(defn.WeakTypeTag)) return Literal(Constant(null))
+    if (ctx.macrosEnabled && formal.isRef(defn.WeakTypeTag)) return Literal(Constant(null))
 
     /** formalValue: The value type for which an implicit is searched
      *  lazyImplicit: An implicit symbol to install for nested by-name resolutions
