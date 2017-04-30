@@ -144,7 +144,7 @@ private[macros] object Transform {
     val typeType = Select(tb, "TypeTree".toTypeName)
 
     val toolboxType = "Toolbox"
-    val toolbox = ValDef("toolbox".toTermName, Ident(toolboxType.toTypeName), EmptyTree).withFlags(TermParam)
+    val toolbox = ValDef("toolbox".toTermName, Ident(toolboxType.toTypeName), EmptyTree).withFlags(TermParam | Implicit)
     val prefix = ValDef("prefix".toTermName, termType, EmptyTree).withFlags(TermParam)
     val typeParams = for (tdef: TypeDef <- defn.tparams)
       yield ValDef(tdef.name.toTermName, typeType, EmptyTree).withFlags(TermParam)

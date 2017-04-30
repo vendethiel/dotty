@@ -689,25 +689,15 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       def simpleApply(fun1: Tree, proto: FunProto)(implicit ctx: Context): Tree =
         methPart(fun1).tpe match {
           case funRef: TermRef =>
-            if (ctx.macrosEnabled && macros.isQuasiquote(funRef.termSymbol, tree))
+            if (ctx.macrosEnabled && macros.isQuasiquote(funRef.termSymbol))
               typed(macros.expandQuasiquote(tree, isTerm = true), pt)
             else {
               val app =
                 if (proto.allArgTypesAreCurrent())
                   new ApplyToTyped(tree, fun1, funRef, proto.typedArgs, pt)
-                else
-                  new ApplyToUntyped(tree, fun1, funRef, proto, pt)(argCtx(tree))
-              val treeTpd = convertNewGenericArray(ConstFold(app.result))
-
-              // expand def macros after type checking
-              // Note: macros that expand to functions cannot be immediately applied.
-              // This is a practical constraint, as currying is also disallowed for macros
-              if (macros.isDefMacro(fun1.symbol) && !pt.isInstanceOf[ApplyingProto]) {
-                if (ctx.macrosEnabled)
-                  typed(macros.expandDefMacro(treeTpd), pt)
-                else
-                  errorTree(treeTpd, s"can't expand the macro ${fun1.symbol.show}, make sure `scala.gestalt` is in -classpath")
-              } else treeTpd
+                 else
+                   new ApplyToUntyped(tree, fun1, funRef, proto, pt)(argCtx(tree))
+              convertNewGenericArray(ConstFold(app.result))
             }
           case _ =>
             handleUnexpectedFunType(tree, fun1)
@@ -817,17 +807,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       case _                                             => tree.withType(TryDynamicCallType)
     }
     if (typedFn.tpe eq TryDynamicCallType) tryDynamicTypeApply()
-    else {
-      val tpdTree = assignType(cpy.TypeApply(tree)(typedFn, typedArgs), typedFn, typedArgs)
-      // expand def macros after type checking
-      if (macros.isDefMacro(typedFn.symbol) && !pt.isInstanceOf[ApplyingProto]) {
-        if (ctx.macrosEnabled)
-          typed(macros.expandDefMacro(tpdTree), pt)
-        else
-          errorTree(tpdTree, s"can't expand the macro ${typedFn.symbol.show}, make sure `scala.gestalt` is in -classpath")
-      }
-      else tpdTree
-    }
+    else assignType(cpy.TypeApply(tree)(typedFn, typedArgs), typedFn, typedArgs)
   }
 
   /** Rewrite `new Array[T](....)` if T is an unbounded generic to calls to newGenericArray.
@@ -937,7 +917,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       }
 
     unapplyFn.tpe.widen match {
-      case tp if ctx.macrosEnabled && macros.isQuasiquote(unapplyFn.symbol, tree) =>
+      case tp if ctx.macrosEnabled && macros.isQuasiquote(unapplyFn.symbol) =>
         typed(macros.expandQuasiquote(tree, isTerm = false), selType)
       case mt: MethodType if mt.paramInfos.length == 1 =>
         val unapplyArgType = mt.paramInfos.head

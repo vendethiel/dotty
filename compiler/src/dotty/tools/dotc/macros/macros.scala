@@ -11,7 +11,9 @@ import util._
 import StdNames._
 import typer.ErrorReporting._
 import reporting.diagnostic._
-import config.Printers.{ macros => debug }
+import config.Printers.{macros => debug}
+import dotty.tools.dotc.typer.ProtoTypes.ApplyingProto
+import typer.{ForceDegree, Inferencing, Typer}
 
 package object macros {
   import untpd._
@@ -34,7 +36,7 @@ package object macros {
    *  @param symbol the symbol of the function in the Apply tree
    *  @param tree   the Apply tree
    */
-  def isQuasiquote(symbol: Symbol, tree: Tree)(implicit ctx: Context): Boolean =
+  def isQuasiquote(symbol: Symbol)(implicit ctx: Context): Boolean =
     symbol.isContainedIn(defn.q) || symbol.isContainedIn(defn.t)
 
   /** Expand a quasiquote tree */
@@ -92,10 +94,28 @@ package object macros {
     symbol.is(Flags.Macro) && !symbol.owner.is(Flags.Scala2x)
 
   /** Expand def macros */
-  def expandDefMacro(tree: tpd.Tree)(implicit ctx: Context): Tree = {
-    val res = forObject("scala.gestalt.dotty.Expander").apply("expandDefMacro", tree, ctx).asInstanceOf[Tree]
-    debug.println(i"def macro expansion: $tree expands to $res")
-    res
+  def expandDefMacro(tree: tpd.Tree, pt: Type, typer: Typer)(implicit ctx: Context): tpd.Tree = {
+    def isMacroApplyEnd: Boolean =
+      (tree.isInstanceOf[tpd.Apply] || tree.isInstanceOf[tpd.TypeApply]) &&
+        !tree.tpe.isError && tree.tpe.isValueType && macros.isDefMacro(tree.symbol)
+
+    def expanded: Tree = {
+      // instantiate tvars as much as possible before macro expansion
+      tree match {
+        case tapply: tpd.TypeApply =>
+          tapply.args.map(arg => Inferencing.isFullyDefined(arg.tpe, ForceDegree.noBottom))
+        case _ =>
+      }
+
+      val res = forObject("scala.gestalt.dotty.Expander").apply("expandDefMacro", tree, ctx).asInstanceOf[Tree]
+      debug.println(i"def macro expansion: $tree expands to $res")
+      res
+    }
+
+    if (isMacroApplyEnd)
+      if (ctx.macrosEnabled) typer.typed(expanded, pt)
+      else errorTree(tree, s"can't expand macro, make sure `scala.gestalt` is in -classpath")
+    else tree
   }
 
   /** Transform macro definitions in class definition

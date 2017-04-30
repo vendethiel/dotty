@@ -632,27 +632,10 @@ trait Implicits { self: Typer =>
           case _ => false
         }
 
-        // expand def macros
-        val arg1 = arg match {
-          case tapply: GenericApply[_] =>
-            if (macros.isDefMacro(tapply.symbol)) {
-              if (ctx.macrosEnabled) {
-                // instantiate tvars as much as possible before macro expansion
-                if (tapply.isInstanceOf[TypeApply])
-                  fullyDefinedType(arg.tpe, s"can't instantiate some type var in ${arg.show}", pos)
-                typed(macros.expandDefMacro(tapply), formal)
-              }
-              else
-                errorTree(tapply, s"can't expand the macro ${tapply.symbol.show}, make sure `scala.gestalt` is in -classpath")
-            }
-            else arg
-          case _ => arg
-        }
-
         if (lazyImplicit.exists && refersToLazyImplicit)
-          Block(ValDef(lazyImplicit.asTerm, arg1).withPos(pos) :: Nil, ref(lazyImplicit))
+          Block(ValDef(lazyImplicit.asTerm, arg).withPos(pos) :: Nil, ref(lazyImplicit))
         else
-          arg1
+          arg
       case ambi: AmbiguousImplicits =>
         error(where => s"ambiguous implicits: ${ambi.explanation} of $where")
         EmptyTree
@@ -812,7 +795,8 @@ trait Implicits { self: Typer =>
           typed(untpd.Ident(ref.name) withPos pos.toSynthetic, funProto)(
             nestedContext.addMode(Mode.ImplicitShadowing).setExploreTyperState())
         def refSameAs(shadowing: Tree): Boolean =
-          ref.symbol == closureBody(shadowing).symbol || {
+          ref.symbol == closureBody(shadowing).symbol ||
+            generated1.symbol == closureBody(shadowing).symbol || {  // possible macro expansion
             shadowing match {
               case Trees.Select(qual, nme.apply) => refSameAs(qual)
               case Trees.Apply(fn, _) => refSameAs(fn)
