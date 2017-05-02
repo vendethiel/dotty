@@ -326,6 +326,7 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
     val e = new ClassfileParser(classfile, classRoot, moduleRoot)(ctx).run()
     e match {
       case Some(unpickler: tasty.DottyUnpickler) =>
+        // BREAKS COMPILATION
         val List(unpickled) = unpickler.body(ctx.addMode(Mode.ReadPositions))
         import ast.tpd._
         def setTrees(t: Tree): Unit = t match {
