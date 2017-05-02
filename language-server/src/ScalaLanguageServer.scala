@@ -146,7 +146,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
     val configs: List[IDEConfig] = (new ObjectMapper).readValue(new JFile(new URI(params.getRootUri + "/.dotty-ide")), classOf[Array[IDEConfig]]).toList
     println("configs: " + configs)
 
-    val defaultFlags = List(/*"-Yplain-printer","-Ydebug",*/ "-Yprintpos", "-Ystop-after:frontend", "-language:Scala2", "-rewrite")
+    val defaultFlags = List(/*"-Yplain-printer","-Ydebug", "-Yprintpos", */ "-Ystop-after:frontend")
     for (config <- configs) {
       drivers.put(config, new ServerDriver(defaultFlags ++ config.scalacArgs.toList ++ List("-classpath", (config.target +: config.depCp).mkString(":"))))
     }
