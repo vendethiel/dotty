@@ -238,26 +238,9 @@ class CompilationTests extends ParallelTesting {
         opt)
     }
 
-    def dotty2 =
-      compileShallowFilesInDir("../compiler/src/dotty", opt)
-
     {
       lib.keepOutput :: dotty1.keepOutput :: {
-        dotty2 +
-        compileShallowFilesInDir("../compiler/src/dotty/tools", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/ast", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/config", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/parsing", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/printing", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/repl", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/reporting", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/rewrite", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/transform", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/typer", opt) +
-        compileShallowFilesInDir("../compiler/src/dotty/tools/dotc/util", opt) +
-        compileList("shallow-backend", backendSources, opt) +
-        compileList("shallow-backend-jvm", backendJvmSources, opt)
+        compileFile("../compiler/src/dotty/tools/dotc/core/Contexts.scala", opt)
       } :: Nil
     }.map(_.checkCompile()).foreach(_.delete())
   }
