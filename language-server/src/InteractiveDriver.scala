@@ -62,12 +62,18 @@ class ServerDriver(settings: List[String]) extends Driver {
     new SourcePosition(source, p)
   }
 
-  implicit def ctx: Context = myCtx
-
-  private[this] var myCtx: Context = {
+  def myInitCtx = {
     val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
     setup(settings.toArray, rootCtx)._2
   }
+
+  implicit def ctx: Context = myCtx
+
+  private[this] var myCtx: Context = myInitCtx
+  // private[this] var myCtx: Context = {
+  //   val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
+  //   setup(settings.toArray, rootCtx)._2
+  // }
 
   private[this] def newReporter: Reporter =
     new StoreReporter(null) with UniqueMessagePositions with HideNonSensicalMessages
@@ -86,7 +92,10 @@ class ServerDriver(settings: List[String]) extends Driver {
           if (tree != null) {
             // println("Got tree: " + clsd)
             assert(tree.isInstanceOf[TypeDef])
-            val sourceFile = new SourceFile(tree.symbol.sourceFile, Codec.UTF8)
+            assert(tree.symbol.exists, "NO SYMBOL tree: " + tree.show)
+            val source = tree.symbol.sourceFile
+            assert(source != null, "NO SOURCE tree: " + tree)
+            val sourceFile = new SourceFile(source, Codec.UTF8)
             if (!fromSource && openClasses.contains(toUri(sourceFile))) {
               //println("Skipping, already open from source")
               assert(false, clsd) // TODO: remove fromSource parameter
@@ -180,7 +189,8 @@ class ServerDriver(settings: List[String]) extends Driver {
       println("run: " + ctx.period)
 
       val reporter = newReporter
-      val run = compiler.newRun(ctx.fresh.setReporter(reporter))
+      // val run = compiler.newRun(ctx.fresh.setReporter(reporter))
+      val run = compiler.newRun(myInitCtx.fresh.setReporter(reporter))
       myCtx = run.runContext
 
       val virtualFile = new VirtualFile(uri.toString, Paths.get(uri).toString)
