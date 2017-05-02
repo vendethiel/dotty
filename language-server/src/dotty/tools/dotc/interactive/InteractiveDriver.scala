@@ -62,7 +62,7 @@ class ServerDriver(settings: List[String]) extends Driver {
     new SourcePosition(source, p)
   }
 
-  def myInitCtx = {
+  val myInitCtx = {
     val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions)
     setup(settings.toArray, rootCtx)._2
   }

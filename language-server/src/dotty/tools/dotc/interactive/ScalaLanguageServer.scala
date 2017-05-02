@@ -127,7 +127,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   def computeAsync[R](fun: CancelChecker => R): CompletableFuture[R] =
     CompletableFutures.computeAsync({(cancelToken: CancelChecker) =>
       // We do not support any concurrent use of the compiler currently.
-      this.synchronized {
+      thisServer.synchronized {
         cancelToken.checkCanceled()
         try {
           fun(cancelToken)
@@ -209,7 +209,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val defs = Interactive.definitions(trees, sym, namePosition = true, allowApproximation = true)
       defs.map(location).asJava
     }
-    override def didChange(params: DidChangeTextDocumentParams): Unit = {
+    override def didChange(params: DidChangeTextDocumentParams): Unit = thisServer.synchronized {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
       val driver = findDriver(uri)
@@ -226,13 +226,13 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
         document.getUri,
         diags.flatMap(diagnostic).asJava))
     }
-    override def didClose(params: DidCloseTextDocumentParams): Unit = {
+    override def didClose(params: DidCloseTextDocumentParams): Unit = thisServer.synchronized {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
 
       findDriver(uri).close(uri)
     }
-    override def didOpen(params: DidOpenTextDocumentParams): Unit = {
+    override def didOpen(params: DidOpenTextDocumentParams): Unit = thisServer.synchronized {
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
       val driver = findDriver(uri)
@@ -246,7 +246,7 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
         document.getUri,
         diags.flatMap(diagnostic).asJava))
     }
-    override def didSave(params: DidSaveTextDocumentParams): Unit = {}
+    override def didSave(params: DidSaveTextDocumentParams): Unit = /*thisServer.synchronized*/ {}
     override def documentHighlight(params: TextDocumentPositionParams): CompletableFuture[jList[_ <: DocumentHighlight]] = computeAsync { cancelToken =>
       val document = params.getTextDocument
       val uri = URI.create(document.getUri)
@@ -334,8 +334,8 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   }
 
   override def getWorkspaceService(): WorkspaceService = new WorkspaceService {
-    override def didChangeConfiguration(params: DidChangeConfigurationParams): Unit = {}
-    override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = {}
+    override def didChangeConfiguration(params: DidChangeConfigurationParams): Unit = /*thisServer.synchronized*/ {}
+    override def didChangeWatchedFiles(params: DidChangeWatchedFilesParams): Unit = /*thisServer.synchronized*/ {}
     override def symbol(params: WorkspaceSymbolParams): CompletableFuture[jList[_ <: SymbolInformation]] = computeAsync { cancelToken =>
       val query = params.getQuery
 
