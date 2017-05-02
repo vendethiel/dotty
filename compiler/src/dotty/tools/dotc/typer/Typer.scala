@@ -242,8 +242,8 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
       @tailrec def loop(lastCtx: Context)(implicit ctx: Context): Type = {
         if (ctx.scope == null) previous
         else {
-          var outer = ctx.outer
-          while (outer.runId != ctx.runId && outer.runId != 0) outer = outer.outer
+          // var outer = ctx.outer
+          // while (outer.runId != ctx.runId && outer.runId != 0) outer = outer.outer
           var result: Type = NoType
 
           // find definition
