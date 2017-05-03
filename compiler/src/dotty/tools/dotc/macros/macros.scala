@@ -112,7 +112,9 @@ package object macros {
       res
     }
 
-    if (isMacroApplyEnd)
+    // trees with errors are possibly not well formed, which could result in macro expansion exception
+    // e.g. macros with missing implicit arguments will take the expected value type instead of ImplicitMethod
+    if (!ctx.reporter.hasErrors && isMacroApplyEnd)
       if (ctx.macrosEnabled) typer.typed(expanded, pt)
       else errorTree(tree, s"can't expand macro, make sure `scala.gestalt` is in -classpath")
     else tree
