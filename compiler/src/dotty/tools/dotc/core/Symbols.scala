@@ -391,7 +391,25 @@ object Symbols {
 
     //assert(id != 3548)
 
-    var tree: Tree = _
+    /** If this is a symbol for a top-level class, and if
+     *  `-Ykeep-trees` is set, return the tree for this class,
+     *  otherwise null.
+     */
+    def tree(implicit ctx: Context): Tree = {
+      if (unpickler != null && !denot.isAbsent) {
+        assert(myTree == null)
+
+        import ast.Trees._
+
+        val List(PackageDef(_, stats)) = unpickler.body(ctx.addMode(Mode.ReadPositions))
+        unpickler = null
+
+        myTree = stats.find(_.symbol eq this).get
+      }
+      myTree
+    }
+    private[dotc] var myTree: Tree = _
+    private[dotc] var unpickler: tasty.DottyUnpickler = _
 
     /** The last denotation of this symbol */
     private[this] var lastDenot: SymDenotation = _

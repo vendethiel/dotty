@@ -321,25 +321,14 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
   override def doComplete(root: SymDenotation)(implicit ctx: Context): Unit =
     load(root)
 
-  def load(root: SymDenotation)(implicit ctx: Context): Option[ClassfileParser.Embedded] = {
+  def load(root: SymDenotation)(implicit ctx: Context): Unit = {
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
-    val e = new ClassfileParser(classfile, classRoot, moduleRoot)(ctx).run()
-    e match {
-      case Some(unpickler: tasty.DottyUnpickler) =>
-        // BREAKS COMPILATION
-        val List(unpickled) = unpickler.body(ctx.addMode(Mode.ReadPositions))
-        import ast.tpd._
-        def setTrees(t: Tree): Unit = t match {
-          case PackageDef(_, stats) => stats.foreach(setTrees)
-          case cls: TypeDef =>
-            // println("Unpickling: " + cls.symbol)
-            cls.symbol.tree = cls
-          case _ => None
-        }
-        setTrees(unpickled)
+    (new ClassfileParser(classfile, classRoot, moduleRoot)(ctx)).run() match {
+      case Some(unpickler: tasty.DottyUnpickler) if ctx.settings.YretainTrees.value =>
+        classRoot.symbol.unpickler = unpickler
+        moduleRoot.symbol.unpickler = unpickler
       case _ =>
     }
-    e
   }
 }
 
