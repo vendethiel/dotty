@@ -13,8 +13,6 @@ import org.eclipse.lsp4j.launch._
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val portOpt = args.dropWhile(_ != "-port").drop(1).headOption.map(_.toInt)
-
     val (in: InputStream, out: OutputStream) = args.toList match {
       case List("-port", port) =>
         val serverSocket = new ServerSocket(port.toInt)
