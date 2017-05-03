@@ -611,9 +611,6 @@ trait Implicits { self: Typer =>
       lctx.setProperty(DelayedImplicit, lazyImplicit.termRef)
     }
 
-    /** Don't synthesize implicit TypeTags, let macro expansion does the job */
-    if (ctx.macrosEnabled && formal.isRef(defn.WeakTypeTag)) return Literal(Constant(null))
-
     /** formalValue: The value type for which an implicit is searched
      *  lazyImplicit: An implicit symbol to install for nested by-name resolutions
      *  argCtx      : The context to be used for searching the implicit argument
@@ -648,6 +645,10 @@ trait Implicits { self: Typer =>
           else
             EmptyTree
         if (!arg.isEmpty) arg
+        else if (ctx.macrosEnabled && formal.isRef(defn.WeakTypeTag)) {
+          /** Don't synthesize implicit TypeTags, let macro expansion does the job */
+          return Literal(Constant(null))
+        }
         else {
           var msgFn = (where: String) =>
             em"no implicit argument of type $formal found for $where" + failure.postscript

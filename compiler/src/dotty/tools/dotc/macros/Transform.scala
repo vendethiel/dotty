@@ -159,7 +159,7 @@ private[macros] object Transform {
 
     val termParams = for (params <- defn.vparamss)
       yield params.map { case vdef: ValDef =>
-        ValDef(vdef.name.toTermName, paramType(vdef), EmptyTree).withFlags(TermParam)
+        ValDef(vdef.name.toTermName, paramType(vdef), EmptyTree).withMods(vdef.mods | TermParam)
       }
 
     val params =
