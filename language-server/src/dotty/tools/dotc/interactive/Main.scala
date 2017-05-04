@@ -18,30 +18,21 @@ object Main {
       case List("-stdio") =>
         startServer(System.in, System.out)
       case "-client_command" :: clientCommand =>
-        val serverSocketChannel = ServerSocketChannel.open()
-          .bind(null)
-        // serverSocketChannel.configureBlocking(false)
-
+        val serverSocket = new ServerSocket(0)
         Runtime.getRuntime().addShutdownHook(new Thread(
           new Runnable {
             def run: Unit = {
-              serverSocketChannel.close()
+              serverSocket.close()
             }
           }));
 
-        // new Thread((() => {
-        //   var clientSocketChannel: SocketChannel = null
-        //   while ({clientSocketChannel = serverSocketChannel.accept(); clientSocketChannel} == null) {}
-        //   startServer(clientSocketChannel.socket.getInputStream, clientSocketChannel.socket.getOutputStream)
-        // }): Runnable)
-
         Console.err.println("Starting client: " + clientCommand)
         val clientPB = new java.lang.ProcessBuilder(clientCommand: _*)
-        clientPB.environment.put("DLS_PORT", serverSocketChannel.socket.getLocalPort.toString)
+        clientPB.environment.put("DLS_PORT", serverSocket.getLocalPort.toString)
         clientPB.inheritIO().start()
 
-        val clientSocketChannel = serverSocketChannel.accept()
-        startServer(clientSocketChannel.socket.getInputStream, clientSocketChannel.socket.getOutputStream)
+        val clientSocket = serverSocket.accept()
+        startServer(clientSocket.getInputStream, clientSocket.getOutputStream)
       case _ =>
         Console.err.println("Invalid arguments: expected \"-stdio\" or \"-port NNNN\"")
         System.exit(1)
