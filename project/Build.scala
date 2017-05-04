@@ -309,7 +309,7 @@ object Build {
       "com.vladsch.flexmark" % "flexmark-ext-emoji" % "0.11.1",
       "com.vladsch.flexmark" % "flexmark-ext-gfm-strikethrough" % "0.11.1",
       "com.vladsch.flexmark" % "flexmark-ext-yaml-front-matter" % "0.11.1",
-      "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % "2.8.6",
+      Deps.`jackson-dataformat-yaml`,
       "nl.big-o" % "liqp" % "0.6.7"
     )
   )
@@ -754,7 +754,7 @@ object DottyInjectedPlugin extends AutoPlugin {
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
         "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0.M7",
-        "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.6"
+        Deps.`jackson-databind`
       ),
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,
 
@@ -882,6 +882,7 @@ object DottyInjectedPlugin extends AutoPlugin {
     settings(
       sbtPlugin := true,
       version := "0.1.0-RC4",
+      libraryDependencies += Deps.`jackson-databind`,
       ScriptedPlugin.scriptedSettings,
       ScriptedPlugin.sbtTestDirectory := baseDirectory.value / "sbt-test",
       ScriptedPlugin.scriptedBufferLog := false,
@@ -921,8 +922,7 @@ object DottyInjectedPlugin extends AutoPlugin {
             }
         }
         val tsc = baseDirectory.value / "node_modules" / ".bin" / "tsc"
-        val exitCode = new java.lang.ProcessBuilder(tsc.getAbsolutePath, "--pretty")
-          .directory(baseDirectory.value)
+        val exitCode = new java.lang.ProcessBuilder(tsc.getAbsolutePath, "--pretty", "--project", baseDirectory.value.getAbsolutePath)
           .inheritIO()
           .start()
           .waitFor()

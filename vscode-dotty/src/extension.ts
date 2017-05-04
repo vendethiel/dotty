@@ -35,7 +35,7 @@ export function activate(context: ExtensionContext) {
       throw err
     }
     let config: IDEConfig[] = JSON.parse(data.toString())
-    When different versions of dotty are used by subprojects, choose the latest one.
+    // When different versions of dotty are used by subprojects, choose the latest one.
     let version = config.map(x => x.scalaVersion).sort().pop()
 
     if (process.env['DLS_PORT'] !== undefined) {
