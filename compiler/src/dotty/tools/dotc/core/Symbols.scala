@@ -401,10 +401,19 @@ object Symbols {
 
         import ast.Trees._
 
-        val List(PackageDef(_, stats)) = unpickler.body(ctx.addMode(Mode.ReadPositions))
+        def findTree(tree: ast.tpd.Tree): Option[ast.tpd.Tree] = tree match {
+          case PackageDef(_, stats) =>
+            stats.flatMap(findTree).headOption
+          case _ =>
+            if (tree.symbol eq this)
+              Some(tree)
+            else
+              None
+        }
+        val List(unpickledTree) = unpickler.body(ctx.addMode(Mode.ReadPositions))
         unpickler = null
 
-        myTree = stats.find(_.symbol eq this).get
+        myTree = findTree(unpickledTree).get
       }
       myTree
     }

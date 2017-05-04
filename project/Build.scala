@@ -235,7 +235,8 @@ object Build {
       submoduleChecks,
 
       addCommandAlias("run", "dotty-compiler/run") ++
-      addCommandAlias("legacyTests", "dotty-compiler/testOnly dotc.tests")
+      addCommandAlias("legacyTests", "dotty-compiler/testOnly dotc.tests") ++
+      addCommandAlias("devLaunchIDE", ";configureIDE;compileForIDE;dotty-language-server/run")
     )
 
   // Same as `dotty` but using bootstrapped projects.
@@ -759,6 +760,13 @@ object DottyInjectedPlugin extends AutoPlugin {
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,
 
       run := Def.inputTaskDyn {
+        val log = streams.value.log
+        log.warn("")
+        log.warn("=====================================================================================================")
+        log.warn("You should launch `sbt \"~compileForIDE\"` in a separate console, otherwise the IDE will be inaccurate!")
+        log.warn("=====================================================================================================")
+        log.warn("")
+
         val mainClass = "dotty.tools.dotc.interactive.Main"
         val extensionPath = (baseDirectory in `vscode-dotty`).value.getAbsolutePath
         val projectPath = (baseDirectory.value / "..").getAbsolutePath
