@@ -14,8 +14,10 @@ import org.eclipse.lsp4j.launch._
 object Main {
   def main(args: Array[String]): Unit = {
     val (in: InputStream, out: OutputStream) = args.toList match {
-      case List("-port", port) =>
-        val serverSocket = new ServerSocket(port.toInt)
+      case List("-stdio") =>
+        (System.in, System.out)
+      case "-client_command" :: clientCommand =>
+        val serverSocket = new ServerSocket(0)
         Runtime.getRuntime().addShutdownHook(new Thread(
           new Runnable {
             def run: Unit = {
@@ -23,10 +25,13 @@ object Main {
             }
           }));
 
+        Console.err.println("Starting client: " + clientCommand)
+        val clientPB = new java.lang.ProcessBuilder(clientCommand: _*)
+        clientPB.environment.put("DLS_PORT", serverSocket.getLocalPort.toString)
+        clientPB.inheritIO().start()
+
         val clientSocket = serverSocket.accept()
         (clientSocket.getInputStream, clientSocket.getOutputStream)
-      case List("-stdio") =>
-        (System.in, System.out)
       case _ =>
         Console.err.println("Invalid arguments: expected \"-stdio\" or \"-port NNNN\"")
         System.exit(1)
@@ -36,7 +41,7 @@ object Main {
 
     System.setOut(System.err)
     scala.Console.withOut(scala.Console.err) {
-      println("hi")
+      println("Starting server")
       // val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new PrintWriter(System.err, true))
       val launcher = LSPLauncher.createServerLauncher(server, in, out)
       val client = launcher.getRemoteProxy()

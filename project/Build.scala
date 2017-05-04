@@ -231,8 +231,9 @@ object Build {
     dependsOn(`dotty-library`).
     settings(commonNonBootstrappedSettings).
     settings(
-      triggeredMessage in ThisBuild := Watched.clearWhenTriggered,
+      // triggeredMessage in ThisBuild := Watched.clearWhenTriggered,
       submoduleChecks,
+
       addCommandAlias("run", "dotty-compiler/run") ++
       addCommandAlias("legacyTests", "dotty-compiler/testOnly dotc.tests")
     )
@@ -753,10 +754,17 @@ object DottyInjectedPlugin extends AutoPlugin {
       resolvers += Resolver.sonatypeRepo("snapshots"),
       libraryDependencies ++= Seq(
         "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0.M7",
-        // "com.google.code.gson" % "gson" % "2.8.0"
         "com.fasterxml.jackson.core" % "jackson-databind" % "2.8.6"
       ),
-      javaOptions := (javaOptions in `dotty-compiler`).value
+      javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,
+
+      run := Def.inputTaskDyn {
+        val mainClass = "dotty.tools.dotc.interactive.Main"
+        val extensionPath = (baseDirectory in `vscode-dotty`).value.getAbsolutePath
+        val projectPath = (baseDirectory.value / "..").getAbsolutePath
+
+        runTask(Runtime, mainClass, "-client_command", "code", s"--extensionDevelopmentPath=$extensionPath", projectPath)
+      }.dependsOn(compile in (`vscode-dotty`, Compile)).evaluated
     )
 
   /** A sandbox to play with the Scala.js back-end of dotty.
@@ -889,6 +897,59 @@ object DottyInjectedPlugin extends AutoPlugin {
         val x6 = (publishLocal in `dotty-bootstrapped`).value // Needed because sbt currently hardcodes the dotty artifact
       }).evaluated
     )
+
+  lazy val `vscode-dotty` = project.in(file("vscode-dotty")).
+    settings(commonSettings).
+    settings(
+      EclipseKeys.skipProject := true,
+      autoScalaLibrary := false,
+      publishArtifact := false,
+      // includeFilter in unmanagedSources := NothingFilter | "*.ts" | "**.json",
+      watchSources in Global ++= (unmanagedSources in Compile).value,
+      compile in Compile := {
+        val coursier = baseDirectory.value / "coursier"
+        val packageJson = baseDirectory.value / "package.json"
+        if (!coursier.exists || packageJson.lastModified > coursier.lastModified) {
+          val exitCode = new java.lang.ProcessBuilder("npm", "run", "update-all")
+            .directory(baseDirectory.value)
+            .inheritIO()
+            .start()
+            .waitFor()
+          if (exitCode != 0)
+            throw new FeedbackProvidedException {
+              override def toString = "'npm run update-all' in vscode-dotty failed"
+            }
+        }
+        val tsc = baseDirectory.value / "node_modules" / ".bin" / "tsc"
+        val exitCode = new java.lang.ProcessBuilder(tsc.getAbsolutePath, "--pretty")
+          .directory(baseDirectory.value)
+          .inheritIO()
+          .start()
+          .waitFor()
+        if (exitCode != 0)
+          throw new FeedbackProvidedException {
+            override def toString = "tsc in vscode-dotty failed"
+          }
+        sbt.inc.Analysis.Empty
+      },
+
+      // TODO: depend on .dotty-ide.json
+      run := {
+        // dotty-language-server
+        val exitCode = new java.lang.ProcessBuilder(
+          "code",
+          s"--extensionDevelopmentPath=${baseDirectory.value}",
+          (baseDirectory.value / "..").getAbsolutePath)
+          .inheritIO()
+          .start()
+          .waitFor()
+        if (exitCode != 0)
+          throw new FeedbackProvidedException {
+            override def toString = "Running Visual Studio Code failed"
+          }
+      }
+    )
+
 
    lazy val publishSettings = Seq(
      publishMavenStyle := true,

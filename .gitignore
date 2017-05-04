@@ -17,6 +17,9 @@ project/local-plugins.sbt
 .ensime
 .ensime_cache/
 
+# npm
+node_modules
+
 # Scala-IDE specific
 .scala_dependencies
 .cache
@@ -54,6 +57,7 @@ testlogs/
 # Put local stuff here
 local/
 compiler/test/debug/Gen.jar
+vscode-dotty/coursier
 
 compiler/before-pickling.txt
 compiler/after-pickling.txt
