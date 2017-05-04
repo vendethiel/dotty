@@ -35,8 +35,17 @@ export function activate(context: ExtensionContext) {
       throw err
     }
     let config: IDEConfig[] = JSON.parse(data.toString())
-    let version = process.env['DLS_VERSION'] || config.map(x => x.scalaVersion).sort().pop()
-    fetchAndRun(version)
+    When different versions of dotty are used by subprojects, choose the latest one.
+    let version = config.map(x => x.scalaVersion).sort().pop()
+
+    if (process.env['DLS_PORT'] !== undefined) {
+      run({
+        command: "netcat",
+        args: ["localhost", process.env['DLS_PORT']]
+      })
+    } else {
+      fetchAndRun(version)
+    }
   })
 }
 
@@ -72,32 +81,21 @@ function fetchAndRun(version: String) {
 
     outputChannel.dispose()
 
-    run(classPath)
+    run({
+      command: "java",
+      args: ["-cp", classPath, "dotty.tools.dotc.interactive.Main", "-stdio"]
+    })
   })
 }
 
-function run(classPath: string) {
-  let serverOptions: Executable = {
-    command: "java",
-    args: ["-cp", classPath, "dotty.tools.dotc.interactive.Main", "-stdio"]
-  }
-  if (process.env['DLS_PORT'] !== undefined) {
-    serverOptions = {
-      command: "netcat",
-      args: ["localhost", process.env['DLS_PORT']]
-    }
-  }
-
-  // Options to control the language client
+function run(serverOptions: Executable) {
   let clientOptions: LanguageClientOptions = {
-    // Register the server for plain text documents
     documentSelector: ['scala'],
     synchronize: {
       configurationSection: 'dotty'
     }
   }
 
-  // Create the language client and start the client.
   let client = new LanguageClient('dotty', 'Dotty Language Server', serverOptions, clientOptions);
 
   // Push the disposable to the context's subscriptions so that the
