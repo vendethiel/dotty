@@ -20,20 +20,24 @@ client.setEncoding('utf8')
 process.stdout.setEncoding('utf8')
 process.stdin.setEncoding('utf8')
 
+let isConnected = false
+
 client.on('data', (data) => {
   process.stdout.write(data.toString())
 })
 process.stdin.on('readable', () => {
   let chunk = process.stdin.read();
   if (chunk !== null) {
-    client.write(chunk)
+    if (isConnected) {
+      client.write(chunk)
+    } else {
+      client.on('connection', () => {
+        client.write(chunk)
+      })
+    }
   }
 })
 
-
-waitForPort('localhost', port, (err) => {
-  if (err)
-    throw new Error(err)
-
-  client.connect(port)
+client.connect(port, () => {
+  isConnected = true
 })

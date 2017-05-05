@@ -32,6 +32,7 @@ object Main {
         clientPB.inheritIO().start()
 
         val clientSocket = serverSocket.accept()
+
         startServer(clientSocket.getInputStream, clientSocket.getOutputStream)
       case _ =>
         Console.err.println("Invalid arguments: expected \"-stdio\" or \"-port NNNN\"")
@@ -45,8 +46,8 @@ object Main {
     System.setOut(System.err)
     scala.Console.withOut(scala.Console.err) {
       println("Starting server")
-      // val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new PrintWriter(System.err, true))
-      val launcher = LSPLauncher.createServerLauncher(server, in, out)
+      val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new java.io.PrintWriter(System.err, true))
+      // val launcher = LSPLauncher.createServerLauncher(server, in, out)
       val client = launcher.getRemoteProxy()
       server.connect(client)
       launcher.startListening()

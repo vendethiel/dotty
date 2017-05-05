@@ -36,8 +36,7 @@
   "dependencies": {
     "child-process-promise": "^2.2.1",
     "vscode-languageclient": "^3.2.1",
-    "vscode-languageserver": "^3.2.1",
-    "wait-for-port": "0.0.2"
+    "vscode-languageserver": "^3.2.1"
   },
   "devDependencies": {
     "typescript": "^2.3.2",
