@@ -913,7 +913,7 @@ object DottyInjectedPlugin extends AutoPlugin {
       EclipseKeys.skipProject := true,
       autoScalaLibrary := false,
       publishArtifact := false,
-      // includeFilter in unmanagedSources := NothingFilter | "*.ts" | "**.json",
+      includeFilter in unmanagedSources := NothingFilter | "*.ts" | "**.json",
       watchSources in Global ++= (unmanagedSources in Compile).value,
       compile in Compile := {
         val coursier = baseDirectory.value / "coursier"

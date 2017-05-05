@@ -40,8 +40,8 @@ export function activate(context: ExtensionContext) {
 
     if (process.env['DLS_PORT'] !== undefined) {
       run({
-        command: "netcat",
-        args: ["localhost", process.env['DLS_PORT']]
+        module: context.asAbsolutePath('out/src/passthrough-server.js'),
+        args: [process.env['DLS_PORT']]
       })
     } else {
       fetchAndRun(version)
@@ -79,8 +79,6 @@ function fetchAndRun(version: String) {
       return
     }
 
-    outputChannel.dispose()
-
     run({
       command: "java",
       args: ["-cp", classPath, "dotty.tools.dotc.interactive.Main", "-stdio"]
@@ -88,13 +86,15 @@ function fetchAndRun(version: String) {
   })
 }
 
-function run(serverOptions: Executable) {
+function run(serverOptions: ServerOptions) {
   let clientOptions: LanguageClientOptions = {
     documentSelector: ['scala'],
     synchronize: {
       configurationSection: 'dotty'
     }
   }
+
+  outputChannel.dispose()
 
   let client = new LanguageClient('dotty', 'Dotty Language Server', serverOptions, clientOptions);
 
