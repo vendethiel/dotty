@@ -8,8 +8,6 @@ import {
 	CompletionItem, CompletionItemKind
 } from 'vscode-languageserver';
 
-import * as waitForPort from 'wait-for-port';
-
 import * as net from 'net';
 
 let argv = process.argv.slice(2)
