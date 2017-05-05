@@ -4,7 +4,7 @@ package interactive
 
 import java.util.function.Consumer
 
-import java.io.{ InputStream, OutputStream }
+import java.io.{ File => JFile, InputStream, OutputStream, PrintWriter }
 import java.net._
 import java.nio.channels._
 
@@ -28,7 +28,12 @@ object Main {
 
         Console.err.println("Starting client: " + clientCommand)
         val clientPB = new java.lang.ProcessBuilder(clientCommand: _*)
-        clientPB.environment.put("DLS_PORT", serverSocket.getLocalPort.toString)
+        clientPB.environment.put("DLS_DEV_MODE", "1")
+        
+        val pw = new PrintWriter("../.dotty-ide-dev-port")
+        pw.write(serverSocket.getLocalPort.toString)
+        pw.close()
+
         clientPB.inheritIO().start()
 
         val clientSocket = serverSocket.accept()

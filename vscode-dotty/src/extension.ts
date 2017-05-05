@@ -38,10 +38,18 @@ export function activate(context: ExtensionContext) {
     // When different versions of dotty are used by subprojects, choose the latest one.
     let version = config.map(x => x.scalaVersion).sort().pop()
 
-    if (process.env['DLS_PORT'] !== undefined) {
-      run({
-        module: context.asAbsolutePath('out/src/passthrough-server.js'),
-        args: [process.env['DLS_PORT']]
+    if (process.env['DLS_DEV_MODE']) {
+      const portFile = `${vscode.workspace.rootPath}/.dotty-ide-dev-port`
+      fs.readFile(portFile, (err, port) => {
+        if (err) {
+          outputChannel.append(`Unable to parse ${portFile}`)
+          throw err
+        }
+
+        run({
+          module: context.asAbsolutePath('out/src/passthrough-server.js'),
+          args: [ port.toString() ]
+        })
       })
     } else {
       fetchAndRun(version)
