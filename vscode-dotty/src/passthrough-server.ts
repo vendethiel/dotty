@@ -8,6 +8,8 @@ import {
 	CompletionItem, CompletionItemKind
 } from 'vscode-languageserver';
 
+import * as waitForPort from 'wait-for-port';
+
 import * as net from 'net';
 
 let argv = process.argv.slice(2)
@@ -28,4 +30,10 @@ process.stdin.on('readable', () => {
   }
 })
 
-client.connect(port)
+
+waitForPort('localhost', port, (err) => {
+  if (err)
+    throw new Error(err)
+
+  client.connect(port)
+})
