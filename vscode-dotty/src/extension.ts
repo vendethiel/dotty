@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 
+import * as cpp from 'child-process-promise';
+
 import { commands, workspace, Disposable, ExtensionContext, Uri } from 'vscode';
 import { Executable, LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind } from 'vscode-languageclient';
 import * as lc from 'vscode-languageclient';
@@ -25,8 +27,6 @@ let outputChannel: vscode.OutputChannel
 export function activate(context: ExtensionContext) {
   extensionContext = context
   outputChannel = vscode.window.createOutputChannel('Dotty Language Server');
-
-  outputChannel.show();
 
   let configFile = `${vscode.workspace.rootPath}/.dotty-ide.json`
   fs.readFile(configFile, (err, data) => {
@@ -52,37 +52,47 @@ export function activate(context: ExtensionContext) {
 function fetchAndRun(version: String) {
   let coursierPath = path.join(extensionContext.extensionPath, './coursier');
 
-  let coursierProc =
-    spawn("java", [
-      "-jar", coursierPath,
-      "fetch",
-      "-p",
-      "-r", "ivy2Local",
-      "-r", "ivy2Cache",
-      "-r", "sonatype:snapshots",
-      "-r", "typesafe:ivy-releases",
-      "ch.epfl.lamp:dotty-language-server_0.1:" + version
-    ])
+  vscode.window.withProgress({
+    location: vscode.ProgressLocation.Window,
+    title: 'Fetching the Dotty Language Server'
+  }, (progress) => {
 
-  let classPath = ""
+    let coursierPromise =
+      cpp.spawn("java", [
+        "-jar", coursierPath,
+        "fetch",
+        "-p",
+        "-r", "ivy2Local",
+        "-r", "ivy2Cache",
+        "-r", "sonatype:snapshots",
+        "-r", "typesafe:ivy-releases",
+        "ch.epfl.lamp:dotty-language-server_0.1:" + version
+      ])
+    let coursierProc = coursierPromise.childProcess
 
-  coursierProc.stdout.on('data', (data) => {
-    classPath += data.toString()
-  })
-  coursierProc.stderr.on('data', (data) => {
-    outputChannel.append(data.toString())
-  })
+    let classPath = ""
 
-  coursierProc.on('close', (code) => {
-    if (code != 0) {
-      outputChannel.appendLine("Fetching the language server failed.")
-      return
-    }
-
-    run({
-      command: "java",
-      args: ["-cp", classPath, "dotty.tools.dotc.interactive.Main", "-stdio"]
+    coursierProc.stdout.on('data', (data) => {
+      classPath += data.toString()
     })
+    coursierProc.stderr.on('data', (data) => {
+      let msg = data.toString()
+      outputChannel.append(msg)
+    })
+
+    coursierProc.on('close', (code) => {
+      if (code != 0) {
+        let msg = "Fetching the language server failed."
+        outputChannel.append(msg)
+        throw new Error(msg)
+      }
+
+      run({
+        command: "java",
+        args: ["-cp", classPath, "dotty.tools.dotc.interactive.Main", "-stdio"]
+      })
+    })
+    return coursierPromise
   })
 }
 
