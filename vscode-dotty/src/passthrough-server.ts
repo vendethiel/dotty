@@ -31,13 +31,25 @@ process.stdin.on('readable', () => {
     if (isConnected) {
       client.write(chunk)
     } else {
-      client.on('connection', () => {
+      client.on('connect', () => {
         client.write(chunk)
       })
     }
   }
 })
 
-client.connect(port, () => {
-  isConnected = true
+client.on('error', (err) => {
+  if (!isConnected) {
+    startConnection()
+  }
 })
+
+function startConnection() {
+  setTimeout(() => {
+    client.connect(port, () => {
+      isConnected = true
+    })
+  }, 1000)
+}
+
+startConnection()
