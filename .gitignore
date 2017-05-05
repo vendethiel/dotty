@@ -31,6 +31,10 @@ node_modules
 classes/
 */bin/
 
+# Dotty IDE
+.dotty-ide-dev-port
+.dotty-ide.json
+
 # idea
 .idea
 .idea_modules
