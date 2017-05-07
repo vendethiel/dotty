@@ -146,14 +146,12 @@ object DottyIDEPlugin extends AutoPlugin {
   override def requires: Plugins = plugins.JvmPlugin
   override def trigger = allRequirements
 
-
-  override def projectSettings: Seq[Setting[_]] = Seq(
+  override def buildSettings: Seq[Setting[_]] = Seq(
     commands ++= Seq(
       Command.command("configureIDE")(state => { IDE.writeConfig(state); state }),
       Command.command("compileForIDE")(state => { IDE.compileForIDE(state); state })
-    )
-  )
-  override def buildSettings: Seq[Setting[_]] = Seq(
+    ),
+
     runCode := {
       val exitCode = new ProcessBuilder("code", "--install-extension", "lampepfl.dotty")
         .inheritIO()
