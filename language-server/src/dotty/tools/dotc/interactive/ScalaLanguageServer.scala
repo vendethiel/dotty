@@ -91,10 +91,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       di.setCode("0")
       di.setMessage(cont.message)
 
-      if (!cont.pos.exists) {
-        println("cont: " + cont)
-      }
-
       // if (cont.pos.exists) diagnostics += di
 
       cont.patch match {
@@ -116,11 +112,9 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   }
 
   override def exit(): Unit = {
-    println("exit")
     System.exit(0)
   }
   override def shutdown(): CompletableFuture[Object] = {
-    println("shutdown")
     CompletableFuture.completedFuture(new Object)
   }
 
@@ -142,7 +136,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
     val configs: List[IDEConfig] = (new ObjectMapper).readValue(new JFile(new URI(params.getRootUri + "/.dotty-ide.json")), classOf[Array[IDEConfig]]).toList
-    println("configs: " + configs)
 
     val defaultFlags = List(/*"-Yplain-printer","-Ydebug", "-Yprintpos", */ "-Ystop-after:frontend", "-Yretain-trees")
     for (config <- configs) {
@@ -235,7 +228,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
       val uri = URI.create(document.getUri)
       val driver = findDriver(uri)
       val path = Paths.get(uri)
-      println("open: " + path)
       val text = params.getTextDocument.getText
 
       val diags = driver.run(uri, text)
@@ -282,7 +274,6 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
       val pos = driver.sourcePosition(uri, params.getPosition)
       val tp = Interactive.enclosingType(driver.trees, pos)
-      println("hover: " + tp.show)
 
       val str = tp.widenTermRefExpr.show.toString
 

@@ -140,7 +140,7 @@ class ServerDriver(settings: List[String]) extends Driver {
 
   def trees = {
     val sourceClasses = openClasses.values.flatten.toList
-    println("openClasses: " + openClasses)
+    // println("openClasses: " + openClasses)
     val otherClasses = tastyClasses.filter(tastyCls =>
       !sourceClasses.exists(sourceCls =>
         tastyCls.toTypeName.stripModuleClassSuffix.toString == sourceCls.stripModuleClassSuffix.toString))
@@ -186,8 +186,6 @@ class ServerDriver(settings: List[String]) extends Driver {
 
   def run(uri: URI, sourceCode: String): List[MessageContainer] = {
     try {
-      println("run: " + ctx.period)
-
       val reporter = newReporter
       // val run = compiler.newRun(ctx.fresh.setReporter(reporter))
       val run = compiler.newRun(myInitCtx.fresh.setReporter(reporter))
