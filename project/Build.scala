@@ -915,6 +915,9 @@ object DottyInjectedPlugin extends AutoPlugin {
     settings(commonSettings).
     settings(
       EclipseKeys.skipProject := true,
+
+      version := "0.0.1", // Keep in sync with package.json
+
       autoScalaLibrary := false,
       publishArtifact := false,
       includeFilter in unmanagedSources := NothingFilter | "*.ts" | "**.json",
@@ -944,7 +947,30 @@ object DottyInjectedPlugin extends AutoPlugin {
           }
         sbt.inc.Analysis.Empty
       },
+      sbt.Keys.`package`:= {
+        val exitCode = new java.lang.ProcessBuilder("vsce", "package")
+          .directory(baseDirectory.value)
+          .inheritIO()
+          .start()
+          .waitFor()
+        if (exitCode != 0)
+          throw new FeedbackProvidedException {
+            override def toString = "vsce package failed"
+          }
 
+        baseDirectory.value / s"dotty-${version.value}.vsix"
+      },
+      publish := {
+        val exitCode = new java.lang.ProcessBuilder("vsce", "publish")
+          .directory(baseDirectory.value)
+          .inheritIO()
+          .start()
+          .waitFor()
+        if (exitCode != 0)
+          throw new FeedbackProvidedException {
+            override def toString = "vsce publish failed"
+          }
+      },
       // TODO: depend on .dotty-ide.json
       run := {
         // dotty-language-server

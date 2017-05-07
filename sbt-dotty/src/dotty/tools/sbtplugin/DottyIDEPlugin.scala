@@ -3,6 +3,7 @@ package dotty.tools.sbtplugin
 import sbt._
 import sbt.Keys._
 import java.io.{File => JFile}
+import java.lang.ProcessBuilder
 
 import com.fasterxml.jackson.databind.ObjectMapper
 
@@ -79,7 +80,13 @@ private object IDE {
       val depCp = Attributed.data((dependencyClasspath in config).runOpt.getOrElse(Seq()))
       val target = (classDirectory in config).gimme
 
-      new IDEConfig(id, compilerVersion, sources.toArray, scalacArgs.toArray, depCp.toArray, target)
+      new IDEConfig(
+        id,
+        compilerVersion.replace("-nonbootstrapped", ""), // The language server is only published bootstrapped
+        sources.toArray,
+        scalacArgs.toArray,
+        depCp.toArray,
+        target)
     }
 
     // TODO: cross support (require equivalent to ++)
@@ -130,15 +137,36 @@ private object IDE {
 }
 
 object DottyIDEPlugin extends AutoPlugin {
+  object autoImport {
+    val runCode = taskKey[Unit]("Run Visual Studio Code on this project")
+  }
+
+  import autoImport._
+
   override def requires: Plugins = plugins.JvmPlugin
   override def trigger = allRequirements
 
-  override def projectSettings: Seq[Setting[_]] = {
-    Seq(
-      commands ++= Seq(
-        Command.command("configureIDE")(state => { IDE.writeConfig(state); state }),
-        Command.command("compileForIDE")(state => { IDE.compileForIDE(state); state })
-      )
+
+  override def projectSettings: Seq[Setting[_]] = Seq(
+    commands ++= Seq(
+      Command.command("configureIDE")(state => { IDE.writeConfig(state); state }),
+      Command.command("compileForIDE")(state => { IDE.compileForIDE(state); state })
     )
-  }
+  )
+  override def buildSettings: Seq[Setting[_]] = Seq(
+    runCode := {
+      val exitCode = new ProcessBuilder("code", "--install-extension", "lampepfl.dotty")
+        .inheritIO()
+        .start()
+        .waitFor()
+      if (exitCode != 0)
+        throw new FeedbackProvidedException {
+          override def toString = "Installing the Dotty support for VSCode failed"
+        }
+
+      new ProcessBuilder("code", baseDirectory.value.getAbsolutePath)
+        .inheritIO()
+        .start()
+    }
+  )
 }
