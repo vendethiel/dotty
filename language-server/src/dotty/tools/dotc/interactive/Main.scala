@@ -16,7 +16,10 @@ object Main {
   def main(args: Array[String]): Unit = {
     args.toList match {
       case List("-stdio") =>
-        startServer(System.in, System.out)
+        System.setOut(System.err)
+        scala.Console.withOut(scala.Console.err) {
+          startServer(System.in, System.out)
+        }
       case "-client_command" :: clientCommand =>
         val serverSocket = new ServerSocket(0)
         Runtime.getRuntime().addShutdownHook(new Thread(
@@ -26,7 +29,7 @@ object Main {
             }
           }));
 
-        Console.err.println("Starting client: " + clientCommand)
+        println("Starting client: " + clientCommand)
         val clientPB = new java.lang.ProcessBuilder(clientCommand: _*)
         clientPB.environment.put("DLS_DEV_MODE", "1")
         
@@ -48,14 +51,11 @@ object Main {
   def startServer(in: InputStream, out: OutputStream) = {
     val server = new ScalaLanguageServer
 
-    System.setOut(System.err)
-    scala.Console.withOut(scala.Console.err) {
-      println("Starting server")
-      // val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new java.io.PrintWriter(System.err, true))
-      val launcher = LSPLauncher.createServerLauncher(server, in, out)
-      val client = launcher.getRemoteProxy()
-      server.connect(client)
-      launcher.startListening()
-    }
+    println("Starting server")
+    // val launcher = LSPLauncher.createServerLauncher(server, in, out, false, new java.io.PrintWriter(System.err, true))
+    val launcher = LSPLauncher.createServerLauncher(server, in, out)
+    val client = launcher.getRemoteProxy()
+    server.connect(client)
+    launcher.startListening()
   }
 }
