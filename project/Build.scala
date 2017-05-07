@@ -760,6 +760,8 @@ object DottyInjectedPlugin extends AutoPlugin {
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,
 
       run := Def.inputTaskDyn {
+        val inputArgs = spaceDelimited("<arg>").parsed
+
         val log = streams.value.log
         log.warn("")
         log.warn("=====================================================================================================")
@@ -769,9 +771,11 @@ object DottyInjectedPlugin extends AutoPlugin {
 
         val mainClass = "dotty.tools.dotc.interactive.Main"
         val extensionPath = (baseDirectory in `vscode-dotty`).value.getAbsolutePath
-        val projectPath = (baseDirectory.value / "..").getAbsolutePath
 
-        runTask(Runtime, mainClass, "-client_command", "code", s"--extensionDevelopmentPath=$extensionPath", projectPath)
+        val codeArgs = if (inputArgs.isEmpty) List((baseDirectory.value / "..").getAbsolutePath) else inputArgs
+        val allArgs = List("-client_command", "code", s"--extensionDevelopmentPath=$extensionPath") ++ codeArgs
+
+        runTask(Runtime, mainClass, allArgs: _*)
       }.dependsOn(compile in (`vscode-dotty`, Compile)).evaluated
     )
 
