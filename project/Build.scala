@@ -893,7 +893,7 @@ object DottyInjectedPlugin extends AutoPlugin {
     settings(commonSettings).
     settings(
       sbtPlugin := true,
-      version := "0.1.0-RC4",
+      version := "0.1.0-RC4-SNAPSHOT",
       libraryDependencies += Deps.`jackson-databind`,
       ScriptedPlugin.scriptedSettings,
       ScriptedPlugin.sbtTestDirectory := baseDirectory.value / "sbt-test",
