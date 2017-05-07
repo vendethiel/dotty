@@ -3713,16 +3713,18 @@ object Types {
    *     variance = 0 : propagate NoType to next outer level
    */
   abstract class ApproximatingTypeMap(implicit ctx: Context) extends TypeMap { thisMap =>
-    def approx(lo: Type = defn.NothingType, hi: Type = defn.AnyType) =
+    protected def approx(lo: Type = defn.NothingType, hi: Type = defn.AnyType) =
       if (variance == 0) NoType
       else apply(if (variance < 0) lo else hi)
+
+    protected def canWiden(tp: NamedType): Boolean = variance > 0
 
     override protected def derivedSelect(tp: NamedType, pre: Type) =
       if (pre eq tp.prefix) tp
       else tp.info match {
         case TypeAlias(alias) => apply(alias) // try to heal by following aliases
         case _ =>
-          if (pre.exists && !pre.isRef(defn.NothingClass) && variance > 0) tp.derivedSelect(pre)
+          if (pre.exists && !pre.isRef(defn.NothingClass) && canWiden(tp)) tp.derivedSelect(pre)
           else tp.info match {
             case TypeBounds(lo, hi) => approx(lo, hi)
             case _ => approx()

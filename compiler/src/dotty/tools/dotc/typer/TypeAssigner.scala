@@ -6,7 +6,7 @@ import core._
 import ast._
 import Scopes._, Contexts._, Constants._, Types._, Symbols._, Names._, Flags._, Decorators._
 import ErrorReporting._, Annotations._, Denotations._, SymDenotations._, StdNames._, TypeErasure._
-import TypeApplications.AppliedType
+import TypeApplications.{AppliedType, TypeParamInfo}
 import util.Positions._
 import config.Printers.typr
 import ast.Trees._
@@ -50,7 +50,7 @@ trait TypeAssigner {
    *   - drop refinements referring to a forbidden symbol.
    */
   def avoid(tp: Type, symsToAvoid: => List[Symbol])(implicit ctx: Context): Type = {
-    val widenMap = new TypeMap {
+    val widenMap = new ApproximatingTypeMap {
       lazy val forbidden = symsToAvoid.toSet
       def toAvoid(tp: Type): Boolean =
         // TODO: measure the cost of using `existsPart`, and if necessary replace it
@@ -60,27 +60,42 @@ trait TypeAssigner {
           case tp: ThisType => forbidden contains tp.cls
           case _ => false
         }
+
+      /** We also treat the situation where `x: y.type`. Then `x.type =:= y.type`,
+       *  hence we can widen `x.type` to `y.type` in all contexts, not just covariant ones.
+       *  The reason this is not done in ApproximatingTypeMap is that it involves a subtype check.
+       */
+      override def canWiden(tp: NamedType) =
+        super.canWiden(tp) || tp.isTerm && tp.info.widenExpr <:< tp
+
+      override protected def derivedAppliedType(tp: HKApply, tycon: Type, args: List[Type]): Type = {
+        def widenArg(arg: Type, tparam: TypeParamInfo): Type =
+          if (arg.exists) arg else tparam.paramInfo
+        if (tycon.exists) {
+          if (args.forall(_.exists))
+            super.derivedAppliedType(tp, tycon, args)
+          else
+            apply(tp.derivedAppliedType(tycon, args.zipWithConserve(tycon.typeParams)(widenArg)))
+        }
+        else apply(tp.superType)
+      }
+
+      override protected def derivedRefinedType(tp: RefinedType, parent: Type, info: Type) =
+        if (parent.exists)
+          if (info.exists) super.derivedRefinedType(tp, parent, info)
+          else if (tp.refinedName.isTypeName) super.derivedRefinedType(tp, parent, TypeBounds.empty)
+          else parent
+        else approx(hi = parent)
+
       def apply(tp: Type): Type = tp match {
-        case tp: TermRef
-        if toAvoid(tp) && (variance > 0 || tp.info.widenExpr <:< tp) =>
-          // Can happen if `x: y.type`, then `x.type =:= y.type`, hence we can widen `x.type`
-          // to y.type in all contexts, not just covariant ones.
-          apply(tp.info.widenExpr)
-        case tp: TypeRef if toAvoid(tp) =>
-          tp.info match {
-            case TypeAlias(ref) =>
-              apply(ref)
+        case tp: NamedType if forbidden.contains(tp.symbol) =>
+          if (tp.isTerm && canWiden(tp)) apply(tp.info.widenExpr)
+          else tp.info match {
+            case TypeAlias(ref) => apply(ref)
             case info: ClassInfo if variance > 0 =>
-              if (!(forbidden contains tp.symbol)) {
-                val prefix = apply(tp.prefix)
-                val tp1 = tp.derivedSelect(prefix)
-                if (tp1.typeSymbol.exists)
-                  return tp1
-              }
               val parentType = info.parentsWithArgs.reduceLeft(ctx.typeComparer.andType(_, _))
               def addRefinement(parent: Type, decl: Symbol) = {
-                val inherited =
-                  parentType.findMember(decl.name, info.cls.thisType, Private)
+                val inherited = parentType.findMember(decl.name, info.cls.thisType, Private)
                     .suchThat(decl.matches(_))
                 val inheritedInfo = inherited.info
                 if (inheritedInfo.exists && decl.info <:< inheritedInfo && !(inheritedInfo <:< decl.info)) {
@@ -88,45 +103,28 @@ trait TypeAssigner {
                   typr.println(i"add ref $parent $decl --> " + r)
                   r
                 }
-                else
-                  parent
+                else parent
               }
               val refinableDecls = info.decls.filter(
                 sym => !(sym.is(TypeParamAccessor | Private) || sym.isConstructor))
               val fullType = (parentType /: refinableDecls)(addRefinement)
               apply(fullType)
-            case TypeBounds(lo, hi) if variance > 0 =>
-              apply(hi)
-            case _ =>
-              mapOver(tp)
+            case TypeBounds(lo, hi) => approx(lo, hi)
+            case _ => approx()
           }
-        case tp @ HKApply(tycon, args) if toAvoid(tycon) =>
-          apply(tp.superType)
-        case tp @ AppliedType(tycon, args) if toAvoid(tycon) =>
-          val base = apply(tycon)
-          var args = tp.baseArgInfos(base.typeSymbol)
-          if (base.typeParams.length != args.length)
-            args = base.typeParams.map(_.paramInfo)
-          apply(base.appliedTo(args))
-        case tp @ RefinedType(parent, name, rinfo) if variance > 0 =>
-          val parent1 = apply(tp.parent)
-          val refinedInfo1 = apply(rinfo)
-          if (toAvoid(refinedInfo1)) {
-            typr.println(s"dropping refinement from $tp")
-            if (name.isTypeName) tp.derivedRefinedType(parent1, name, TypeBounds.empty)
-            else parent1
-          } else {
-            tp.derivedRefinedType(parent1, name, refinedInfo1)
-          }
+        case tp: ThisType if forbidden.contains(tp.cls) =>
+          approx()
         case tp: TypeVar if ctx.typerState.constraint.contains(tp) =>
           val lo = ctx.typerState.constraint.fullLowerBound(tp.origin)
-          val lo1 = avoid(lo, symsToAvoid)
+          val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
         case _ =>
           mapOver(tp)
       }
     }
-    widenMap(tp)
+    val wtp = widenMap(tp)
+    if (wtp ne tp) typr.println(i"widenend $tp / ${tp.toString} ---> $wtp / ${wtp.toString}")
+    wtp
   }
 
   def avoidingType(expr: Tree, bindings: List[Tree])(implicit ctx: Context): Type =
