@@ -137,6 +137,8 @@ private object IDE {
 }
 
 object DottyIDEPlugin extends AutoPlugin {
+  val warnWhenStopped = taskKey[Unit]("Warn when compileForIDE was stopped")
+
   object autoImport {
     val runCode = taskKey[Unit]("Run Visual Studio Code on this project")
   }
@@ -165,6 +167,13 @@ object DottyIDEPlugin extends AutoPlugin {
       new ProcessBuilder("code", baseDirectory.value.getAbsolutePath)
         .inheritIO()
         .start()
+    },
+
+    warnWhenStopped := {
+      val log = streams.value.log
+      log.warn("Incremental compilation was stopped, the IDE will now be inaccurate!")
+      log.warn("Run `sbt ~compileForIDE` to keep the IDE working correctly.")
     }
-  )
+  ) ++
+  addCommandAlias("launchIDE", ";configureIDE;runCode;~compileForIDE;warnWhenStopped")
 }
