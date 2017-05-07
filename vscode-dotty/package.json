@@ -5,6 +5,7 @@
   "version": "0.0.1",
   "publisher": "lampepfl",
   "repository": "https://github.com/smarter/vscode-dotty",
+  "icon": "images/dotty-logo.svg",
   "engines": {
     "vscode": "^1.12.0"
   },
