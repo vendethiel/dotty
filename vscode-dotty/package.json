@@ -33,6 +33,9 @@
     "update-all": "npm install && node ./node_modules/vscode/bin/install && curl -L -o coursier https://github.com/coursier/coursier/raw/v1.0.0-RC2/coursier",
     "test": "node ./node_modules/vscode/bin/test"
   },
+  "extensionDependencies": [
+    "daltonjorge.scala"
+  ],
   "dependencies": {
     "child-process-promise": "^2.2.1",
     "vscode-languageclient": "^3.2.1",
