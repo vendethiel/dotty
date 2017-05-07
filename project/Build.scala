@@ -81,6 +81,9 @@ object Build {
     bootstrapFromPublishedJars := false
   )
 
+  // Only available in vscode-dotty
+  lazy val unpublish = taskKey[Unit]("Unpublish a package")
+
 
   lazy val commonSettings = publishSettings ++ Seq(
     organization := dottyOrganization,
@@ -959,6 +962,17 @@ object DottyInjectedPlugin extends AutoPlugin {
           }
 
         baseDirectory.value / s"dotty-${version.value}.vsix"
+      },
+      unpublish := {
+        val exitCode = new java.lang.ProcessBuilder("vsce", "unpublish")
+          .directory(baseDirectory.value)
+          .inheritIO()
+          .start()
+          .waitFor()
+        if (exitCode != 0)
+          throw new FeedbackProvidedException {
+            override def toString = "vsce unpublish failed"
+          }
       },
       publish := {
         val exitCode = new java.lang.ProcessBuilder("vsce", "publish")
