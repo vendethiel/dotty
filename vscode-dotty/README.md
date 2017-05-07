@@ -6,7 +6,7 @@ This is still very experimental. You can try it using the following steps.
 
 ```shell
 git clone --recursive http://github.com/lampepfl/dotty
-git remote add staging http://github.com/dotty-staging/dotty/
+git remote add staging http://github.com/dotty-staging/dotty
 git fetch staging
 git checkout ide-support
 sbt ";sbt-dotty/publishLocal;dotty-bootstrapped/publishLocal"
