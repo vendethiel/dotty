@@ -28,7 +28,7 @@ package object macros {
 
   private def forObject(qual: String)(implicit ctx: Context) = {
     val clazz = ctx.classloader.loadClass(qual + "$")
-    val module = clazz.getField(nme.MODULE_INSTANCE_FIELD.toString).get(null)
+    val module = clazz.getField(str.MODULE_INSTANCE_FIELD.toString).get(null)
     new Proxy(clazz, module)
   }
 

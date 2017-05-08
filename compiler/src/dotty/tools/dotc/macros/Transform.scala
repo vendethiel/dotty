@@ -40,7 +40,7 @@ import config.Printers.{ macros => debug }
 private[macros] object Transform {
   import untpd._
 
-  val INLINE_SUFFIX = nme.NAME_JOIN + "inline"
+  val INLINE_SUFFIX = str.NAME_JOIN + "inline"
 
   /** Transform macros definitions inside class definitions (see the note above)
    */
