@@ -16,9 +16,11 @@ object Main {
   def main(args: Array[String]): Unit = {
     args.toList match {
       case List("-stdio") =>
+        val serverIn = System.in
+        val serverOut = System.out
         System.setOut(System.err)
         scala.Console.withOut(scala.Console.err) {
-          startServer(System.in, System.out)
+          startServer(serverIn, serverOut)
         }
       case "-client_command" :: clientCommand =>
         val serverSocket = new ServerSocket(0)
