@@ -71,9 +71,7 @@ function fetchAndRun(version: String) {
         "fetch",
         "-p",
         "-r", "ivy2Local",
-        "-r", "ivy2Cache",
         "-r", "sonatype:snapshots",
-        "-r", "typesafe:ivy-releases",
         "ch.epfl.lamp:dotty-language-server_0.1:" + version
       ])
     let coursierProc = coursierPromise.childProcess
