@@ -141,20 +141,20 @@ private[macros] object Transform {
     val tb = Ident("toolbox".toTermName)
     val treeType = Select(tb, "Tree".toTypeName)
     val termType = Select(tb, "TermTree".toTypeName)
-    val typeType = Select(tb, "TypeTree".toTypeName)
+    val typedTreeType = Select(Select(tb, "tpd".toTermName), "Tree".toTypeName)
 
     val toolboxType = "Toolbox"
     val toolbox = ValDef("toolbox".toTermName, Ident(toolboxType.toTypeName), EmptyTree).withFlags(TermParam | Implicit)
     val prefix = ValDef("prefix".toTermName, termType, EmptyTree).withFlags(TermParam)
     val typeParams = for (tdef: TypeDef <- defn.tparams)
-      yield ValDef(tdef.name.toTermName, typeType, EmptyTree).withFlags(TermParam)
+      yield ValDef(tdef.name.toTermName, typedTreeType, EmptyTree).withFlags(TermParam)
 
     def paramType(vdef: ValDef): Tree = vdef.tpt match {
       case AppliedTypeTree(f @ Ident(tpnme.WeakTypeTag), _) => AppliedTypeTree(f, Ident(tpnme.Nothing))
       case AppliedTypeTree(f @ Select(_, tpnme.WeakTypeTag), _) => AppliedTypeTree(f, Ident(tpnme.Nothing))
       case _ =>
         if (isAnnotMacroDef) treeType
-        else termType
+        else typedTreeType
     }
 
     val termParams = for (params <- defn.vparamss)
