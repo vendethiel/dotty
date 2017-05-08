@@ -245,6 +245,7 @@ object Build {
   // Same as `dotty` but using bootstrapped projects.
   lazy val `dotty-bootstrapped` = project.
     aggregate(`dotty-interfaces`, `dotty-library-bootstrapped`, `dotty-compiler-bootstrapped`, `dotty-doc-bootstrapped`,
+      `dotty-language-server`,
       dottySbtBridgeBootstrappedRef,
       `scala-library`, `scala-compiler`, `scala-reflect`, scalap).
     dependsOn(`dotty-compiler-bootstrapped`).
@@ -749,7 +750,7 @@ object DottyInjectedPlugin extends AutoPlugin {
     )
 
   lazy val `dotty-language-server` = project.in(file("language-server")).
-    dependsOn(`dotty-bootstrapped`).
+    dependsOn(`dotty-compiler-bootstrapped`).
     settings(commonBootstrappedSettings).
     settings(
       // fork so that the shutdown hook in Main is run when we ctrl+c a run
