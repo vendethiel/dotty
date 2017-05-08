@@ -16,7 +16,7 @@ sbt ";sbt-dotty/publishLocal;dotty-bootstrapped/publishLocal"
 
 Follow https://github.com/lampepfl/dotty-example-project, but use the version of Dotty you built:
 ```scala
-scalaVersion := 0.1.1-bin-SNAPSHOT
+scalaVersion := "0.1.1-bin-SNAPSHOT"
 ```
 and the version of sbt-dotty you built:
 
