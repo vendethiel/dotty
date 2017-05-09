@@ -135,7 +135,10 @@ class ScalaLanguageServer extends LanguageServer with LanguageClientAware { this
 
   override def initialize(params: InitializeParams): CompletableFuture[InitializeResult] = computeAsync { cancelToken =>
 
-    val configs: List[IDEConfig] = (new ObjectMapper).readValue(new JFile(new URI(params.getRootUri + "/.dotty-ide.json")), classOf[Array[IDEConfig]]).toList
+    // Get rid of it after https://github.com/emacs-lsp/lsp-mode/issues/84 is fixed.
+    val rootUri = Option(params.getRootUri).getOrElse("file://" + params.getRootPath)
+
+    val configs: List[IDEConfig] = (new ObjectMapper).readValue(new JFile(new URI(rootUri + "/.dotty-ide.json")), classOf[Array[IDEConfig]]).toList
 
     val defaultFlags = List(/*"-Yplain-printer","-Ydebug", "-Yprintpos", */ "-Ystop-after:frontend", "-Yretain-trees")
     for (config <- configs) {
