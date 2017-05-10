@@ -1,0 +1,78 @@
+#!/usr/bin/env python2
+import subprocess
+import sys
+from urllib2 import urlopen, URLError
+import os.path
+
+#VERSION = "0.1.1-bin-20170508-a391a58-NIGHTLY"
+VERSION = "0.1.1-bin-SNAPSHOT"
+
+################################################################################
+# Some basic coloring support:                                                 #
+################################################################################
+class Color:
+    def supports_color():
+        return (sys.platform != 'win32' or 'ANSICON' in os.environ) and \
+                hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+
+    BLUE    = '\033[94m' if supports_color() else ''
+    GREEN   = '\033[92m' if supports_color() else ''
+    RED     = '\033[91m' if supports_color() else ''
+    NOCOLOR = '\033[0m'  if supports_color() else ''
+
+    @staticmethod
+    def color(c, string):
+        return c + string + Color.NOCOLOR
+    @staticmethod
+    def red(string):
+        return Color.color(Color.RED, string)
+    @staticmethod
+    def green(string):
+        return Color.color(Color.GREEN, string)
+    @staticmethod
+    def blue(string):
+        return Color.color(Color.BLUE, string)
+
+# Log without printin newline
+def log(msg):
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+
+def logln(msg):
+    print msg
+
+################################################################################
+# Download coursier to get other dependencies                                  #
+################################################################################
+coursier_url = 'https://github.com/coursier/coursier/raw/v1.0.0-RC2/coursier'
+
+try:
+    if not os.path.isfile("coursier"):
+        log(Color.blue('Downloading coursier...'))
+
+        response = urlopen(coursier_url)
+        with open("coursier", 'wb') as f:
+            while True:
+                chunk = response.read(16 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+        logln(Color.green("DONE!"))
+except URLError:
+    logln(Color.red("Couldn't download coursier jar from '%s'" % coursier_url))
+    sys.exit(1)
+
+
+logln(Color.blue("Downloading dependencies from maven..."))
+invoke_coursier = \
+        subprocess.call([ 'java' , '-jar'
+                        , 'coursier' , 'fetch' , '-p' , '-r' , 'ivy2Local'
+                        ,'-r' , 'sonatype:snapshots'
+                        , 'ch.epfl.lamp:dotty-language-server_0.1:' + VERSION
+                        ])
+
+if not invoke_coursier == 0:
+    logln(Color.red("Failed to invoke coursier, exiting...."))
+    sys.exit(1)
+else:
+    logln(Color.green("Successfully downloaded all dependencies."))
