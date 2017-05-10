@@ -1677,12 +1677,12 @@ object Types {
       if (reduced.exists) reduced else this
     }
 
-    def symbol(implicit ctx: Context): Symbol = {
-      val now = ctx.period
-      if (checkedPeriod == now ||
-          lastDenotation == null && lastSymbol != null) lastSymbol
+    def symbol(implicit ctx: Context): Symbol =
+      if (checkedPeriod.runId == ctx.runId) lastSymbol else computeSymbol
+
+    def computeSymbol(implicit ctx: Context): Symbol =
+      if (lastDenotation == null && lastSymbol != null) lastSymbol
       else denot.symbol
-    }
 
     /** Retrieves currently valid symbol without necessarily updating denotation.
      *  Assumes that symbols do not change between periods in the same run.
