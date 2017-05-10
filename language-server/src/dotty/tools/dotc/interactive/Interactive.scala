@@ -60,21 +60,7 @@ object Interactive {
       // FIXME: We shouldn't need a cast. Change NavigateAST.pathTo to return a List of Tree?
       val path = NavigateAST.pathTo(spos.pos, stree.tree).asInstanceOf[List[untpd.Tree]]
 
-      def sanePath(path: List[untpd.Tree]): List[untpd.Tree] = path match {
-        case p0 :: p1 :: _ if p0.pos.sameRange(p1.pos) =>
-          // Before typing: Ident(foo)
-          // After typing: Select(This(A), foo)
-          // Select and This get position of original Ident, we want Select.
-          sanePath(path.tail)
-        case p0 :: _ if !p0.hasType =>
-          // This wouldn't be needed if typed trees only contain typed trees but this is incorrect in two
-          // cases currently: `Super` and `This` have `untpd.Ident` members
-          sanePath(path.tail)
-        case _ =>
-          path
-      }
-      // println("###PATH: " + path.map(_.show))
-      sanePath(path).asInstanceOf[List[tpd.Tree]]
+      path.dropWhile(!_.hasType).asInstanceOf[List[tpd.Tree]]
     })
 
   /** The type of the closest enclosing tree containing position `spos`. */
