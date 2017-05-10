@@ -128,7 +128,7 @@ object Checking {
   /** A type map which checks that the only cycles in a type are F-bounds
    *  and that protects all F-bounded references by LazyRefs.
    */
-  class CheckNonCyclicMap(sym: Symbol, reportErrors: Boolean)(implicit ctx: Context) extends TypeMap {
+  class CheckNonCyclicMap(rootSym: Symbol, reportErrors: Boolean)(implicit ctx: Context) extends TypeMap {
 
     /** Set of type references whose info is currently checked */
     private val locked = mutable.Set[TypeRef]()
@@ -200,12 +200,12 @@ object Checking {
       case tp @ TypeRef(pre, name) =>
         try {
           // A prefix is interesting if it might contain (transitively) a reference
-          // to symbol `sym` itself. We only check references with interesting
+          // to symbol `rootSym` itself. We only check interesting
           // prefixes for cycles. This pruning is done in order not to force
           // global symbols when doing the cyclicity check.
           def isInteresting(prefix: Type): Boolean = prefix.stripTypeVar match {
             case NoPrefix => true
-            case prefix: ThisType => sym.owner.isClass && prefix.cls.isContainedIn(sym.owner)
+            case prefix: ThisType => rootSym.owner.isClass && prefix.cls.isContainedIn(rootSym.owner)
             case prefix: NamedType => !prefix.symbol.isStaticOwner && isInteresting(prefix.prefix)
             case SuperType(thistp, _) => isInteresting(thistp)
             case AndType(tp1, tp2) => isInteresting(tp1) || isInteresting(tp2)
@@ -213,15 +213,18 @@ object Checking {
             case _: RefinedOrRecType | _: HKApply => true
             case _ => false
           }
-          if (isInteresting(pre)) {
-            val pre1 = this(pre, false, false)
-            if (locked.contains(tp)) throw CyclicReference(tp.symbol)
+          val pre1 = if (isInteresting(pre)) this(pre, false, false) else pre
+          val sym = tp.symbol
+          if (!sym.isClass && !sym.is(BaseTypeArg)) {
+            // No need to follow infos of classes or type parameter arguments.
+            // Class cycles are already checked in `Namer#checkedParentType`.
+            // Type parameter arguments cannot produce cycles by themselves.
+            if (locked.contains(tp)) throw CyclicReference(sym)
             locked += tp
             try checkInfo(tp.info)
             finally locked -= tp
-            if (pre1 eq pre) tp else tp.newLikeThis(pre1)
           }
-          else tp
+          if (pre1 eq pre) tp else tp.newLikeThis(pre1)
         } catch {
           case ex: CyclicReference =>
             ctx.debuglog(i"cycle detected for $tp, $nestedCycleOK, $cycleOK")
