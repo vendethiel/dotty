@@ -76,3 +76,15 @@ if not invoke_coursier == 0:
     sys.exit(1)
 else:
     logln(Color.green("Successfully downloaded all dependencies."))
+
+logln(Color.blue("Starting dotty language server..."))
+subprocess.Popen([ 'java', '-jar'
+                 , 'coursier'
+                 , 'launch'
+                 , 'ch.epfl.lamp:dotty-language-server_0.1:0.1.1-bin-SNAPSHOT'
+                 , '-M'
+                 , 'dotty.tools.dotc.interactive.Main'
+                 , '--'
+                 , '-stdio'
+                 ],
+                 stdin=sys.stdin, stdout=sys.stdout).wait()
