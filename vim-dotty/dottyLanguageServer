@@ -81,7 +81,7 @@ logln(Color.blue("Starting dotty language server..."))
 subprocess.Popen([ 'java', '-jar'
                  , 'coursier'
                  , 'launch'
-                 , 'ch.epfl.lamp:dotty-language-server_0.1:0.1.1-bin-SNAPSHOT'
+                 , 'ch.epfl.lamp:dotty-language-server_0.1:' + VERSION
                  , '-M'
                  , 'dotty.tools.dotc.interactive.Main'
                  , '--'
