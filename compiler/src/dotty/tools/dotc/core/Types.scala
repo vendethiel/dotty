@@ -1462,7 +1462,8 @@ object Types {
 
     private[this] var lastDenotation: Denotation = _
     private[this] var lastSymbol: Symbol = _
-    private[this] var checkedPeriod = Nowhere
+    private[this] var checkedPeriod = Nowhere // the period where lastDenotation was known to be up-to-date
+    private[this] var checkedRunId = NoRunId // the run id where lastSymbol was known to be up-to-date
 
     // Invariants:
     // (1) checkedPeriod != Nowhere  =>  lastDenotation != null
@@ -1542,6 +1543,7 @@ object Types {
           checkDenot()
           lastSymbol = d.symbol
           checkedPeriod = ctx.period
+          checkedRunId = NoRunId
         }
         d
       }
@@ -1623,6 +1625,7 @@ object Types {
       checkDenot()
       lastSymbol = denot.symbol
       checkedPeriod = Nowhere
+      checkedRunId = NoRunId
     }
 
     private[dotc] def withSym(sym: Symbol, signature: Signature)(implicit ctx: Context): ThisType =
@@ -1644,6 +1647,7 @@ object Types {
       lastDenotation = null
       lastSymbol = sym
       checkedPeriod = Nowhere
+      checkedRunId = NoRunId
     }
 
     private def withSig(sig: Signature)(implicit ctx: Context): NamedType =
@@ -1678,19 +1682,17 @@ object Types {
     }
 
     def symbol(implicit ctx: Context): Symbol =
-      if (checkedPeriod.runId == ctx.runId) lastSymbol else computeSymbol
+      if (checkedRunId == ctx.runId) lastSymbol else computeSymbol
 
-    def computeSymbol(implicit ctx: Context): Symbol =
-      if (lastDenotation == null && lastSymbol != null) lastSymbol
-      else denot.symbol
-
-    /** Retrieves currently valid symbol without necessarily updating denotation.
-     *  Assumes that symbols do not change between periods in the same run.
-     *  Used to get the class underlying a ThisType.
-     */
-    private[Types] def stableInRunSymbol(implicit ctx: Context): Symbol =
-      if (checkedPeriod.runId == ctx.runId) lastSymbol
-      else symbol
+    private def computeSymbol(implicit ctx: Context): Symbol = {
+      val sym =
+        if (lastSymbol != null &&
+           (lastDenotation == null || lastDenotation.validFor.runId == ctx.runId))
+          lastSymbol
+        else denot.symbol
+      if (lastSymbol != null) checkedRunId = ctx.runId
+      sym
+    }
 
     def info(implicit ctx: Context): Type = denot.info
 
@@ -2061,7 +2063,7 @@ object Types {
    *  do not survive runs whereas typerefs do.
    */
   abstract case class ThisType(tref: TypeRef) extends CachedProxyType with SingletonType {
-    def cls(implicit ctx: Context): ClassSymbol = tref.stableInRunSymbol.asClass
+    def cls(implicit ctx: Context): ClassSymbol = tref.symbol.asClass
     override def underlying(implicit ctx: Context): Type =
       if (ctx.erasedTypes) tref else cls.classInfo.selfType
     override def computeHash = doHash(tref)
