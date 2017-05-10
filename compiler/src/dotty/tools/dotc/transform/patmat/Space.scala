@@ -366,12 +366,7 @@ class SpaceEngine(implicit ctx: Context) extends SpaceLogic {
 
   /** Decompose a type into subspaces -- assume the type can be decomposed */
   def decompose(tp: Type): List[Space] = {
-    val children = tp.classSymbol.annotations.filter(_.symbol == ctx.definitions.ChildAnnot).map { annot =>
-      // refer to definition of Annotation.makeChild
-      annot.tree match {
-        case Apply(TypeApply(_, List(tpTree)), _) => tpTree.symbol
-      }
-    }
+    val children = tp.classSymbol.children
 
     tp match {
       case OrType(tp1, tp2) => List(Typ(tp1, true), Typ(tp2, true))
