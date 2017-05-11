@@ -2,6 +2,7 @@
 import subprocess
 import sys
 from urllib2 import urlopen, URLError
+import os
 import os.path
 
 #VERSION = "0.1.1-bin-20170508-a391a58-NIGHTLY"
@@ -78,13 +79,12 @@ else:
     logln(Color.green("Successfully downloaded all dependencies."))
 
 logln(Color.blue("Starting dotty language server..."))
-subprocess.Popen([ 'java', '-jar'
-                 , 'coursier'
-                 , 'launch'
-                 , 'ch.epfl.lamp:dotty-language-server_0.1:' + VERSION
-                 , '-M'
-                 , 'dotty.tools.dotc.interactive.Main'
-                 , '--'
-                 , '-stdio'
-                 ],
-                 stdin=sys.stdin, stdout=sys.stdout).wait()
+os.execvp('java', [ 'java'
+                  , '-jar'
+                  , 'coursier'
+                  , 'launch'
+                  , 'ch.epfl.lamp:dotty-language-server_0.1:' + VERSION
+                  , '-M'
+                  , 'dotty.tools.dotc.interactive.Main'
+                  , '--'
+                  , '-stdio'])
