@@ -343,6 +343,9 @@ class TreeChecker extends Phase with SymTransformer {
           !tree.name.is(OuterSelectName) // outer selects have effectively fixed symbols
           ) {
         val qualTpe = tree.qualifier.typeOpt
+        if (tree.toString == "Select(Ident(f3),apply$mcII$sp)") {
+          println("here")
+        }
         val member =
           if (sym.is(Private)) qualTpe.member(tree.name)
           else qualTpe.nonPrivateMember(tree.name)

@@ -1605,11 +1605,13 @@ object SymDenotations {
     final def nonPrivateMembersNamed(name: Name, inherited: Boolean = false)(implicit ctx: Context): PreDenotation = {
       Stats.record("nonPrivateMembersNamed")
       if (Config.cacheMembersNamed) {
+        if (name.toString == "apply$mcII$sp")
+          println("here")
         var denots: PreDenotation = memberCache lookup name
         if (denots == null) {
           denots = computeNPMembersNamed(name, inherited)
           if (isFullyCompleted) memberCache.enter(name, denots)
-        } else if (Config.checkCacheMembersNamed) {
+        } else if (true) {
           val denots1 = computeNPMembersNamed(name, inherited)
           assert(denots.exists == denots1.exists, s"cache inconsistency: cached: $denots, computed $denots1, name = $name, owner = $this")
         }
