@@ -245,15 +245,12 @@ object TypeErasure {
         case JavaArrayType(_) => defn.ObjectType
         case _ =>
           val cls2 = tp2.classSymbol
-          val t = tp1.baseClasses
-            .find(bc => cls2.derivesFrom(bc) && bc != defn.AnyClass)
+          // The above algorithm is approximated by finding the first
+          // superclass or trait S of tp1 such that tp1 derivesFrom it.
+          tp1.baseClasses
+            .find(x => cls2.derivesFrom(x) && x != defn.AnyClass && x != defn.AnyValClass)
             .getOrElse(defn.ObjectClass)
-
-          // We might as well merge the AnyClass & AnyValClass cases in the find...
-          if (t eq defn.AnyValClass)
-            // while AnyVal is a valid common super class for primitives it does not exist after erasure
-            defn.ObjectType
-          else t.typeRef
+            .typeRef
       }
   }
 
