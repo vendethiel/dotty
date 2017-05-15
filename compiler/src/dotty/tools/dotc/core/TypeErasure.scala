@@ -247,18 +247,11 @@ object TypeErasure {
           val cls2 = tp2.classSymbol
           @tailrec def loop(bcs: List[ClassSymbol], bestSoFar: ClassSymbol): ClassSymbol = bcs match {
             case bc :: bcs1 =>
-              // Suppose bc == defn.AnyClass
-              if (cls2.derivesFrom(bc)) { // true
-                val newBest = if (bestSoFar.derivesFrom(bc)) bestSoFar else bc
-                // newBest = bestSoFar (also true, everything derives from Any)
-
-                if (bc != defn.AnyClass) // false
-                  newBest
-                else
-                  // newBest = bestSoFar; so this is equivalant to loop(bcs1, bestSoFar)
-                  // these two branches can be merged
-                  loop(bcs1, newBest)
-              } else
+              if (cls2.derivesFrom(bc) && bc != defn.AnyClass)
+                if (bestSoFar.derivesFrom(bc)) bestSoFar else bc
+              else
+                // This is the only recursive call, bestSoFar is stable: always Object.
+                // As a result `bestSoFar.derivesFrom(bc)` is always false.
                 loop(bcs1, bestSoFar)
             case nil =>
               bestSoFar
