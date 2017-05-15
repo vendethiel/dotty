@@ -245,18 +245,11 @@ object TypeErasure {
         case JavaArrayType(_) => defn.ObjectType
         case _ =>
           val cls2 = tp2.classSymbol
-          @tailrec def loop(bcs: List[ClassSymbol], bestSoFar: ClassSymbol): ClassSymbol = bcs match {
-            case bc :: bcs1 =>
-              if (cls2.derivesFrom(bc) && bc != defn.AnyClass)
-                if (bestSoFar.derivesFrom(bc)) bestSoFar else bc
-              else
-                // This is the only recursive call, bestSoFar is stable: always Object.
-                // As a result `bestSoFar.derivesFrom(bc)` is always false.
-                loop(bcs1, bestSoFar)
-            case nil =>
-              bestSoFar
-          }
-          val t = loop(tp1.baseClasses, defn.ObjectClass)
+          val t = tp1.baseClasses
+            .find(bc => cls2.derivesFrom(bc) && bc != defn.AnyClass)
+            .getOrElse(defn.ObjectClass)
+
+          // We might as well merge the AnyClass & AnyValClass cases in the find...
           if (t eq defn.AnyValClass)
             // while AnyVal is a valid common super class for primitives it does not exist after erasure
             defn.ObjectType
