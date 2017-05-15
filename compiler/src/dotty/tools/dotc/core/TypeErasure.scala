@@ -250,7 +250,7 @@ object TypeErasure {
               if (cls2.derivesFrom(bc)) {
                 val newBest = if (bestSoFar.derivesFrom(bc)) bestSoFar else bc
 
-                if (!bc.is(Trait) && bc != defn.AnyClass)
+                if (bc != defn.AnyClass)
                   newBest
                 else
                   loop(bcs1, newBest)
