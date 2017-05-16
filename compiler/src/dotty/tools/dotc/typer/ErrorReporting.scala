@@ -148,6 +148,7 @@ object ErrorReporting {
       val found1 = reported(found)
       reported.setVariance(-1)
       val expected1 = reported(expected)
+      println(i"type error $found not <:< $expected, ${ctx.typeComparer.isFrozen}")
       TypeMismatch(found1, expected1, whyNoMatchStr(found, expected), postScript)
     }
 

@@ -2878,7 +2878,7 @@ object Types {
           rt.derivedTypeAlias(expand(rt.alias))
         case rt @ TypeBounds(lo, hi) =>
           rt.derivedTypeBounds(
-            if (lo.isRef(defn.NothingClass)) lo else expand(lo), expand(hi))
+            if (lo.isRef(defn.NothingClass) && false) lo else expand(lo), expand(hi))
         case rt =>
           expand(rt)
       }

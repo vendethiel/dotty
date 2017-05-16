@@ -44,10 +44,12 @@ object Checking {
       if (!bound.isHK && arg.tpe.isHK)
         ctx.error(ex"missing type parameter(s) for $arg", arg.pos)
     }
-    for ((arg, which, bound) <- ctx.boundsViolations(args, boundss, instantiate))
+    for ((arg, bound, isUpper) <- ctx.boundsViolations(args, boundss, instantiate)) {
+      val (which, lo, hi) = if (isUpper) ("upper", arg.tpe, bound) else ("lower", bound, arg.tpe)
       ctx.error(
-          ex"Type argument ${arg.tpe} does not conform to $which bound $bound ${err.whyNoMatchStr(arg.tpe, bound)}",
+          ex"Type argument ${arg.tpe} does not conform to $which bound $bound ${err.whyNoMatchStr(lo, hi)}",
           arg.pos.focus)
+    }
   }
 
   /** Check that type arguments `args` conform to corresponding bounds in `tl`

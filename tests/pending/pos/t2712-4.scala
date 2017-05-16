@@ -5,9 +5,9 @@ object Test1 {
   trait Y extends X
   class Foo[T, U <: X]
   def meh[M[_ <: A], A](x: M[A]): M[A] = x
-  meh(new Foo[Int, Y])
+  meh[[U >: Y] => Foo[Int, U], X](new Foo[Int, Y])
 }
-
+/*
 object Test2 {
   trait X
   trait Y extends X
@@ -15,3 +15,4 @@ object Test2 {
   def meh[M[_ >: A], A](x: M[A]): M[A] = x
   meh(new Foo[Int, X])
 }
+*/

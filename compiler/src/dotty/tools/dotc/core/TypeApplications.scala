@@ -43,22 +43,26 @@ object TypeApplications {
   }
 
   /** Does variance `v1` conform to variance `v2`?
-   *  This is the case if the variances are the same or `sym` is nonvariant.
+   *  This is the case if the variances are the same or `v2` is nonvariant.
    */
   def varianceConforms(v1: Int, v2: Int): Boolean =
     v1 == v2 || v2 == 0
 
-  /** Does the variance of type parameter `tparam1` conform to the variance of type parameter `tparam2`?
+  /** Does the variance of type parameter `tparam1` conform to the variance
+   *  of type parameter `tparam2`?
+   *  This is the case if the variances are the same or `tparam2` is nonvariant,
+   *  or `tp1` exists and `tparam1` does not appear in `tp1`.
    */
-  def varianceConforms(tparam1: TypeParamInfo, tparam2: TypeParamInfo)(implicit ctx: Context): Boolean =
-    varianceConforms(tparam1.paramVariance, tparam2.paramVariance)
+  def varianceConforms(tparam1: TypeParamInfo, tparam2: TypeParamInfo, tp1: Type)(implicit ctx: Context): Boolean =
+    varianceConforms(tparam1.paramVariance, tparam2.paramVariance) ||
+    tp1.exists && !tparam1.paramRef.occursIn(tp1)
 
   /** Do the variances of type parameters `tparams1` conform to the variances
    *  of corresponding type parameters `tparams2`?
    *  This is only the case of `tparams1` and `tparams2` have the same length.
    */
-  def variancesConform(tparams1: List[TypeParamInfo], tparams2: List[TypeParamInfo])(implicit ctx: Context): Boolean =
-    tparams1.corresponds(tparams2)(varianceConforms)
+  def variancesConform(tparams1: List[TypeParamInfo], tparams2: List[TypeParamInfo], tp1: Type = NoType)(implicit ctx: Context): Boolean =
+    tparams1.corresponds(tparams2)(varianceConforms(_, _, tp1))
 
   /** Extractor for
    *
@@ -276,9 +280,9 @@ class TypeApplications(val self: Type) extends AnyVal {
   /** Convert a type constructor `TC` which has type parameters `T1, ..., Tn`
    *  in a context where type parameters `U1,...,Un` are expected to
    *
-   *     LambdaXYZ { Apply = TC[hk$0, ..., hk$n] }
+   *     [v1 X1, ..., vn Xn] => TC[X1, ..., Xn]
    *
-   *  Here, XYZ corresponds to the variances of
+   *  Here, the variances v1, ..., vn of X1, ..., Xn are the variances of
    *   - `U1,...,Un` if the variances of `T1,...,Tn` are pairwise compatible with `U1,...,Un`,
    *   - `T1,...,Tn` otherwise.
    *  v1 is compatible with v2, if v1 = v2 or v2 is non-variant.
@@ -342,7 +346,8 @@ class TypeApplications(val self: Type) extends AnyVal {
       def adaptArg(arg: Type): Type = arg match {
         case arg @ HKTypeLambda(tparams, body) if
              !tparams.corresponds(hkParams)(_.paramVariance == _.paramVariance) &&
-             tparams.corresponds(hkParams)(varianceConforms) =>
+             variancesConform(tparams, hkParams) =>
+
           HKTypeLambda(
             (tparams, hkParams).zipped.map((tparam, hkparam) =>
               tparam.paramName.withVariance(hkparam.paramVariance)))(

@@ -434,10 +434,10 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
 
   /** An argument bounds violation is a triple consisting of
    *   - the argument tree
-   *   - a string "upper" or "lower" indicating which bound is violated
    *   - the violated bound
+   *   - a boolean indicating "bound is an upper bound"
    */
-  type BoundsViolation = (Tree, String, Type)
+  type BoundsViolation = (Tree, Type, Boolean)
 
   /** The list of violations where arguments are not within bounds.
    *  @param  args          The arguments
@@ -456,8 +456,8 @@ trait TypeOps { this: Context => // TODO: Make standalone object.
         val loBound = instantiate(bounds.lo, argTypes.mapConserve(_.bounds.lo))
           // Note that argTypes can contain a TypeBounds type for arguments that are
           // not fully determined. In that case we need to check against the hi bound of the argument.
-        if (!(lo <:< hiBound)) violations += ((arg, "upper", hiBound))
-        if (!(loBound <:< hi)) violations += ((arg, "lower", bounds.lo))
+        if (!(lo <:< hiBound)) violations += ((arg, hiBound, true))
+        if (!(loBound <:< hi)) violations += ((arg, loBound, false))
       }
       arg.tpe match {
         case TypeBounds(lo, hi) => checkOverlapsBounds(lo, hi)

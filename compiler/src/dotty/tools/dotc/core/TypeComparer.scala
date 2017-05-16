@@ -681,7 +681,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         val lengthDiff = tparams1a.length - tparams.length
         lengthDiff >= 0 && {
           val tparams1 = tparams1a.drop(lengthDiff)
-          variancesConform(tparams1, tparams) && {
+          variancesConform(tparams1, tparams, tp1) && {
             if (lengthDiff > 0)
               tycon1b = HKTypeLambda(tparams1.map(_.paramName))(
                 tl => tparams1.map(tparam => tl.integrate(tparams, tparam.paramInfo).bounds),
