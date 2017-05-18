@@ -613,7 +613,7 @@ object Contexts {
     def macrosEnabled: Boolean = _macrosEnabled
     private def initMacrosEnabled(implicit ctx: Context) = {
       _macrosEnabled = try {
-        Class.forName("scala.gestalt.package", false, classloader)
+        Class.forName("scala.gestalt.api", false, classloader)
         true
       } catch {
         case _: ClassNotFoundException =>

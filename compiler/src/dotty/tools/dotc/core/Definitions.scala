@@ -667,16 +667,12 @@ class Definitions {
   def ShowAsInfixAnnot(implicit ctx: Context) = ShowAsInfixAnotType.symbol.asClass
 
   // macro-related definitions
-  lazy val GestaltPackage = ctx.requiredModule("scala.gestalt.package")
-  def meta(implicit ctx: Context) = GestaltPackage.requiredMethodRef(nme.meta).symbol
-
-  def QuasiquoteHelper(implicit ctx: Context) = ctx.requiredClass("scala.gestalt.QuasiquoteHelper")
+  def QuasiquoteHelper(implicit ctx: Context) = ctx.requiredClass("scala.gestalt.api.QuasiquoteHelper")
   def q(implicit ctx: Context) = QuasiquoteHelper.requiredValue("q").info.classSymbol
   def t(implicit ctx: Context) = QuasiquoteHelper.requiredValue("t").info.classSymbol
 
-  lazy val ToolboxType = ctx.requiredClassRef("scala.gestalt.Toolbox")
+  lazy val ToolboxType = ctx.requiredClassRef("scala.gestalt.core.Toolbox")
   def Toolbox(implicit ctx: Context) = ToolboxType.symbol.asClass
-  def toolbox(implicit ctx: Context) = GestaltPackage.requiredValue("toolbox".toTermName)
 
   def WeakTypeTag(implicit ctx: Context) = Toolbox.info.member("WeakTypeTag".toTypeName).symbol
 

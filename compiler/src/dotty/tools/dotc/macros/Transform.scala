@@ -33,7 +33,7 @@ import config.Printers.{ macros => debug }
  *    }
  *
  *    object main$inline {
- *      @static def f(toolbox: Toolbox, prefix: toolbox.Tree)(T: toolbox.TypeTree)(a: toolbox.Tree)(b: toolbox.Tree): toolbox.Tree = body
+ *      @static def f(prefix: Tree)(T: TypeTree)(a: Tree)(b: Tree): Tree = body
  *    }
  */
 
@@ -128,9 +128,9 @@ private[macros] object Transform {
    *  will be implemented by
    *
    *    @static
-   *    def f(toolbox: Toolbox, prefix: toolbox.TermTree)
-   *         (T: toolbox.TypeTree)
-   *         (a: toolbox.TermTree)(b: toolbox.TermTree): toolbox.Tree = body
+   *    def f(prefix: TermTree)
+   *         (T: TypeTree)
+   *         (a: TermTree)(b: TermTree): Tree = body
    *
    *  with `this` replaced by `prefix` in `body`
    *
@@ -138,13 +138,11 @@ private[macros] object Transform {
   private def createImplMethod(defn: DefDef, isAnnotMacroDef: Boolean)(implicit ctx: Context): DefDef = {
     val Apply(_, rhs :: Nil) = defn.rhs
 
-    val tb = Ident("toolbox".toTermName)
+    val tb = Select(Select(Ident("scala".toTermName), "gestalt".toTermName), "api".toTermName)
     val treeType = Select(tb, "Tree".toTypeName)
     val termType = Select(tb, "TermTree".toTypeName)
     val typedTreeType = Select(Select(tb, "tpd".toTermName), "Tree".toTypeName)
 
-    val toolboxType = "Toolbox"
-    val toolbox = ValDef("toolbox".toTermName, Ident(toolboxType.toTypeName), EmptyTree).withFlags(TermParam | Implicit)
     val prefix = ValDef("prefix".toTermName, if (isAnnotMacroDef) termType else typedTreeType, EmptyTree).withFlags(TermParam)
     val typeParams = for (tdef: TypeDef <- defn.tparams)
       yield ValDef(tdef.name.toTermName, typedTreeType, EmptyTree).withFlags(TermParam)
@@ -163,8 +161,8 @@ private[macros] object Transform {
       }
 
     val params =
-      if (typeParams.size > 0) List(toolbox, prefix) :: typeParams :: termParams
-      else List(toolbox, prefix) :: termParams
+      if (typeParams.size > 0) List(prefix) :: typeParams :: termParams
+      else List(prefix) :: termParams
 
     // replace `this` with `prefix`
     val mapper = new UntypedTreeMap {
