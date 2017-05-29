@@ -191,17 +191,9 @@ object Build {
     // Compile using the non-bootstrapped and non-published dotty
     managedScalaInstance := false,
     scalaInstance := {
-      val (libraryJar, compilerJar) =
-        if (bootstrapFromPublishedJars.value) {
-          val jars = update.value.select(
-            configuration = configurationFilter(Configurations.ScalaTool.name),
-            artifact = artifactFilter(extension = "jar")
-          )
-          (jars.find(_.getName.startsWith("dotty-library_2.11")).get,
-           jars.find(_.getName.startsWith("dotty-compiler_2.11")).get)
-        } else
-          ((packageBin in (`dotty-library`, Compile)).value,
-           (packageBin in (`dotty-compiler`, Compile)).value)
+      val home = System.getProperty("user.home")
+      val libraryJar = new File(s"$home/.ivy2/local/ch.epfl.lamp/dotty-library_0.1/0.1.1-bin-SNAPSHOT/jars/dotty-library_0.1.jar")
+      val compilerJar = new File(s"$home/.ivy2/local/ch.epfl.lamp/dotty-compiler_0.1/0.1.1-bin-SNAPSHOT/jars/dotty-compiler_0.1.jar")
 
       // All compiler dependencies except the library
       val otherDependencies = (dependencyClasspath in (`dotty-compiler`, Compile)).value
