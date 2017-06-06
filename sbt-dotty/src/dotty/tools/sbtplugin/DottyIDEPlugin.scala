@@ -62,16 +62,16 @@ object DottyIDEPlugin extends AutoPlugin {
     // Use Def.derive so `projectConfig` is only defined in the configurations where the
     // tasks/settings it depends on are defined.
     Def.derive(projectConfig := {
+      val id = s"${thisProject.value.id}/${configuration.value.name}"
+      val compilerVersion = scalaVersion.value
+        .replace("-nonbootstrapped", "") // The language server is only published bootstrapped
+      val compilerArguments = scalacOptions.value
+      val sourceDirectories = unmanagedSourceDirectories.value ++ managedSourceDirectories.value
+      val depClasspath = Attributed.data(dependencyClasspath.value)
+      val classDir = classDirectory.value
+
       if (sources.value.isEmpty) None
       else {
-        val id = s"${thisProject.value.id}/${configuration.value.name}"
-        val compilerVersion = scalaVersion.value
-          .replace("-nonbootstrapped", "") // The language server is only published bootstrapped
-        val compilerArguments = scalacOptions.value
-        val sourceDirectories = unmanagedSourceDirectories.value ++ managedSourceDirectories.value
-        val depClasspath = Attributed.data(dependencyClasspath.value)
-        val classDir = classDirectory.value
-
         Some(new ProjectConfig(
           id,
           compilerVersion,
