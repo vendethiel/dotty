@@ -37,7 +37,8 @@ package object macros {
    *  @param tree   the Apply tree
    */
   def isQuasiquote(symbol: Symbol)(implicit ctx: Context): Boolean =
-    symbol.isContainedIn(defn.q) || symbol.isContainedIn(defn.t)
+    (symbol.isContainedIn(defn.q) || symbol.isContainedIn(defn.t)) &&
+      (symbol.name == nme.apply || symbol.name == nme.unapply)
 
   /** Expand a quasiquote tree */
   def expandQuasiquote(tree: Tree, isTerm: Boolean)(implicit ctx: Context): Tree = {
