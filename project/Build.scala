@@ -7,17 +7,11 @@ import java.nio.file.Files
 import java.util.Calendar
 
 import scala.reflect.io.Path
-import sbtassembly.AssemblyKeys.assembly
-import xerial.sbt.Pack._
 
 import sbt.Package.ManifestAttributes
 
-import com.typesafe.sbteclipse.plugin.EclipsePlugin._
-
 import dotty.tools.sbtplugin.DottyPlugin.autoImport._
 import dotty.tools.sbtplugin.DottyIDEPlugin.autoImport._
-import org.scalajs.sbtplugin.ScalaJSPlugin
-import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 
 /* In sbt 0.13 the Build trait would expose all vals to the shell, where you
  * can use them in "set a := b" like expressions. This re-exposes them.
@@ -138,7 +132,6 @@ object Build {
 
   // Settings used when compiling dotty with a non-bootstrapped dotty
   lazy val commonBootstrappedSettings = commonSettings ++ Seq(
-    EclipseKeys.skipProject := true,
     version := dottyVersion,
     scalaVersion := dottyNonBootstrappedVersion,
 
@@ -270,8 +263,6 @@ object Build {
       crossPaths := false,
       // Do not depend on the Scala library
       autoScalaLibrary := false,
-      // Let the sbt eclipse plugin know that this is a Java-only project
-      EclipseKeys.projectFlavor := EclipseProjectFlavor.Java,
       //Remove javac invalid options in Compile doc
       javacOptions in (Compile, doc) --= Seq("-Xlint:unchecked", "-Xlint:deprecation")
     )
@@ -347,10 +338,6 @@ object Build {
     settings(commonScala2Settings).
     settings(
       resourceDirectory in Test := baseDirectory.value / "test" / "resources",
-
-      // specify main and ignore tests when assembling
-      mainClass in assembly := Some("dotty.tools.bot.Main"),
-      test in assembly := {},
 
       libraryDependencies ++= {
         val circeVersion = "0.7.0"
@@ -440,18 +427,11 @@ object Build {
         Seq(file)
       }.taskValue,
 
-      // include sources in eclipse (downloads source code for all dependencies)
-      //http://stackoverflow.com/questions/10472840/how-to-attach-sources-to-sbt-managed-dependencies-in-scala-ide#answer-11683728
-      com.typesafe.sbteclipse.plugin.EclipsePlugin.EclipseKeys.withSource := true,
-
       // get libraries onboard
-      libraryDependencies ++= Seq("com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
+      libraryDependencies ++= Seq("org.scala-sbt" % "compiler-interface" % "1.0.0-X16",
                                   ("org.scala-lang.modules" %% "scala-xml" % "1.0.1").withDottyCompat(),
                                   "com.novocode" % "junit-interface" % "0.11" % "test",
                                   "org.scala-lang" % "scala-library" % scalacVersion % "test"),
-
-      // enable improved incremental compilation algorithm
-      incOptions := incOptions.value.withNameHashing(true),
 
       // For convenience, change the baseDirectory when running the compiler
       baseDirectory in (Compile, run) := baseDirectory.value / "..",
@@ -700,7 +680,7 @@ object Build {
     description := "sbt compiler bridge for Dotty",
     resolvers += Resolver.typesafeIvyRepo("releases"), // For org.scala-sbt:api
     libraryDependencies ++= Seq(
-      "com.typesafe.sbt" % "sbt-interface" % sbtVersion.value,
+      "org.scala-sbt" % "compiler-interface" % "1.0.0-X16",
       "org.scala-sbt" % "api" % sbtVersion.value % "test",
       ("org.specs2" %% "specs2" % "2.3.11" % "test").withDottyCompat()
     ),
@@ -899,8 +879,6 @@ object Build {
   lazy val `vscode-dotty` = project.in(file("vscode-dotty")).
     settings(commonSettings).
     settings(
-      EclipseKeys.skipProject := true,
-
       version := "0.1.0", // Keep in sync with package.json
 
       autoScalaLibrary := false,
@@ -1053,101 +1031,6 @@ object Build {
        </developers>
      )
    )
-
-  // Compile with dotty
-  lazy val compileWithDottySettings = {
-    inConfig(Compile)(inTask(compile)(Defaults.runnerTask) ++ Seq(
-      // Compile with dotty
-      fork in compile := true,
-
-      compile := {
-        val inputs = (compileInputs in compile).value
-        import inputs.config._
-
-        val s = streams.value
-        val logger = s.log
-        val cacheDir = s.cacheDirectory
-
-        // Discover classpaths
-
-        def cpToString(cp: Seq[File]) =
-          cp.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)
-
-        val compilerCp = Attributed.data((fullClasspath in (`dotty-compiler`, Compile)).value)
-        val cpStr = cpToString(classpath ++ compilerCp)
-
-        // List all my dependencies (recompile if any of these changes)
-
-        val allMyDependencies = classpath filterNot (_ == classesDirectory) flatMap { cpFile =>
-          if (cpFile.isDirectory) (cpFile ** "*.class").get
-          else Seq(cpFile)
-        }
-
-        // Compile
-
-        val cachedCompile = FileFunction.cached(cacheDir / "compile",
-            FilesInfo.lastModified, FilesInfo.exists) { dependencies =>
-
-          logger.info(
-              "Compiling %d Scala sources to %s..." format (
-              sources.size, classesDirectory))
-
-          if (classesDirectory.exists)
-            IO.delete(classesDirectory)
-          IO.createDirectory(classesDirectory)
-
-          val sourcesArgs = sources.map(_.getAbsolutePath()).toList
-
-          /* run.run() below in doCompile() will emit a call to its
-           * logger.info("Running dotty.tools.dotc.Main [...]")
-           * which we do not want to see. We use this patched logger to
-           * filter out that particular message.
-           */
-          val patchedLogger = new Logger {
-            def log(level: Level.Value, message: => String) = {
-              val msg = message
-              if (level != Level.Info ||
-                  !msg.startsWith("Running dotty.tools.dotc.Main"))
-                logger.log(level, msg)
-            }
-            def success(message: => String) = logger.success(message)
-            def trace(t: => Throwable) = logger.trace(t)
-          }
-
-          def doCompile(sourcesArgs: List[String]): Unit = {
-            val run = (runner in compile).value
-            run.run("dotty.tools.dotc.Main", compilerCp,
-                "-classpath" :: cpStr ::
-                "-d" :: classesDirectory.getAbsolutePath() ::
-                options ++:
-                sourcesArgs,
-                patchedLogger) foreach sys.error
-          }
-
-          // Work around the Windows limitation on command line length.
-          val isWindows =
-            System.getProperty("os.name").toLowerCase().indexOf("win") >= 0
-          if ((fork in compile).value && isWindows &&
-              (sourcesArgs.map(_.length).sum > 1536)) {
-            IO.withTemporaryFile("sourcesargs", ".txt") { sourceListFile =>
-              IO.writeLines(sourceListFile, sourcesArgs)
-              doCompile(List("@"+sourceListFile.getAbsolutePath()))
-            }
-          } else {
-            doCompile(sourcesArgs)
-          }
-
-          // Output is all files in classesDirectory
-          (classesDirectory ** AllPassFilter).get.toSet
-        }
-
-        cachedCompile((sources ++ allMyDependencies).toSet)
-
-        // We do not have dependency analysis when compiling externally
-        sbt.inc.Analysis.Empty
-      }
-    ))
-  }
 
   lazy val submoduleChecks = onLoad in Global := (onLoad in Global).value andThen { state =>
     val submodules = List(new File("scala-backend"), new File("scala2-library"), new File("collection-strawman"))
