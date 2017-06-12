@@ -72,7 +72,8 @@ class Foo {
   def test(bar: String): Unit = {
     val bla: String = "hehe"
 
-    { def x = 1; x; println(foo + bar + bla) }
+    { def x = 1; (); println(foo + bar + bla + x) }
+    // FIXME: block might not survive until backend, more reliable solution ?
   }
 }
 

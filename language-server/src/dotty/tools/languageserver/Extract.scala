@@ -42,7 +42,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
   class ExtractTransformer extends Transformer {
     var expr: tpd.Block = _
     var exprOwner: Symbol = _
-    var defs: List[tpd.DefTree] = Nil
+    var defs: List[DefDef] = Nil
 
     override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
       case tree: TypeDef if tree.symbol == GlobalClass =>
@@ -51,7 +51,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
       case _ =>
         if (tree.pos.exists && exprPos.contains(tree.pos)) {
           tree match {
-            case tree: DefTree =>
+            case tree: DefDef =>
               defs = tree :: defs
             case tree: Block =>
               assert(expr == null)
@@ -65,7 +65,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
     }
   }
 
-  class GlobalTransformer(expr: tpd.Block, exprOwner: Symbol, defs: List[tpd.DefTree]) extends Transformer {
+  class GlobalTransformer(expr: tpd.Block, exprOwner: Symbol, defs: List[DefDef]) extends Transformer {
     def rewiredTarget(referenced: Symbol)(implicit ctx: Context): Symbol =
       NoSymbol // TODO
 
