@@ -86,74 +86,79 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
       buf.toList
     }
 
+    def lifted(name: TermName, resultType: Type, origParams: List[NameTree], origOwner: Symbol, origClass: ClassSymbol, origBody: Tree)
+        (implicit ctx: Context): Tree = {
+      val paramNames = nme.SELF :: origParams.map(_.name.asTermName)
+      val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widenSingleton)
+      val liftedType = MethodType.apply(paramNames)(mt => paramInfos, mt => resultType)
+
+      val liftedSym = ctx.newSymbol(GlobalClass, name, Method | Synthetic, liftedType)
+
+      polyDefDef(liftedSym, trefs => vrefss => {
+        val thisRef :: argRefs = vrefss.flatten
+
+        def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
+          def rewireCall(thisArg: Tree): Tree = {
+            val rewired = rewiredTarget(tree.symbol)
+            if (rewired.exists) {
+              val base = thisArg.tpe
+
+              ref(rewired.termRef)
+                .appliedTo(thisArg)
+            } else EmptyTree
+          }
+          tree match {
+            case Ident(_) => rewireCall(thisRef)
+            case Select(qual, _) => rewireCall(qual)
+            case _ => EmptyTree
+          }
+        }
+
+        def rewireType(tpe: Type) = tpe match {
+          case tpe: TermRef if rewiredTarget(tpe.symbol).exists => tpe.widen
+          case _ => tpe
+        }
+
+        new TreeTypeMap(
+          typeMap = rewireType(_)
+            .subst(origParams.map(_.symbol), argRefs.map(_.tpe))
+            .substThisUnlessStatic(origClass, thisRef.tpe)
+            ,
+          treeMap = {
+            case tree: This if tree.symbol == origClass => thisRef
+            case tree =>
+              rewireTree(tree, Nil) orElse tree
+          },
+          oldOwners = exprOwner :: Nil,
+          newOwners = liftedSym :: Nil
+        ).transform(origBody)
+      })
+    }
+
 
     override def transform(tree: Tree)(implicit ctx: Context): Tree = {
       tree match {
         case tree: Template if tree.symbol.owner == GlobalClass =>
-          val origClass = exprOwner.enclosingClass.asClass
 
           val origParams = collectParams(expr)
-          println("params: " + origParams)
+          val origClass = exprOwner.enclosingClass.asClass
 
-          val paramNames = nme.SELF :: origParams.map(_.name.asTermName)
-          val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widenSingleton)
-          val resultType = defn.UnitType
-          val liftedType = MethodType.apply(paramNames)(mt => paramInfos, mt => resultType)
+          val liftedExpr = lifted("liftedExpr".toTermName, defn.UnitType, origParams, exprOwner, origClass, expr)
+          val liftedDefs = defs.map(d =>
+            lifted(d.name, d.tpt.tpe, collectParams(d.rhs) ++ d.vparamss.flatten, d.symbol.owner, origClass, d.rhs))
 
-          val liftedSym = ctx.newSymbol(GlobalClass, "liftedExpr".toTermName,
-            Method | Synthetic,
-            liftedType)
+          val allDefs = liftedExpr :: liftedDefs
 
-          val liftedDef = polyDefDef(liftedSym, trefs => vrefss => {
-            val thisRef :: argRefs = vrefss.flatten
-
-            def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
-              def rewireCall(thisArg: Tree): Tree = {
-                val rewired = rewiredTarget(tree.symbol)
-                if (rewired.exists) {
-                  val base = thisArg.tpe
-
-                  ref(rewired.termRef)
-                    .appliedTo(thisArg)
-                } else EmptyTree
-              }
-              tree match {
-                case Ident(_) => rewireCall(thisRef)
-                case Select(qual, _) => rewireCall(qual)
-                case _ => EmptyTree
-              }
-            }
-
-            def rewireType(tpe: Type) = tpe match {
-              case tpe: TermRef if rewiredTarget(tpe.symbol).exists => tpe.widen
-              case _ => tpe
-            }
-
-            new TreeTypeMap(
-              typeMap = rewireType(_)
-                .subst(origParams.map(_.symbol), argRefs.map(_.tpe))
-                .substThisUnlessStatic(origClass, thisRef.tpe)
-                ,
-              treeMap = {
-                case tree: This if tree.symbol == origClass => thisRef
-                case tree =>
-                  rewireTree(tree, Nil) orElse tree
-              },
-              oldOwners = exprOwner :: Nil,
-              newOwners = liftedSym :: Nil
-            ).transform(expr)
-          })
           val cinfo = GlobalClass.classInfo
           val newDecls = cinfo.decls.cloneScope
-          newDecls.enter(liftedSym)
+          allDefs.foreach(d => newDecls.enter(d.symbol))
 
 
           GlobalClass.copySymDenotation(
             info = cinfo.derivedClassInfo(
               decls = newDecls)).installAfter(thisTransformer)
 
-          cpy.Template(tree)(body = tree.body ++
-            List(liftedDef))
+          cpy.Template(tree)(body = tree.body ++ allDefs)
         case _ =>
           super.transform(tree)
       }
