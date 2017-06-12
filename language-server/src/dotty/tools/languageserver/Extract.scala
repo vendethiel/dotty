@@ -66,9 +66,6 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
   }
 
   class GlobalTransformer(expr: tpd.Block, exprOwner: Symbol, defs: List[DefDef]) extends Transformer {
-    def rewiredTarget(referenced: Symbol)(implicit ctx: Context): Symbol =
-      NoSymbol // TODO
-
     def collectParams(tree: Tree)(implicit ctx: Context) = {
       val buf = new mutable.ListBuffer[Ident]
 
@@ -86,30 +83,36 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
       buf.toList
     }
 
-    def lifted(name: TermName, resultType: Type, origParams: List[NameTree], origOwner: Symbol, origClass: ClassSymbol, origBody: Tree)
-        (implicit ctx: Context): Tree = {
+    def liftedSym(name: TermName, resultType: Type, origParams: List[NameTree], origClass: ClassSymbol)(implicit ctx: Context) = {
       val paramNames = nme.SELF :: origParams.map(_.name.asTermName)
       val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widenSingleton)
       val liftedType = MethodType.apply(paramNames)(mt => paramInfos, mt => resultType)
 
-      val liftedSym = ctx.newSymbol(GlobalClass, name, Method | Synthetic, liftedType)
+      ctx.newSymbol(GlobalClass, name, Method | Synthetic, liftedType)
+    }
 
-      polyDefDef(liftedSym, trefs => vrefss => {
+    def lifted(newSym: TermSymbol, resultType: Type, origParams: List[NameTree], origClass: ClassSymbol,
+      origOwner: Symbol, origBody: Tree, oldSyms: List[Symbol], newSyms: List[Symbol])(implicit ctx: Context): Tree = {
+      val symMap = (oldSyms, newSyms).zipped.toMap
+      def rewiredTarget(referenced: Symbol)(implicit ctx: Context): Symbol =
+        symMap.getOrElse(referenced, NoSymbol)
+
+      polyDefDef(newSym, trefs => vrefss => {
         val thisRef :: argRefs = vrefss.flatten
 
         def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
-          def rewireCall(thisArg: Tree): Tree = {
+          def rewireCall(thisArg: Tree, otherArgs: List[Tree]): Tree = {
             val rewired = rewiredTarget(tree.symbol)
             if (rewired.exists) {
-              val base = thisArg.tpe
-
               ref(rewired.termRef)
-                .appliedTo(thisArg)
+                .appliedTo(thisArg, otherArgs: _*)
             } else EmptyTree
           }
           tree match {
-            case Ident(_) => rewireCall(thisRef)
-            case Select(qual, _) => rewireCall(qual)
+            case Apply(Ident(_), args) => rewireCall(thisRef, args)
+            case Apply(Select(qual, _), args) => rewireCall(qual, args)
+            case Ident(_) => rewireCall(thisRef, Nil)
+            case Select(qual, _) => rewireCall(qual, Nil)
             case _ => EmptyTree
           }
         }
@@ -130,7 +133,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
               rewireTree(tree, Nil) orElse tree
           },
           oldOwners = exprOwner :: Nil,
-          newOwners = liftedSym :: Nil
+          newOwners = newSym :: Nil
         ).transform(origBody)
       })
     }
@@ -143,9 +146,17 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
           val origParams = collectParams(expr)
           val origClass = exprOwner.enclosingClass.asClass
 
-          val liftedExpr = lifted("liftedExpr".toTermName, defn.UnitType, origParams, exprOwner, origClass, expr)
-          val liftedDefs = defs.map(d =>
-            lifted(d.name, d.tpt.tpe, collectParams(d.rhs) ++ d.vparamss.flatten, d.symbol.owner, origClass, d.rhs))
+          val liftedExprSym =
+            liftedSym("liftedExpr".toTermName, defn.UnitType, origParams, origClass)
+          val liftedDefsSyms = defs.map(d =>
+            liftedSym(d.name, d.tpt.tpe, collectParams(d.rhs) ++ d.vparamss.flatten, origClass))
+
+          val oldSyms = exprOwner :: defs.map(_.symbol)
+          val newSyms = liftedExprSym :: liftedDefsSyms
+
+          val liftedExpr = lifted(liftedExprSym, defn.UnitType, origParams, origClass, exprOwner, expr, oldSyms, newSyms)
+          val liftedDefs = (defs, liftedDefsSyms).zipped.map((d, sym) =>
+            lifted(sym, d.tpt.tpe, collectParams(d.rhs) ++ d.vparamss.flatten, origClass, d.symbol.owner, d.rhs, oldSyms, newSyms))
 
           val allDefs = liftedExpr :: liftedDefs
 
