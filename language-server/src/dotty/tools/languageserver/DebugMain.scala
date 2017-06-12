@@ -63,7 +63,7 @@ object DebugDriver extends Driver {
   */
 
 object DebugMain {
-  val sourceCode =
+  val sourceCode0 =
 """
 package dbg
 
@@ -85,7 +85,35 @@ object Global {
 }
 """
 
+  val sourceCode =
+"""
+object Test {
+  var x = "a"
+
   def main(args: Array[String]): Unit = {
+    Class.forName("dotty.runtime.DebugEval")
+
+    var y = "b"
+
+    while (x == "a") {
+      { (); println("x: " + x) }
+      y = "c"
+      Thread.sleep(1000)
+    }
+  }
+}
+
+package dbg {
+  import scala.collection.immutable._
+
+  class Global {
+    def makeMap(names: Array[String], locals: Array[Object]): Map[String, Object] =
+      (names, locals).zipped.toMap
+  }
+}
+"""
+
+  def main2(args: Array[String]): Unit = {
     val virtualFile = new VirtualFile("<virtual>")
     val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))
     writer.write(sourceCode)
@@ -113,7 +141,7 @@ object Global {
     val t = run.units.head.tpdTree
  }
 
-  def main2(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val vmm = Bootstrap.virtualMachineManager()
     val ac = vmm.attachingConnectors().get(0)
     val env = ac.defaultArguments()
@@ -127,13 +155,13 @@ object Global {
 
     val evtReqMgr = vm.eventRequestManager
     val cpr = evtReqMgr.createClassPrepareRequest
-    cpr.addClassFilter("Test")
+    cpr.addClassFilter("Test$")
     cpr.setEnabled(true)
 
-    vm.classesByName("Test").asScala.headOption match {
+    vm.classesByName("Test$").asScala.headOption match {
       case Some(testModule) =>
         println("PREP: " + testModule)
-        val loc = testModule.locationsOfLine(9).get(0)
+        val loc = testModule.locationsOfLine(10).get(0)
 
         val bReq = evtReqMgr.createBreakpointRequest(loc)
         bReq.setSuspendPolicy(EventRequest.SUSPEND_ALL)
@@ -160,7 +188,7 @@ object Global {
             val stackFrame = threadRef.frame(0)
             val visVars = stackFrame.visibleVariables
             println("vars: " + visVars)
-            val testModule = vm.classesByName("Test").asScala.head.asInstanceOf[ClassType]
+            println("x: " + visVars.asScala.map(stackFrame.getValue))
 
             val stringClass = vm.classesByName("java.lang.String").asScala.head.asInstanceOf[ClassType]
 
@@ -172,14 +200,27 @@ object Global {
             nameArrayRef.setValues(visVars.asScala.map(v => vm.mirrorOf(v.name)).asJava)
             localsArrayRef.setValues(visVars.asScala.map(stackFrame.getValue).asJava)
 
-            val exec = testModule.methodsByName("exec").get(0)
-            testModule.invokeMethod(threadRef, exec, List(stackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
+            val debugCls = vm.classesByName("dotty.runtime.DebugEval").asScala.head.asInstanceOf[ClassType]
+            val eval = debugCls.methodsByName("eval").get(0)
+            // val path = "/home/smarter/opt/dotty/language-server/dbg/Global.class"
+            val path = "/home/smarter/opt/dotty/language-server/"
+            try {
+              debugCls.invokeMethod(threadRef, eval,
+                List(vm.mirrorOf(path), stackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
+            } catch {
+              case e: InvocationException =>
+                val under = e.exception
+                val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
+                println("##About to print exception")
+                under.invokeMethod(threadRef, print, List().asJava, 0)
+            }
+            evt.request.disable()
           case evt: ClassPrepareEvent =>
             println("cpe: " + evt)
             // val testModule = vm.allClasses.asScala.find(_.name == "Test$").get
             val testModule = evt.referenceType
             println(testModule)
-            val loc = testModule.locationsOfLine(9).get(0)
+            val loc = testModule.locationsOfLine(10).get(0)
 
             val bReq = evtReqMgr.createBreakpointRequest(loc)
             bReq.setSuspendPolicy(EventRequest.SUSPEND_ALL)

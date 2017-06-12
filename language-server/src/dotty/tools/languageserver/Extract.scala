@@ -34,10 +34,9 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
 
   override protected def newTransformer(implicit ctx: Context) = ???
 
-  private val GlobalModuleRef = new CtxLazy(implicit ctx =>
-    ctx.requiredModuleRef("dbg.Global"))
-  def GlobalModule(implicit ctx: Context) = GlobalModuleRef().symbol
-  def GlobalClass(implicit ctx: Context) = GlobalModule.moduleClass.asClass
+  private val GlobalClassRef = new CtxLazy(implicit ctx =>
+    ctx.requiredClassRef("dbg.Global"))
+  def GlobalClass(implicit ctx: Context) = GlobalClassRef().symbol.asClass
 
   private val immMapType = new CtxLazy(implicit ctx =>
     ctx.requiredClassRef("scala.collection.immutable.Map"))
@@ -75,7 +74,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
       (new TreeTraverser {
         override def traverse(tree: Tree)(implicit ctx: Context) = {
           tree match {
-            case ident: Ident if !exprPos.contains(ident.symbol.pos) =>
+            case ident: Ident if ident.tpe.asInstanceOf[NamedType].prefix == NoPrefix && !exprPos.contains(ident.symbol.pos) =>
               buf += ident
             case _ =>
           }
@@ -88,11 +87,21 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
 
     def liftedSym(name: TermName, resultType: Type, origParams: List[NameTree], origClass: ClassSymbol)(implicit ctx: Context) = {
       val paramNames = nme.SELF :: origParams.map(_.name.asTermName)
-      val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widenSingleton)
+      val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widen)
       val liftedType = MethodType.apply(paramNames)(mt => paramInfos, mt => resultType)
 
       ctx.newSymbol(GlobalClass, name, Method | Synthetic, liftedType)
     }
+
+    def desugarIdent(i: Ident)(implicit ctx: Context): Tree =
+      i.tpe match {
+        case TermRef(prefix: TermRef, name) =>
+          tpd.ref(prefix).select(i.symbol)
+        case TermRef(prefix: ThisType, name) =>
+          tpd.This(prefix.cls).select(i.symbol)
+        case _ =>
+          i
+      }
 
     def lifted(newSym: TermSymbol, resultType: Type, origParams: List[NameTree], origClass: ClassSymbol,
       origOwner: Symbol, origBody: Tree, oldSyms: List[Symbol], newSyms: List[Symbol])(implicit ctx: Context): Tree = {
@@ -103,7 +112,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
       polyDefDef(newSym, trefs => vrefss => {
         val thisRef :: argRefs = vrefss.flatten
 
-        def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
+        def rewireTree0(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
           def rewireCall(thisArg: Tree, otherArgs: List[Tree]): Tree = {
             val rewired = rewiredTarget(tree.symbol)
             if (rewired.exists) {
@@ -117,6 +126,14 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
             case Ident(_) => rewireCall(thisRef, Nil)
             case Select(qual, _) => rewireCall(qual, Nil)
             case _ => EmptyTree
+          }
+        }
+
+        def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
+          tree match {
+            case Apply(i @ Ident(_), args) => rewireTree0(cpy.Apply(tree)(desugarIdent(i), args), targs)
+            case i @ Ident(_) => rewireTree0(desugarIdent(i), targs)
+            case _ => rewireTree0(tree, targs)
           }
         }
 
@@ -147,7 +164,6 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
         case tree: TypeDef if tree.symbol != GlobalClass =>
           EmptyTree
         case tree: Template if tree.symbol.owner == GlobalClass =>
-
           val origParams = collectParams(expr)
           val origClass = exprOwner.enclosingClass.asClass
 
@@ -171,13 +187,13 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
             val List(selfRef, namesRef, argsRef) = vrefss.flatten
             val mapSym = ctx.newSymbol(execDefSym, "map".toTermName, Synthetic, immMapType())
             val localArgs = origParams.map(param =>
-              ref(mapSym).select(nme.apply)
+              Ident(mapSym.termRef).select(nme.apply)
                 .appliedTo(Literal(Constant(param.name.mangledString)))
-                .asInstance(param.tpe.widenSingleton))
+                .asInstance(param.tpe.widen))
 
             Block(
               List(
-                ValDef(mapSym, ref(GlobalModule).select("makeMap".toTermName).appliedTo(namesRef, argsRef)),
+                ValDef(mapSym, This(GlobalClass).select("makeMap".toTermName).appliedTo(namesRef, argsRef)),
                 ref(liftedExprSym).appliedTo(selfRef.asInstance(origClass.typeRef), localArgs: _*)
               ),
               Literal(Constant(()))
