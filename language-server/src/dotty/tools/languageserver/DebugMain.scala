@@ -67,6 +67,8 @@ object DebugMain {
 """
 package dbg
 
+import scala.collection.immutable._
+
 class Foo {
   val foo: String = "duck"
   def test(bar: String): Unit = {
@@ -77,21 +79,21 @@ class Foo {
   }
 }
 
-object Global
-// object Global extends dotty.runtime.DebugEvaluator {
-//   def eval(self: Object, locals: Array[Object]): Unit = ???
-// }
+object Global {
+  def makeMap(names: Array[String], locals: Array[Object]): Map[String, Object] =
+    (names, locals).zipped.toMap
+}
 """
 
-  def main2(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val virtualFile = new VirtualFile("<virtual>")
     val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))
     writer.write(sourceCode)
     writer.close()
     val source = new SourceFile(virtualFile, Codec.UTF8)
 
-    val start = source.lineToOffset(8)
-    val end = source.lineToOffset(9) - 1
+    val start = source.lineToOffset(10)
+    val end = source.lineToOffset(11) - 1
     val exprPos = Position(start, end)
 
     val rootCtx = (new ContextBase).initialCtx
@@ -111,7 +113,7 @@ object Global
     val t = run.units.head.tpdTree
  }
 
-  def main(args: Array[String]): Unit = {
+  def main2(args: Array[String]): Unit = {
     val vmm = Bootstrap.virtualMachineManager()
     val ac = vmm.attachingConnectors().get(0)
     val env = ac.defaultArguments()

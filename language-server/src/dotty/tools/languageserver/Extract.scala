@@ -39,6 +39,9 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
   def GlobalModule(implicit ctx: Context) = GlobalModuleRef().symbol
   def GlobalClass(implicit ctx: Context) = GlobalModule.moduleClass.asClass
 
+  private val immMapType = new CtxLazy(implicit ctx =>
+    ctx.requiredClassRef("scala.collection.immutable.Map"))
+
   class ExtractTransformer extends Transformer {
     var expr: tpd.Block = _
     var exprOwner: Symbol = _
@@ -160,7 +163,29 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
           val liftedDefs = (defs, liftedDefsSyms).zipped.map((d, sym) =>
             lifted(sym, d.tpt.tpe, collectParams(d.rhs) ++ d.vparamss.flatten, origClass, d.symbol.owner, d.rhs, oldSyms, newSyms))
 
-          val allDefs = liftedExpr :: liftedDefs
+          val execParamNames = List("self", "names", "args").map(_.toTermName)
+          val execParamTypes = List(defn.ObjectType, JavaArrayType(defn.StringType), JavaArrayType(defn.ObjectType))
+          val execDefSym = ctx.newSymbol(GlobalClass, "exec".toTermName, Method | Synthetic,
+            MethodType(execParamNames)(mt => execParamTypes, mt => defn.UnitType))
+          val execDef = polyDefDef(execDefSym, trefs => vrefss => {
+            val List(selfRef, namesRef, argsRef) = vrefss.flatten
+            val mapSym = ctx.newSymbol(execDefSym, "map".toTermName, Synthetic, immMapType())
+            val localArgs = origParams.map(param =>
+              ref(mapSym).select(nme.apply)
+                .appliedTo(Literal(Constant(param.name.mangledString)))
+                .asInstance(param.tpe.widenSingleton))
+
+            Block(
+              List(
+                ValDef(mapSym, ref(GlobalModule).select("makeMap".toTermName).appliedTo(namesRef, argsRef)),
+                ref(liftedExprSym).appliedTo(selfRef.asInstance(origClass.typeRef), localArgs: _*)
+              ),
+              Literal(Constant(()))
+            )
+            // ref(liftedExprSym).applied
+          })
+
+          val allDefs = execDef :: liftedExpr :: liftedDefs
 
           val cinfo = GlobalClass.classInfo
           val newDecls = cinfo.decls.cloneScope
