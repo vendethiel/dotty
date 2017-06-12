@@ -51,8 +51,11 @@ object DebugDriver extends Driver {
 /**
   Alternative: do everything with phases after backend
   // XX: Don't just extract expr, extract everything in pos of expr
-  Phase 1: Extract expr to companion with $this and non-local idents as params, original becomes forwarder
+  Phase 1a: Extract expr to companion with $this and non-local idents as params
+           //~original becomes forwarder~(not actually needed)
+  Phase 1b: Extract methods in expr in typer
   Phase 2: Get rid of all trees not in pos of expr, keep forwarder call around
+           //Easy mode: get rid of everything but Global
   Phase 3: Create entry point from forwarder call:
     this -> thisParam
     local x -> locals("x")
@@ -60,31 +63,16 @@ object DebugDriver extends Driver {
   */
 
 object DebugMain {
-  def collectIdents(tree: untpd.Tree)(implicit ctx: Context) = {
-    val buf = new mutable.ListBuffer[untpd.Ident]
-
-    (new untpd.TreeTraverser {
-      override def traverse(tree: untpd.Tree)(implicit ctx: Context) = {
-        tree match {
-          case ident: untpd.Ident =>
-            buf += ident
-          case _ =>
-        }
-        traverseChildren(tree)
-      }
-    }).traverse(tree)
-
-    buf.toList
-  }
-
   val sourceCode =
 """
 package dbg
 
 class Foo {
-  val str: String = "duck"
-  def test: Unit = {
-    { def x = 1; x; println(str) }
+  val foo: String = "duck"
+  def test(bar: String): Unit = {
+    val bla: String = "hehe"
+
+    { def x = 1; x; println(foo + bar + bla) }
   }
 }
 
@@ -98,8 +86,8 @@ object Global
     writer.close()
     val source = new SourceFile(virtualFile, Codec.UTF8)
 
-    val start = source.lineToOffset(6)
-    val end = source.lineToOffset(7) - 1
+    val start = source.lineToOffset(8)
+    val end = source.lineToOffset(9) - 1
     val exprPos = Position(start, end)
 
     val rootCtx = (new ContextBase).initialCtx
@@ -116,42 +104,9 @@ object Global
 
     implicit val ctx: Context = run.runContext
 
-    val u = run.units.head.untpdTree
-    val unAround = NavigateAST.pathTo(exprPos, u).asInstanceOf[List[untpd.Tree]].head
-    val idents = collectIdents(unAround)
-    println("idents: " + idents)
-
-
-
     val t = run.units.head.tpdTree
-
-
-    idents.foreach { ident =>
-      val tree = NavigateAST.pathTo(ident.pos, t).asInstanceOf[List[tpd.Tree]].head
-      val defPos = tree.symbol.pos
-      if (!(defPos.exists && exprPos.contains(defPos))) {
-        val typerTpe = ctx.atPhase(ctx.typerPhase) { implicit ctx =>
-          tree.denot.info
-        }
-
-
-        println(s"$ident became $tree with type $typerTpe")
-      }
-    } 
-      // val path = NavigateAST.pathTo(pos, t).asInstanceOf[List[tpd.Tree]]
-      // val around = path.head
-
-      // val trees =
-      //   if (pos.contains(around.pos))
-      //     List(around)
-      //   else {
-      //     around.productIterator.toList.collect {
-      //       case p: tpd.Tree if pos.contains(p.pos) => p
-      //     }
-      //   }
-
-      // println("trees: " + trees.map(_.show))
  }
+
   def main2(args: Array[String]): Unit = {
     val vmm = Bootstrap.virtualMachineManager()
     val ac = vmm.attachingConnectors().get(0)

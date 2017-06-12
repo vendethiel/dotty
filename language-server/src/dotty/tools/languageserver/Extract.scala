@@ -1,6 +1,8 @@
 package dotty.tools
 package languageserver
 
+import scala.collection.mutable
+
 import dotc.ast.{TreeTypeMap, Trees, tpd}
 import dotc.core._, dotc.core.Decorators._
 import dotc.transform.{ CtxLazy, MacroTransform }
@@ -67,21 +69,43 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
     def rewiredTarget(referenced: Symbol)(implicit ctx: Context): Symbol =
       NoSymbol // TODO
 
+    def collectParams(tree: Tree)(implicit ctx: Context) = {
+      val buf = new mutable.ListBuffer[Ident]
+
+      (new TreeTraverser {
+        override def traverse(tree: Tree)(implicit ctx: Context) = {
+          tree match {
+            case ident: Ident if !exprPos.contains(ident.symbol.pos) =>
+              buf += ident
+            case _ =>
+          }
+          traverseChildren(tree)
+        }
+      }).traverse(tree)
+
+      buf.toList
+    }
+
+
     override def transform(tree: Tree)(implicit ctx: Context): Tree = {
       tree match {
         case tree: Template if tree.symbol.owner == GlobalClass =>
           val origClass = exprOwner.enclosingClass.asClass
 
-          val liftedType = MethodType(List(nme.SELF))(
-            mt => List(origClass.typeRef),
-            mt => defn.UnitType
-          )
+          val origParams = collectParams(expr)
+          println("params: " + origParams)
+
+          val paramNames = nme.SELF :: origParams.map(_.name.asTermName)
+          val paramInfos = origClass.typeRef :: origParams.map(_.tpe.widenSingleton)
+          val resultType = defn.UnitType
+          val liftedType = MethodType.apply(paramNames)(mt => paramInfos, mt => resultType)
+
           val liftedSym = ctx.newSymbol(GlobalClass, "liftedExpr".toTermName,
             Method | Synthetic,
             liftedType)
 
           val liftedDef = polyDefDef(liftedSym, trefs => vrefss => {
-            val thisRef :: _ = vrefss.flatten
+            val thisRef :: argRefs = vrefss.flatten
             /** If tree should be rewired, the rewired tree, otherwise EmptyTree.
               *  @param   targs  Any type arguments passed to the rewired tree.
               */
@@ -109,7 +133,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
 
             new TreeTypeMap(
               typeMap = rewireType(_)
-                // .subst(origVParams, argRefs.map(_.tpe))
+                .subst(origParams.map(_.symbol), argRefs.map(_.tpe))
                 // .substThisUnlessStatic(origClass, thisRef.tpe)
                 ,
               treeMap = {
