@@ -78,9 +78,12 @@ class Foo {
 }
 
 object Global
+// object Global extends dotty.runtime.DebugEvaluator {
+//   def eval(self: Object, locals: Array[Object]): Unit = ???
+// }
 """
 
-  def main(args: Array[String]): Unit = {
+  def main2(args: Array[String]): Unit = {
     val virtualFile = new VirtualFile("<virtual>")
     val writer = new BufferedWriter(new OutputStreamWriter(virtualFile.output, "UTF-8"))
     writer.write(sourceCode)
@@ -108,7 +111,7 @@ object Global
     val t = run.units.head.tpdTree
  }
 
-  def main2(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val vmm = Bootstrap.virtualMachineManager()
     val ac = vmm.attachingConnectors().get(0)
     val env = ac.defaultArguments()
@@ -125,10 +128,10 @@ object Global
     cpr.addClassFilter("Test")
     cpr.setEnabled(true)
 
-    vm.allClasses.asScala.find(_.name == "Test") match {
+    vm.classesByName("Test").asScala.headOption match {
       case Some(testModule) =>
         println("PREP: " + testModule)
-        val loc = testModule.locationsOfLine(7).get(0)
+        val loc = testModule.locationsOfLine(9).get(0)
 
         val bReq = evtReqMgr.createBreakpointRequest(loc)
         bReq.setSuspendPolicy(EventRequest.SUSPEND_ALL)
@@ -155,9 +158,20 @@ object Global
             val stackFrame = threadRef.frame(0)
             val visVars = stackFrame.visibleVariables
             println("vars: " + visVars)
-            val testModule = vm.allClasses.asScala.find(_.name == "Test").get.asInstanceOf[ClassType]
+            val testModule = vm.classesByName("Test").asScala.head.asInstanceOf[ClassType]
+
+            val stringClass = vm.classesByName("java.lang.String").asScala.head.asInstanceOf[ClassType]
+
+            val stringArrayType = vm.classesByName("java.lang.String[]").asScala.head.asInstanceOf[ArrayType]
+            val objArrayType = vm.classesByName("java.lang.Object[]").asScala.head.asInstanceOf[ArrayType]
+
+            val nameArrayRef = stringArrayType.newInstance(visVars.size)
+            val localsArrayRef = objArrayType.newInstance(visVars.size)
+            nameArrayRef.setValues(visVars.asScala.map(v => vm.mirrorOf(v.name)).asJava)
+            localsArrayRef.setValues(visVars.asScala.map(stackFrame.getValue).asJava)
+
             val exec = testModule.methodsByName("exec").get(0)
-            testModule.invokeMethod(threadRef, exec, stackFrame.getValues(visVars).values.asScala.toList.asJava, 0)
+            testModule.invokeMethod(threadRef, exec, List(stackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
           case evt: ClassPrepareEvent =>
             println("cpe: " + evt)
             // val testModule = vm.allClasses.asScala.find(_.name == "Test$").get
