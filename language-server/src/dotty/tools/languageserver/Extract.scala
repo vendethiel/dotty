@@ -106,15 +106,13 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
 
           val liftedDef = polyDefDef(liftedSym, trefs => vrefss => {
             val thisRef :: argRefs = vrefss.flatten
-            /** If tree should be rewired, the rewired tree, otherwise EmptyTree.
-              *  @param   targs  Any type arguments passed to the rewired tree.
-              */
+
             def rewireTree(tree: Tree, targs: List[Tree])(implicit ctx: Context): Tree = {
               def rewireCall(thisArg: Tree): Tree = {
                 val rewired = rewiredTarget(tree.symbol)
                 if (rewired.exists) {
-                  val base = thisArg.tpe//.baseTypeWithArgs(origClass)
-                  assert(base.exists)
+                  val base = thisArg.tpe
+
                   ref(rewired.termRef)
                     .appliedTo(thisArg)
                 } else EmptyTree
@@ -134,7 +132,7 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
             new TreeTypeMap(
               typeMap = rewireType(_)
                 .subst(origParams.map(_.symbol), argRefs.map(_.tpe))
-                // .substThisUnlessStatic(origClass, thisRef.tpe)
+                .substThisUnlessStatic(origClass, thisRef.tpe)
                 ,
               treeMap = {
                 case tree: This if tree.symbol == origClass => thisRef

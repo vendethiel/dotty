@@ -103,7 +103,7 @@ object Global
     run.compileSources(List(source))
     run.printSummary()
 
-    implicit val ctx: Context = run.runContext
+    implicit val ctx = run.runContext
 
     val t = run.units.head.tpdTree
  }
