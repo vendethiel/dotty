@@ -141,6 +141,8 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
 
     override def transform(tree: Tree)(implicit ctx: Context): Tree = {
       tree match {
+        case tree: TypeDef if tree.symbol != GlobalClass =>
+          EmptyTree
         case tree: Template if tree.symbol.owner == GlobalClass =>
 
           val origParams = collectParams(expr)
