@@ -3375,8 +3375,8 @@ object Types {
   /** Type bounds >: lo <: hi */
   abstract case class TypeBounds(lo: Type, hi: Type) extends CachedProxyType with TypeType {
 
-    assert(lo.isInstanceOf[TermType])
-    assert(hi.isInstanceOf[TermType])
+    // assert(lo.isInstanceOf[TermType])
+    // assert(hi.isInstanceOf[TermType])
 
     def variance: Int = 0
 
