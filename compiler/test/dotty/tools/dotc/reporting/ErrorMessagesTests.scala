@@ -877,4 +877,37 @@ class ErrorMessagesTests extends ErrorMessagesTest {
 
         assertEquals(err, WildcardOnTypeArgumentNotAllowedOnNew())
       }
+
+  @Test def implicitFunctionTypeNeedsNonEmptyParameterList =
+    checkMessagesAfter("refchecks") {
+      """abstract class Foo {
+        |  type Contextual[T] = implicit () => T
+        |  val x: implicit () => Int
+        |}""".stripMargin
+    }
+      .expect { (ictx, messages) =>
+        implicit val ctx: Context = ictx
+        val defn = ictx.definitions
+
+        assertMessageCount(2, messages)
+        messages.foreach(assertEquals(_, ImplicitFunctionTypeNeedsNonEmptyParameterList()))
+      }
+
+  @Test def wrongNumberOfParameters =
+    checkMessagesAfter("refchecks") {
+      """object NumberOfParams {
+        |  def unary[T](x: T => Unit) = ()
+        |  unary((x, y) => ())
+        |} """.stripMargin
+    }
+      .expect { (ictx, messages) =>
+        implicit val ctx: Context = ictx
+        val defn = ictx.definitions
+
+        assertMessageCount(1, messages)
+        val err :: Nil = messages
+
+        assertEquals(err, WrongNumberOfParameters(1))
+      }
+
 }

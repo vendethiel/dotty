@@ -690,7 +690,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
       val isImplicit = tree match {
         case _: untpd.ImplicitFunction =>
           if (args.length == 0) {
-            ctx.error(i"implicit function type needs non-empty parameter list", tree.pos)
+            ctx.error(ImplicitFunctionTypeNeedsNonEmptyParameterList(), tree.pos)
             false
           }
           else true
@@ -798,7 +798,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
 
       def protoFormal(i: Int): Type =
         if (protoFormals.length == params.length) protoFormals(i)
-        else errorType(i"wrong number of parameters, expected: ${protoFormals.length}", tree.pos)
+        else errorType(WrongNumberOfParameters(protoFormals.length), tree.pos)
 
       /** Is `formal` a product type which is elementwise compatible with `params`? */
       def ptIsCorrectProduct(formal: Type) = {
