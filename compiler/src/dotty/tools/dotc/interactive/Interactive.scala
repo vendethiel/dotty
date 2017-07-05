@@ -88,7 +88,7 @@ object Interactive {
   def completions(prefix: Type, boundary: Symbol)(implicit ctx: Context): List[Symbol] = {
     val boundaryCtx = ctx.withOwner(boundary)
     prefix.memberDenots(completionsFilter, (name, buf) =>
-      buf ++= prefix.member(name).altsWith(_.symbol.isAccessibleFrom(prefix)(boundaryCtx))
+      buf ++= prefix.member(name).altsWith(d => !d.isAbsent && d.symbol.isAccessibleFrom(prefix)(boundaryCtx))
     ).map(_.symbol).toList
   }
 
