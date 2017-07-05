@@ -19,6 +19,10 @@ import scala.util.control.NonFatal
 object ClassfileParser {
   /** Marker trait for unpicklers that can be embedded in classfiles. */
   trait Embedded
+
+  /** Indicate that there is nothing to unpickle and the corresponding symbols can
+    * be invalidated. */
+  object NoEmbedded extends Embedded
 }
 
 class ClassfileParser(
@@ -147,6 +151,17 @@ class ClassfileParser(
 
       setClassInfo(classRoot, classInfo)
       setClassInfo(moduleRoot, staticInfo)
+    } else if (result == Some(NoEmbedded)) {
+      val scope = classRoot.owner.unforcedDecls.openForMutations
+
+      for (sym <- List(moduleRoot.sourceModule.symbol, moduleRoot.symbol, classRoot.symbol)) {
+        scope.unlink(sym)
+        if (classRoot.owner == defn.ScalaShadowingPackageClass) {
+          // Symbols in scalaShadowing are also added to scala
+          defn.ScalaPackageClass.unforcedDecls.openForMutations.unlink(sym)
+        }
+        sym.markAbsent()
+      }
     }
 
     // eager load java enum definitions for exhaustivity check of pattern match
@@ -692,6 +707,10 @@ class ClassfileParser(
     }
   }
 
+  // Nothing$ and Null$ were incorrectly emitted with a Scala attribute
+  // instead of ScalaSignature before 2.13.0-M2, see https://github.com/scala/scala/pull/5952
+  private[this] val scalaUnpickleWhitelist = List(tpnme.nothingClass, tpnme.nullClass)
+
   /** Parse inner classes. Expects `in.bp` to point to the superclass entry.
    *  Restores the old `bp`.
    *  @return true iff classfile is from Scala, so no Java info needs to be read.
@@ -750,6 +769,12 @@ class ClassfileParser(
       if (scan(tpnme.TASTYATTR)) {
         val attrLen = in.nextInt
         return unpickleTASTY(in.nextBytes(attrLen))
+      }
+
+      if (scan(tpnme.ScalaATTR) && !scalaUnpickleWhitelist.contains(classRoot.name)) {
+        // If the Scala attribute is present but the TASTY attribute isn't, this
+        // classfile is a compilation artifact.
+        return Some(NoEmbedded)
       }
 
       if (scan(tpnme.RuntimeAnnotationATTR)) {
