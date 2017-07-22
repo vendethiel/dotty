@@ -325,7 +325,7 @@ class Namer { typer: Typer =>
           privateWithinClass(tree.mods), tree.namePos), tree)
       case tree: Import =>
         recordSym(ctx.newSymbol(
-          ctx.owner, nme.IMPORT, Synthetic, new Completer(tree), NoSymbol, tree.pos), tree)
+          ctx.owner, nme.IMPORT, Synthetic, new Completer(tree)(ctx), NoSymbol, tree.pos), tree)
       case _ =>
         NoSymbol
     }
@@ -720,12 +720,27 @@ class Namer { typer: Typer =>
   }
 
   /** The completer of a symbol defined by a member def or import (except ClassSymbols) */
-  class Completer(val original: Tree)(implicit ctx: Context) extends LazyType {
+  class Completer(val original: Tree)(ictx: Context) extends LazyType {
 
-    protected def localContext(owner: Symbol) = ctx.fresh.setOwner(owner).setTree(original)
+    val savedCtx = ictx
 
     /** The context with which this completer was created */
-    def creationContext = ctx
+    def creationContext(implicit ctx: Context) = savedCtx
+
+    private[this] var myCtx: Context = null
+    implicit private def ctx: Context = myCtx
+
+    protected def ownContext(sym: Symbol): Context = myCtx
+
+    protected def inCreationContext[T](sym: Symbol, ictx: Context)(op: Context => T) =
+      if (myCtx == null) {
+        myCtx = creationContext(ictx)
+        try op(ownContext(sym)) finally myCtx = null
+      }
+      else op(ownContext(sym))
+
+    protected def localContext(owner: Symbol) =
+      myCtx.fresh.setOwner(owner).setTree(original)
 
     protected def typeSig(sym: Symbol): Type = original match {
       case original: ValDef =>
@@ -746,32 +761,13 @@ class Namer { typer: Typer =>
         }
     }
 
-    final override def complete(denot: SymDenotation)(implicit ctx: Context) = {
-      if (completions != noPrinter && ctx.typerState != this.ctx.typerState) {
-        completions.println(completions.getClass.toString)
-        def levels(c: Context): Int =
-          if (c.typerState eq this.ctx.typerState) 0
-          else if (c.typerState == null) -1
-          else if (c.outer.typerState == c.typerState) levels(c.outer)
-          else levels(c.outer) + 1
-        completions.println(s"!!!completing ${denot.symbol.showLocated} in buried typerState, gap = ${levels(ctx)}")
-      }
-      completeInCreationContext(denot)
-    }
-
-    private def addInlineInfo(denot: SymDenotation) = original match {
-      case original: untpd.DefDef if denot.isInlineMethod =>
-        Inliner.registerInlineInfo(
-            denot,
-            implicit ctx => typedAheadExpr(original).asInstanceOf[tpd.DefDef].rhs
-          )(localContext(denot.symbol))
-      case _ =>
-    }
+    final override def complete(denot: SymDenotation)(implicit ctx: Context) =
+      inCreationContext(denot.symbol, ctx)(implicit ctx => completeInCreationContext(denot))
 
     /** Intentionally left without `implicit ctx` parameter. We need
      *  to pick up the context at the point where the completer was created.
      */
-    def completeInCreationContext(denot: SymDenotation): Unit = {
+    protected def completeInCreationContext(denot: SymDenotation)(implicit ctx: Context): Unit = {
       val sym = denot.symbol
       original match {
         case original: MemberDef => addAnnotations(sym, original)
@@ -782,57 +778,74 @@ class Namer { typer: Typer =>
       Checking.checkWellFormed(sym)
       denot.info = avoidPrivateLeaks(sym, sym.pos)
     }
+
+    private def addInlineInfo(denot: SymDenotation) = original match {
+      case original: untpd.DefDef if denot.isInlineMethod =>
+        Inliner.registerInlineInfo(
+            denot,
+            implicit ctx => typedAheadExpr(original).asInstanceOf[tpd.DefDef].rhs
+          )(localContext(denot.symbol))
+      case _ =>
+    }
   }
 
   class TypeDefCompleter(original: TypeDef)(ictx: Context) extends Completer(original)(ictx) with TypeParamsCompleter {
-    private var myTypeParams: List[TypeSymbol] = null
-    private var nestedCtx: Context = null
     assert(!original.isClassDef)
 
+    private var myTypeParams: List[TypeSymbol] = null
+    private val paramScope: Scope = newScope
+
+    override def ownContext(sym: Symbol) = localContext(sym).setScope(paramScope)
+
     def completerTypeParams(sym: Symbol)(implicit ctx: Context): List[TypeSymbol] = {
-      if (myTypeParams == null) {
-        //println(i"completing type params of $sym in ${sym.owner}")
-        nestedCtx = localContext(sym).setNewScope
-        myTypeParams = {
-          implicit val ctx = nestedCtx
-          def typeParamTrees(tdef: Tree): List[TypeDef] = tdef match {
-            case TypeDef(_, original) =>
-              original match {
-                case LambdaTypeTree(tparams, _) => tparams
-                case original: DerivedFromParamTree => typeParamTrees(original.watched)
-                case _ => Nil
-              }
-            case _ => Nil
+      if (myTypeParams == null)
+        inCreationContext(sym, ctx) { implicit ctx =>
+          myTypeParams = {
+            def typeParamTrees(tdef: Tree): List[TypeDef] = tdef match {
+              case TypeDef(_, original) =>
+                original match {
+                  case LambdaTypeTree(tparams, _) => tparams
+                  case original: DerivedFromParamTree => typeParamTrees(original.watched)
+                  case _ => Nil
+                }
+              case _ => Nil
+            }
+            val tparams = typeParamTrees(original)
+            completeParams(tparams)
+            tparams.map(symbolOfTree(_).asType)
           }
-          val tparams = typeParamTrees(original)
-          completeParams(tparams)
-          tparams.map(symbolOfTree(_).asType)
         }
-      }
       myTypeParams
     }
 
     override protected def typeSig(sym: Symbol): Type =
-      typeDefSig(original, sym, completerTypeParams(sym)(ictx))(nestedCtx)
+      typeDefSig(original, sym, completerTypeParams(sym)(null))(ownContext(sym))
   }
 
   class ClassCompleter(cls: ClassSymbol, original: TypeDef)(ictx: Context) extends Completer(original)(ictx) {
     withDecls(newScope)
 
-    protected implicit val ctx: Context = localContext(cls).setMode(ictx.mode &~ Mode.InSuperCall)
+    override def ownContext(sym: Symbol) = {
+      val lctx = localContext(cls)
+      lctx.setMode(lctx.mode &~ Mode.InSuperCall)
+    }
 
     val TypeDef(name, impl @ Template(constr, parents, self, _)) = original
 
-    val (params, rest) = impl.body span {
-      case td: TypeDef => td.mods is Param
-      case vd: ValDef => vd.mods is ParamAccessor
-      case _ => false
+    val (params, rest) = {
+      implicit val ctx = ictx
+      impl.body(ictx) span {
+        case td: TypeDef => td.mods.is(Param)
+        case vd: ValDef => vd.mods.is(ParamAccessor)
+        case _ => false
+      }
     }
 
-    def init() = index(params)
+    def init()(implicit ctx: Context) =
+      inCreationContext(cls, ctx)(implicit ctx => index(params))
 
     /** The type signature of a ClassDef with given symbol */
-    override def completeInCreationContext(denot: SymDenotation): Unit = {
+    override protected def completeInCreationContext(denot: SymDenotation)(implicit ctx: Context): Unit = {
 
       /* The type of a parent constructor. Types constructor arguments
        * only if parent type contains uninstantiated type parameters.
