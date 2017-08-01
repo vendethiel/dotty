@@ -3,7 +3,7 @@ package dotc
 package typer
 
 import core._
-import ast.{Trees, untpd, tpd, TreeInfo}
+import ast.{Trees, untpd, tpd, TreeInfo, FreshSymbolsMap}
 import util.Positions._
 import util.Stats.track
 import Trees.Untyped
@@ -295,7 +295,10 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     /** Splice new method reference into existing application */
     def spliceMeth(meth: Tree, app: Tree): Tree = app match {
       case Apply(fn, args) =>
-        spliceMeth(meth, fn).appliedToArgs(args)
+        // Arguments may contain local definitions, these should get fresh
+        // symbols when copied to avoid duplicate definitions
+        val freshSymbolsMap = new FreshSymbolsMap
+        spliceMeth(meth, fn).appliedToArgs(args.map(freshSymbolsMap.apply[Tree]))
       case TypeApply(fn, targs) =>
         // Note: It is important that the type arguments `targs` are passed in new trees
         // instead of being spliced in literally. Otherwise, a type argument to a default

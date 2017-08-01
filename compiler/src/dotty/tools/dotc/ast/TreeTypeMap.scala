@@ -31,7 +31,7 @@ import dotty.tools.dotc.transform.SymUtils._
  *  gets two different denotations in the same period. Hence, if -Yno-double-bindings is
  *  set, we would get a data race assertion error.
  */
-final class TreeTypeMap(
+sealed class TreeTypeMap(
   val typeMap: Type => Type = IdentityTypeMap,
   val treeMap: tpd.Tree => tpd.Tree = identity _,
   val oldOwners: List[Symbol] = Nil,
@@ -121,7 +121,8 @@ final class TreeTypeMap(
     transformDefs(trees)._2
 
   private def transformDefs[TT <: tpd.Tree](trees: List[TT])(implicit ctx: Context): (TreeTypeMap, List[TT]) = {
-    val tmap = withMappedSyms(tpd.localSyms(trees))
+    val t = tpd.localSyms(trees)
+    val tmap = withMappedSyms(t)
     (tmap, tmap.transformSub(trees))
   }
 
@@ -184,4 +185,11 @@ final class TreeTypeMap(
     if (symsChanged || (fullMap eq substMap)) fullMap
     else withMappedSyms(syms, mapAlways = true)
   }
+}
+
+/** A map that return a copy of a tree where all locally-defined symbols have
+ *  been replaced by fresh copies. */
+class FreshSymbolsMap(implicit ctx: Context) extends TreeTypeMap()(ctx) {
+  override def withMappedSyms(syms: List[Symbol], mapAlways: Boolean): TreeTypeMap =
+    super.withMappedSyms(syms, mapAlways = true)
 }
