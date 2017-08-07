@@ -1,4 +1,4 @@
-import strawman.collection._
+//import strawman.collection._
 
 object Test {
   def main(args: Array[String]): Unit = {

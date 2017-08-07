@@ -164,7 +164,7 @@ class TreePickler(pickler: TastyPickler) {
         writeByte(if (tpe.isType) TYPEREFpkg else TERMREFpkg)
         pickleName(sym.fullName)
       }
-      else if (sym is Flags.BindDefinedType) {
+      else /*if (sym is Flags.BindDefinedType) {
         registerDef(sym)
         writeByte(BIND)
         withLength {
@@ -173,7 +173,7 @@ class TreePickler(pickler: TastyPickler) {
           pickleRef()
         }
       }
-      else pickleRef()
+      else*/ pickleRef()
     case tpe: TermRefWithSignature =>
       if (tpe.symbol.is(Flags.Package)) picklePackageRef(tpe.symbol)
       else {

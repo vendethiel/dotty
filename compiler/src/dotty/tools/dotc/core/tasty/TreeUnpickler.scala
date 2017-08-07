@@ -107,7 +107,7 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
       val start = currentAddr
       val tag = readByte()
       tag match {
-        case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM | TEMPLATE =>
+        case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM | TEMPLATE | BIND =>
           val end = readEnd()
           for (i <- 0 until numRefs(tag)) readNat()
           if (tag == TEMPLATE) scanTrees(buf, end, MemberDefsOnly)
@@ -247,6 +247,7 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
             case ORtype =>
               OrType(readType(), readType())
             case BIND =>
+              ctx.error("Should never happen, should be in tree")
               val sym = ctx.newSymbol(ctx.owner, readName().toTypeName, BindDefinedType, readType())
               registerSym(start, sym)
               if (currentAddr != end) readType()
@@ -405,6 +406,15 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
         val localDummy = ctx.newLocalDummy(ctx.owner)
         registerSym(currentAddr, localDummy)
         localDummy
+      case BIND =>
+        val start = currentAddr
+        val tag = readByte()
+        val end = readEnd()
+        val name = readName()
+        val info = new Completer(ctx.owner, subReader(start, end))
+        val sym = ctx.newSymbol(ctx.owner, name, EmptyFlags, info)
+        registerSym(start, sym)
+        sym
       case tag =>
         throw new Error(s"illegal createSymbol at $currentAddr, tag = $tag")
     }
@@ -967,9 +977,9 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
               SeqLiteral(until(end)(readTerm()), elemtpt)
             case BIND =>
               val name = readName()
-              val info = readType()
-              val sym = ctx.newSymbol(ctx.owner, name, EmptyFlags, info)
-              registerSym(start, sym)
+              val sym = symbolAt(start).asTerm
+              skipTree()// skip type
+              // symbol has to be created before reading the type, as the type may refer to the symbpl
               Bind(sym, readTerm())
             case ALTERNATIVE =>
               Alternative(until(end)(readTerm()))
@@ -1022,7 +1032,15 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
     }
 
     def readTpt()(implicit ctx: Context) =
-      if (isTypeTreeTag(nextUnsharedTag)) readTerm()
+      if (isTypeTreeTag(nextUnsharedTag)) {
+        val isShared = nextByte == SHARED
+        val term = readTerm()
+        term match {
+          case a: DefTree if isShared =>
+            TypeTree(a.namedType)
+          case _ => term
+        }
+      }
       else {
         val start = currentAddr
         val tp = readType()
