@@ -153,16 +153,17 @@ class TreePickler(pickler: TastyPickler) {
         pickleName(sym.fullName)
       }
       else if (tpe.prefix == NoPrefix)
-        if (sym is Flags.BindDefinedType) {
-          registerDef(sym)
-          writeByte(BIND)
-          withLength {
-            pickleName(sym.name)
-            pickleType(sym.info)
-            pickleDirectRef()
-          }
-        }
-        else pickleDirectRef()
+//        if (sym is Flags.BindDefinedType) {
+//          registerDef(sym)
+//          writeByte(BIND)
+//          withLength {
+//            pickleName(sym.name)
+//            pickleType(sym.info)
+//            pickleDirectRef()
+//          }
+//        }
+//        else
+          pickleDirectRef()
       else if (isLocallyDefined(sym)) {
         writeByte(if (tpe.isType) TYPEREFsymbol else TERMREFsymbol)
         pickleSymRef(sym); pickleType(tpe.prefix)
