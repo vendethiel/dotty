@@ -514,11 +514,16 @@ object Build {
         }
       },
       run := Def.inputTaskDyn {
+        val attList = (dependencyClasspath in Runtime).value
+        val scalaLib = attList
+          .map(_.data.getAbsolutePath)
+          .find(_.contains("scala-library"))
+          .toList.mkString(":")
         val dottyLib = packageAll.value("dotty-library")
         val args: Seq[String] = spaceDelimited("<arg>").parsed
 
         val fullArgs = args.span(_ != "-classpath") match {
-          case (beforeCp, Nil) => beforeCp ++ ("-classpath" :: dottyLib :: Nil)
+          case (beforeCp, Nil) => beforeCp ++ ("-classpath" :: s"$dottyLib:$scalaLib" :: Nil)
           case (beforeCp, rest) => beforeCp ++ rest
         }
 
@@ -529,11 +534,16 @@ object Build {
       dotc := run.evaluated,
 
       repl := Def.inputTaskDyn {
+        val attList = (dependencyClasspath in Runtime).value
+        val scalaLib = attList
+          .map(_.data.getAbsolutePath)
+          .find(_.contains("scala-library"))
+          .toList.mkString(":")
         val dottyLib = packageAll.value("dotty-library")
         val args: Seq[String] = spaceDelimited("<arg>").parsed
 
         val fullArgs = args.span(_ != "-classpath") match {
-          case (beforeCp, Nil) => beforeCp ++ ("-classpath" :: dottyLib :: Nil)
+          case (beforeCp, Nil) => beforeCp ++ ("-classpath" :: s"$dottyLib:$scalaLib" :: Nil)
           case (beforeCp, rest) => beforeCp ++ rest
         }
 
@@ -592,24 +602,7 @@ object Build {
       // http://grokbase.com/t/gg/simple-build-tool/135ke5y90p/sbt-setting-jvm-boot-paramaters-for-scala
       // packageAll should always be run before tests
       javaOptions ++= {
-        val attList = (dependencyClasspath in Runtime).value
         val pA = packageAll.value
-
-        // put needed dependencies on classpath:
-        val path = for {
-          file <- attList.map(_.data)
-          path = file.getAbsolutePath
-          // FIXME: when we snip the cord, this should go bye-bye
-          if path.contains("scala-library") ||
-            // FIXME: currently needed for tests referencing scalac internals
-            path.contains("scala-reflect") ||
-            // FIXME: should go away when xml literal parsing is removed
-            path.contains("scala-xml") ||
-            // used for tests that compile dotty
-            path.contains("scala-asm") ||
-            // needed for the xsbti interface
-            path.contains("sbt-interface")
-        } yield "-Xbootclasspath/p:" + path
 
         val ci_build = // propagate if this is a ci build
           if (sys.props.isDefinedAt(JENKINS_BUILD))
@@ -630,7 +623,7 @@ object Build {
           "-Ddotty.tests.classes.compiler=" + pA("dotty-compiler")
         )
 
-        jars ::: tuning ::: agentOptions ::: ci_build ::: path.toList
+        jars ::: tuning ::: agentOptions ::: ci_build
       }
   )
 

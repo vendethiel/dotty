@@ -28,7 +28,6 @@ fi
 source "$PROG_HOME/bin/common"
 
 default_java_opts="-Xmx768m -Xms768m"
-bootcp=true
 
 CompilerMain=dotty.tools.dotc.Main
 FromTasty=dotty.tools.dotc.FromTasty
@@ -64,11 +63,7 @@ classpathArgs () {
   toolchain+="$DOTTY_LIB$PSEP"
   toolchain+="$DOTTY_COMP"
 
-  if [[ -n "$bootcp" ]]; then
-    jvm_cp_args="-Xbootclasspath/a:\"$toolchain\""
-  else
-    jvm_cp_args="-classpath \"$toolchain\""
-  fi
+  jvm_cp_args="-classpath \"$toolchain\""
 }
 
 while [[ $# -gt 0 ]]; do
@@ -85,8 +80,6 @@ case "$1" in
        -tasty) PROG_NAME="$FromTasty" && shift ;;
      -compile) PROG_NAME="$CompilerMain" && shift ;;
          -run) PROG_NAME="$ReplMain" && shift ;;
-      -bootcp) bootcp=true && shift ;;
-   -nobootcp) unset bootcp && shift ;;
       -colors) colors=true && shift ;;
    -no-colors) unset colors && shift ;;
 
