@@ -441,8 +441,8 @@ trait TypeAssigner {
     tree.withType(body.tpe)
 
   def assignType(tree: untpd.Match, cases: List[CaseDef])(implicit ctx: Context) = {
-    if (tree.selector.typeOpt.isPhantom)
-      ctx.error("cannot pattern match on values of a phantom type", tree.selector.pos)
+    if (tree.selector.typeOpt.isPhantom) ctx.error("cannot pattern match on values of a phantom type", tree.selector.pos)
+    else if (tree.selector.typeOpt.isUnused) ctx.error("cannot pattern match on values marked with @unused", tree.selector.pos)
     tree.withType(lubInSameUniverse(cases, "branches of a match"))
   }
 

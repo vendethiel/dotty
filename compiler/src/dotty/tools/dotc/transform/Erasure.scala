@@ -432,11 +432,11 @@ object Erasure {
         }
       }
 
-      eraseIfWasPhantom(recur(typed(tree.qualifier, AnySelectionProto)), pt)
+      eraseIfUnused(recur(typed(tree.qualifier, AnySelectionProto)), pt)
     }
 
     override def typedIdent(tree: untpd.Ident, pt: Type)(implicit ctx: Context): tpd.Tree =
-      eraseIfWasPhantom(super.typedIdent(tree, pt), pt)
+      eraseIfUnused(super.typedIdent(tree, pt), pt)
 
     override def typedThis(tree: untpd.This)(implicit ctx: Context): Tree =
       if (tree.symbol == ctx.owner.lexicallyEnclosingClass || tree.symbol.isStaticOwner) promote(tree)
@@ -470,7 +470,7 @@ object Erasure {
           }
         case _ => typedExpr(ntree, pt)
       }
-      eraseIfWasPhantom(res, pt)
+      eraseIfUnused(res, pt)
     }
 
 	/** Besides normal typing, this method collects all arguments
@@ -500,7 +500,7 @@ object Erasure {
               throw new MatchError(i"tree $tree has unexpected type of function ${fun1.tpe.widen}, was ${fun.typeOpt.widen}")
           }
       }
-      eraseIfWasPhantom(res, pt)
+      eraseIfUnused(res, pt)
     }
 
     // The following four methods take as the proto-type the erasure of the pre-existing type,
@@ -556,7 +556,7 @@ object Erasure {
         vparamss1 = (tpd.ValDef(bunchedParam) :: Nil) :: Nil
         rhs1 = untpd.Block(paramDefs, rhs1)
       }
-      vparamss1 = vparamss1.mapConserve(_.filterConserve(vparam => !wasPhantom(vparam.tpe)))
+      vparamss1 = vparamss1.mapConserve(_.filterConserve(vparam => !vparam.tpt.typeOpt.hasAnnotation(defn.UnusedAnnot) && !wasPhantom(vparam.tpe)))
       if (sym.is(Flags.ParamAccessor) && wasPhantom(ddef.tpt.tpe)) {
         sym.resetFlag(Flags.ParamAccessor)
         rhs1 = erasedPhantomTerm
@@ -645,11 +645,16 @@ object Erasure {
   def takesBridges(sym: Symbol)(implicit ctx: Context) =
     sym.isClass && !sym.is(Flags.Trait | Flags.Package)
 
-  private def eraseIfWasPhantom(tree: tpd.Tree, pt: Type)(implicit ctx: Context): tpd.Tree = pt match {
-    case _: FunProto => tree
-    case _ =>
-      if ((tree.symbol eq defn.Phantom_assume) || wasPhantom(tree.tpe)) erasedPhantomTerm
-      else tree
+  private def eraseIfUnused(tree: tpd.Tree, pt: Type)(implicit ctx: Context): tpd.Tree = pt match {
+    case _: FunProto         => tree
+    case _ if isUnused(tree) => tpd.defaultValue(tree.tpe.widenDealias.resultType)
+    case _                   => tree
+  }
+
+  private def isUnused(tree: Tree)(implicit ctx: Context): Boolean = {
+    tree.symbol.isUnused ||
+    (tree.symbol eq defn.Phantom_assume) ||
+    wasPhantom(tree.tpe)
   }
 
   private def wasPhantom(tp: Type)(implicit ctx: Context): Boolean = {

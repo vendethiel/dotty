@@ -175,9 +175,10 @@ class FirstTransform extends MiniPhaseTransform with InfoTransformer with Annota
   }
 
   override def transformValDef(vdef: tpd.ValDef)(implicit ctx: Context, info: TransformerInfo): tpd.Tree = {
-    if (vdef.tpt.tpe.isPhantom) {
-      if (vdef.symbol.is(Mutable)) ctx.error("var fields cannot have Phantom types", vdef.pos)
-      else if (vdef.symbol.hasAnnotation(defn.VolatileAnnot)) ctx.error("Phantom fields cannot be @volatile", vdef.pos)
+    if (vdef.tpt.tpe.isUnused) {
+      val kind = if (vdef.tpt.tpe.isPhantom) "phantom" else "@unused"
+      if (vdef.symbol.is(Mutable)) ctx.error("var fields cannot be " + kind, vdef.pos)
+      else if (vdef.symbol.hasAnnotation(defn.VolatileAnnot)) ctx.error(kind + " fields cannot be @volatile", vdef.pos)
     }
     vdef
   }

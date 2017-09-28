@@ -494,10 +494,10 @@ object Checking {
           case param :: params =>
             if (param.is(Mutable))
               ctx.error(ValueClassParameterMayNotBeAVar(clazz, param), param.pos)
-            if (param.info.isPhantom)
+            if (param.info.isUnused)
               ctx.error("value class first parameter must not be phantom", param.pos)
             else {
-              for (p <- params if !p.info.isPhantom)
+              for (p <- params if !p.info.isUnused)
                 ctx.error("value class can only have one non phantom parameter", p.pos)
             }
           case Nil =>

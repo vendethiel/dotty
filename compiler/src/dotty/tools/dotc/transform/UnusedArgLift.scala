@@ -2,17 +2,18 @@ package dotty.tools.dotc.transform
 
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Contexts._
-import dotty.tools.dotc.core.NameKinds._
+import dotty.tools.dotc.core.Definitions._
+import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.transform.TreeTransforms.{MiniPhaseTransform, TransformerInfo}
 import dotty.tools.dotc.typer.EtaExpansion
 
 import scala.collection.mutable.ListBuffer
 
-/** This phase extracts the arguments of phantom type before the application to avoid losing any
+/** This phase extracts the unused arguments before the application to avoid losing any
  *  effects in the argument tree. This trivializes the removal of parameter in the Erasure phase.
  *
- *  `f(x1,...)(y1,...)...(...)` with at least one phantom argument
+ *  `f(x1,...)(y1,...)...(...)` with at least one unused argument
  *
  *    -->
  *
@@ -24,16 +25,16 @@ import scala.collection.mutable.ListBuffer
  *  `ev$f(ev$x1,...)(ev$y1,...)...(...)`
  *
  */
-class PhantomArgLift extends MiniPhaseTransform {
+class UnusedArgLift extends MiniPhaseTransform {
   import tpd._
 
-  override def phaseName: String = "phantomArgLift"
+  override def phaseName: String = "unusedArgLift"
 
   /** Check what the phase achieves, to be called at any point after it is finished. */
   override def checkPostCondition(tree: Tree)(implicit ctx: Context): Unit = tree match {
     case tree: Apply =>
       tree.args.foreach { arg =>
-        assert(!arg.tpe.isPhantom || isPureExpr(arg))
+        assert(!arg.tpe.isUnused || isPureExpr(arg))
       }
     case _ =>
   }
@@ -43,7 +44,7 @@ class PhantomArgLift extends MiniPhaseTransform {
   override def transformApply(tree: Apply)(implicit ctx: Context, info: TransformerInfo): Tree = tree.tpe.widen match {
     case _: MethodType => tree // Do the transformation higher in the tree if needed
     case _ =>
-      if (!hasImpurePhantomArgs(tree)) tree
+      if (!hasUnusedArgs(tree)) tree
       else {
         val buffer = ListBuffer.empty[Tree]
         val app = EtaExpansion.liftApp(buffer, tree)
@@ -54,16 +55,20 @@ class PhantomArgLift extends MiniPhaseTransform {
 
   /* private methods */
 
-  /** Returns true if at least on of the arguments is an impure phantom.
+  /** Returns true if at least on of the arguments is an impure unused.
    *  Inner applies are also checked in case of multiple parameter list.
    */
-  private def hasImpurePhantomArgs(tree: Apply)(implicit ctx: Context): Boolean = {
-    tree.args.exists(arg => arg.tpe.isPhantom && !isPureExpr(arg)) || {
-      tree.fun match {
-        case fun: Apply => hasImpurePhantomArgs(fun)
-        case _ => false
-      }
+  private def hasUnusedArgs(tree: Apply)(implicit ctx: Context): Boolean = {
+    def hasUnusedArgs(tpe: Type): Boolean = tpe match {
+      case tpe: MethodType =>
+        tpe.paramInfos.exists(_.isUnused) || // TODO check if the unused argument is pure
+        hasUnusedArgs(tpe.resType)
+      case tpe: MethodicType =>
+        hasUnusedArgs(tpe.resultType)
+      case _ => false
     }
+    hasUnusedArgs(tree.fun.symbol.info)
   }
+
 
 }

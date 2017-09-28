@@ -188,6 +188,13 @@ object Types {
      */
     final def isPhantom(implicit ctx: Context): Boolean = phantomLatticeType.exists
 
+    /** Returns true if the type is unused
+     *   - true if type has the @unused annotation
+     *   - true if the type is a phantom
+     *   - false otherwise
+     */
+    final def isUnused(implicit ctx: Context): Boolean = hasAnnotation(defn.UnusedAnnot) || isPhantom
+
     /** Returns the top type of the lattice
      *   - XYX.Any if XYZ extends scala.Phantom and this type is upper bounded XYZ.Any
      *   - scala.Any otherwise
