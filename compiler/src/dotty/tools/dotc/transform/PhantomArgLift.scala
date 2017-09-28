@@ -58,6 +58,7 @@ class PhantomArgLift extends MiniPhaseTransform {
    *  Inner applies are also checked in case of multiple parameter list.
    */
   private def hasImpurePhantomArgs(tree: Apply)(implicit ctx: Context): Boolean = {
+    tree.tpe.finalResultType.isPhantom ||
     tree.args.exists(arg => arg.tpe.isPhantom && !isPureExpr(arg)) || {
       tree.fun match {
         case fun: Apply => hasImpurePhantomArgs(fun)
