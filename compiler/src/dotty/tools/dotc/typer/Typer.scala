@@ -1347,7 +1347,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
      *  @param cinfo The info of its constructor
      */
     def maybeCall(ref: Tree, psym: Symbol, cinfo: Type): Tree = cinfo.stripPoly match {
-      case cinfo @ MethodType(Nil) if cinfo.resultType.isInstanceOf[ImplicitMethodType] =>
+      case cinfo @ MethodType(Nil) if cinfo.resultType.isImplicitMethod =>
         val icall = New(ref).select(nme.CONSTRUCTOR).appliedToNone
         typedExpr(untpd.TypedSplice(icall))(superCtx)
       case cinfo @ MethodType(Nil) if !cinfo.resultType.isInstanceOf[MethodType] =>
@@ -1993,7 +1993,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     def adaptNoArgs(wtp: Type): Tree = wtp match {
       case wtp: ExprType =>
         adaptInterpolated(tree.withType(wtp.resultType), pt)
-      case wtp: ImplicitMethodType if constrainResult(wtp, followAlias(pt)) =>
+      case wtp: MethodType if wtp.isImplicit && constrainResult(wtp, followAlias(pt)) =>
         val tvarsToInstantiate = tvarsInParams(tree)
         wtp.paramInfos.foreach(instantiateSelected(_, tvarsToInstantiate))
         val constr = ctx.typerState.constraint

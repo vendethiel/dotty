@@ -206,7 +206,7 @@ object TypeErasure {
       !tp.symbol.is(JavaDefined)
     case tp: TypeParamRef =>
       !tp.derivesFrom(defn.ObjectClass) &&
-      !tp.binder.resultType.isInstanceOf[JavaMethodType]
+      !tp.binder.resultType.isJavaMethod
     case tp: TypeAlias => isUnboundedGeneric(tp.alias)
     case tp: TypeBounds => !tp.hi.derivesFrom(defn.ObjectClass)
     case tp: TypeProxy => isUnboundedGeneric(tp.underlying)

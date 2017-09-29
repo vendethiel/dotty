@@ -288,6 +288,18 @@ object Types {
     /** Is this an alias TypeBounds? */
     final def isAlias: Boolean = this.isInstanceOf[TypeAlias]
 
+    /** Is this an MethodType which has implicit parameters */
+    final def isJavaMethod: Boolean = this match {
+      case mt: MethodType => mt.isJava
+      case _ => false
+    }
+
+    /** Is this an MethodType which has implicit parameters */
+    final def isImplicitMethod: Boolean = this match {
+      case mt: MethodType => mt.isImplicit
+      case _ => false
+    }
+
 // ----- Higher-order combinators -----------------------------------
 
     /** Returns true if there is a part of this type that satisfies predicate `p`.
