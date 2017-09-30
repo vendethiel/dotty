@@ -2512,8 +2512,6 @@ object Types {
 
     override def resultType(implicit ctx: Context) = resType
 
-    def isImplicit = false
-
     def isDependent(implicit ctx: Context): Boolean
     def isParamDependent(implicit ctx: Context): Boolean
 
@@ -2700,7 +2698,7 @@ object Types {
     final def companion: MethodTypeCompanion = MethodType.withKind(kind)
 
     final def isJava: Boolean = kind is JavaKind
-    final override def isImplicit: Boolean = kind is ImplicitKind
+    final def isImplicit: Boolean = kind is ImplicitKind
 
     val paramInfos = paramInfosExp(this)
     val resType = resultTypeExp(this)

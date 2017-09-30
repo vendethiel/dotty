@@ -508,7 +508,7 @@ class TypeComparer(initctx: Context) extends DotClass with ConstraintHandling {
         case tp1: MethodOrPoly =>
           (tp1.signature consistentParams tp2.signature) &&
             matchingParams(tp1, tp2) &&
-            tp1.isImplicit == tp2.isImplicit &&
+            tp1.isImplicitMethod == tp2.isImplicitMethod &&
             isSubType(tp1.resultType, tp2.resultType.subst(tp2, tp1))
         case _ =>
           false
