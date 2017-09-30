@@ -2710,12 +2710,7 @@ object Types {
     def computeSignature(implicit ctx: Context): Signature =
       resultSignature.prepend(paramInfos, isJava)
 
-    protected def prefixString = {
-      if (isJava) "JavaMethodType"
-      else if (isImplicit) "ImplicitMethodType"
-      else "MethodType"
-    }
-
+    protected def prefixString = "MethodType"
   }
 
   final class ConcreteMethodType(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type, val kind: MethodKinds.MethodKind)
