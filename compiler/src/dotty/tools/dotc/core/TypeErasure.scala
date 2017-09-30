@@ -398,7 +398,7 @@ class TypeErasure(isJava: Boolean, semiEraseVCs: Boolean, isConstructor: Boolean
       ctx.typeComparer.orType(this(tp1), this(tp2), erased = true)
     case tp: MethodType =>
       def paramErasure(tpToErase: Type) =
-        erasureFn(tp.isJava, semiEraseVCs, isConstructor, wildcardOK)(tpToErase)
+        erasureFn(tp.isJavaMethod, semiEraseVCs, isConstructor, wildcardOK)(tpToErase)
       val (names, formals0) =
         if (tp.paramInfos.exists(_.isPhantom)) tp.paramNames.zip(tp.paramInfos).filterNot(_._2.isPhantom).unzip
         else (tp.paramNames, tp.paramInfos)
