@@ -288,13 +288,13 @@ object Types {
     /** Is this an alias TypeBounds? */
     final def isAlias: Boolean = this.isInstanceOf[TypeAlias]
 
-    /** Is this an MethodType which has implicit parameters */
+    /** Is this a MethodType which is from Java */
     final def isJavaMethod: Boolean = this match {
       case mt: MethodType => mt.isJava
       case _ => false
     }
 
-    /** Is this an MethodType which has implicit parameters */
+    /** Is this a MethodType which has implicit parameters */
     final def isImplicitMethod: Boolean = this match {
       case mt: MethodType => mt.isImplicit
       case _ => false
