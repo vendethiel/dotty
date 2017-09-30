@@ -2826,9 +2826,10 @@ object Types {
 
     def kind: MethodKind = Plain
 
-    private val methodTypes: mutable.Map[MethodKind, MethodTypeCompanion] = mutable.Map(self.kind -> self)
+    private val methodTypeCompanions: mutable.Map[MethodKind, MethodTypeCompanion] = mutable.Map.empty
     def withKind(methodKind: MethodKind): MethodTypeCompanion =
-      methodTypes.getOrElseUpdate(methodKind, new MethodTypeCompanion { def kind = methodKind })
+      if (methodKind == Plain) this
+      else methodTypeCompanions.getOrElseUpdate(methodKind, new MethodTypeCompanion { def kind = methodKind })
 
     def withKind(isJava: Boolean = false, isImplicit: Boolean = false): MethodTypeCompanion =
       withKind(makeMethodKind(isJava, isImplicit))
