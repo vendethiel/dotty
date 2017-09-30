@@ -292,10 +292,7 @@ object Types {
     def isJavaMethod: Boolean = false
 
     /** Is this a MethodType which has implicit parameters */
-    final def isImplicitMethod: Boolean = this match {
-      case mt: MethodType => mt.isImplicit
-      case _ => false
-    }
+    def isImplicitMethod: Boolean = false
 
 // ----- Higher-order combinators -----------------------------------
 
@@ -1326,7 +1323,7 @@ object Types {
       case mt: MethodType if !mt.isDependent || ctx.mode.is(Mode.AllowDependentFunctions) =>
         val formals1 = if (dropLast == 0) mt.paramInfos else mt.paramInfos dropRight dropLast
         defn.FunctionOf(
-          formals1 mapConserve (_.underlyingIfRepeated(mt.isJavaMethod)), mt.resultType, mt.isImplicit && !ctx.erasedTypes)
+          formals1 mapConserve (_.underlyingIfRepeated(mt.isJavaMethod)), mt.resultType, mt.isImplicitMethod && !ctx.erasedTypes)
     }
 
     /** The signature of this type. This is by default NotAMethod,
@@ -2695,7 +2692,7 @@ object Types {
     final def companion: MethodTypeCompanion = MethodType.withKind(kind)
 
     final override def isJavaMethod: Boolean = kind is JavaKind
-    final def isImplicit: Boolean = kind is ImplicitKind
+    final override def isImplicitMethod: Boolean = kind is ImplicitKind
 
     val paramInfos = paramInfosExp(this)
     val resType = resultTypeExp(this)

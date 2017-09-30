@@ -1993,7 +1993,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
     def adaptNoArgs(wtp: Type): Tree = wtp match {
       case wtp: ExprType =>
         adaptInterpolated(tree.withType(wtp.resultType), pt)
-      case wtp: MethodType if wtp.isImplicit && constrainResult(wtp, followAlias(pt)) =>
+      case wtp: MethodType if wtp.isImplicitMethod && constrainResult(wtp, followAlias(pt)) =>
         val tvarsToInstantiate = tvarsInParams(tree)
         wtp.paramInfos.foreach(instantiateSelected(_, tvarsToInstantiate))
         val constr = ctx.typerState.constraint
@@ -2110,7 +2110,7 @@ class Typer extends Namer with TypeAssigner with Applications with Implicits wit
           typed(etaExpand(tree, wtp, arity), pt)
         else if (wtp.paramInfos.isEmpty && isAutoApplied(tree.symbol))
           adaptInterpolated(tpd.Apply(tree, Nil), pt)
-        else if (wtp.isImplicit)
+        else if (wtp.isImplicitMethod)
           err.typeMismatch(tree, pt)
         else
           missingArgs(wtp)
