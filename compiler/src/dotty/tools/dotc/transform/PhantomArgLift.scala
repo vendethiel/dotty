@@ -3,6 +3,7 @@ package dotty.tools.dotc.transform
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.NameKinds._
+import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.transform.TreeTransforms.{MiniPhaseTransform, TransformerInfo}
 import dotty.tools.dotc.typer.EtaExpansion
@@ -43,7 +44,7 @@ class PhantomArgLift extends MiniPhaseTransform {
   override def transformApply(tree: Apply)(implicit ctx: Context, info: TransformerInfo): Tree = tree.tpe.widen match {
     case _: MethodType => tree // Do the transformation higher in the tree if needed
     case _ =>
-      if (!tree.tpe.finalResultType.isPhantom && !hasImpurePhantomArgs(tree)) tree
+      if (!hasUnusedParams(tree.symbol) && !tree.tpe.finalResultType.isPhantom && !hasImpurePhantomArgs(tree)) tree
       else {
         val buffer = ListBuffer.empty[Tree]
         val app = EtaExpansion.liftApp(buffer, tree)
@@ -64,6 +65,15 @@ class PhantomArgLift extends MiniPhaseTransform {
         case _ => false
       }
     }
+  }
+
+  /** Returns true if at least on of the argument lists in unused. */
+  private def hasUnusedParams(sym: Symbol)(implicit ctx: Context): Boolean = {
+    def hasUnusedParams(tp: Type): Boolean = tp match {
+      case tp: MethodicType => tp.isUnusedMethod || hasUnusedParams(tp.resultType)
+      case _ => false
+    }
+    hasUnusedParams(sym.info)
   }
 
 }

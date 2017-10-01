@@ -36,8 +36,10 @@ class PhantomDefs extends MiniPhaseTransform with InfoTransformer { thisTransfor
     case _ => tp
   }
 
-  private def isPhantomMethod(sym: Symbol)(implicit ctx: Context): Boolean =
-    sym.info.finalResultType.widenDealias.classSymbol eq defn.ErasedPhantomClass
+  private def isPhantomMethod(sym: Symbol)(implicit ctx: Context): Boolean = {
+    sym.hasAnnotation(defn.UnusedAnnot) ||
+    (sym.info.finalResultType.widenDealias.classSymbol eq defn.ErasedPhantomClass)
+  }
 
 }
 

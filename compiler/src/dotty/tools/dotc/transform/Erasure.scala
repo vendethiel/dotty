@@ -487,9 +487,10 @@ object Erasure {
                   .withType(defn.ArrayOf(defn.ObjectType))
                 args0 = bunchedArgs :: Nil
               }
+              val args1 = filterUnusedParams(args0, fun1.tpe)
               // Arguments are phantom if an only if the parameters are phantom, guaranteed by the separation of type lattices
-              val args1 = args0.filterConserve(arg => !wasPhantom(arg.typeOpt)).zipWithConserve(mt.paramInfos)(typedExpr)
-              untpd.cpy.Apply(tree)(fun1, args1) withType mt.resultType
+              val args2 = args1.filterConserve(arg => !wasPhantom(arg.typeOpt)).zipWithConserve(mt.paramInfos)(typedExpr)
+              untpd.cpy.Apply(tree)(fun1, args2) withType mt.resultType
             case _ =>
               throw new MatchError(i"tree $tree has unexpected type of function ${fun1.tpe.widen}, was ${fun.typeOpt.widen}")
           }
@@ -533,7 +534,8 @@ object Erasure {
       val restpe =
         if (sym.isConstructor) defn.UnitType
         else sym.info.resultType
-      var vparamss1 = (outer.paramDefs(sym) ::: ddef.vparamss.flatten) :: Nil
+      val vparamss0 = filterUnusedParams(ddef.vparamss.flatten, sym.termRef)
+      var vparamss1 = (outer.paramDefs(sym) ::: vparamss0) :: Nil
       var rhs1 = ddef.rhs match {
         case id @ Ident(nme.WILDCARD) => untpd.TypedSplice(id.withType(restpe))
         case _ => ddef.rhs
@@ -684,5 +686,18 @@ object Erasure {
       val ctx2 = ctx.withPhase(ctx.erasurePhase)
       tp.widenDealias(ctx2).isPhantom(ctx2)
     }
+  }
+
+  private def filterUnusedParams[T <: untpd.Tree](args: List[T], tpe: Type)(implicit ctx: Context): List[T] = {
+    // TODO improve
+    def loop(tp: Type): List[Boolean] = tp match {
+      case tp: PolyType => loop(tp.resType)
+      case tp: MethodType =>
+        if (tp.isUnusedMethod) tp.paramNames.map(_ => true) ::: loop(tp.resType)
+        else tp.paramNames.map(_ => false) ::: loop(tp.resType)
+      case _ => Nil
+    }
+    val filter = loop(tpe.widen(ctx.withPhase(ctx.erasurePhase)))
+    args.zip(filter).filterNot(_._2).unzip._1
   }
 }

@@ -294,6 +294,9 @@ object Types {
     /** Is this a MethodType which has implicit parameters */
     def isImplicitMethod: Boolean = false
 
+    /** Is this a MethodType which has usused parameters */
+    def isUnusedMethod: Boolean = false
+
 // ----- Higher-order combinators -----------------------------------
 
     /** Returns true if there is a part of this type that satisfies predicate `p`.
@@ -2693,13 +2696,16 @@ object Types {
 
     final override def isJavaMethod: Boolean = kind is JavaKind
     final override def isImplicitMethod: Boolean = kind is ImplicitKind
+    final override def isUnusedMethod: Boolean = kind is UnusedKind
 
     val paramInfos = paramInfosExp(this)
     val resType = resultTypeExp(this)
     assert(resType.exists)
 
-    def computeSignature(implicit ctx: Context): Signature =
-      resultSignature.prepend(paramInfos, isJavaMethod)
+    def computeSignature(implicit ctx: Context): Signature = {
+      val params = if (isUnusedMethod) Nil else paramInfos
+      resultSignature.prepend(params, isJavaMethod)
+    }
 
     protected def prefixString = "MethodType"
   }
@@ -2808,11 +2814,13 @@ object Types {
     // Flags
     val JavaKind: MethodKind = 1: Byte
     val ImplicitKind: MethodKind = 2: Byte
+    val UnusedKind: MethodKind = 4: Byte
 
-    def makeMethodKind(isJava: Boolean, isImplicit: Boolean): MethodKind = {
+    def makeMethodKind(isJava: Boolean, isImplicit: Boolean, isUnused: Boolean): MethodKind = {
       var mk: Int = Plain
       if (isJava) mk |= JavaKind
       if (isImplicit) mk |= ImplicitKind
+      if (isUnused) mk |= UnusedKind
       mk.toByte
     }
 
@@ -2831,8 +2839,8 @@ object Types {
       if (methodKind == Plain) this
       else methodTypeCompanions.getOrElseUpdate(methodKind, new MethodTypeCompanion { def kind = methodKind })
 
-    def withKind(isJava: Boolean = false, isImplicit: Boolean = false): MethodTypeCompanion =
-      withKind(makeMethodKind(isJava, isImplicit))
+    def withKind(isJava: Boolean = false, isImplicit: Boolean = false, isUnused: Boolean = false): MethodTypeCompanion =
+      withKind(makeMethodKind(isJava, isImplicit, isUnused))
   }
 
   /** A ternary extractor for MethodType */
