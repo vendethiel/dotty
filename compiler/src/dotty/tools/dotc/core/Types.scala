@@ -2784,10 +2784,8 @@ object Types {
          tl => tl.integrate(params, resultType))
     }
 
-    final def apply(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType = {
-      val mtc = unique(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, kind))
-      if (kind is JavaKind) mtc else checkValid(mtc)
-    }
+    final def apply(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType =
+      checkValid(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, kind))
 
     def checkValid(mt: MethodType)(implicit ctx: Context): mt.type = {
       if (Config.checkMethodTypes)
