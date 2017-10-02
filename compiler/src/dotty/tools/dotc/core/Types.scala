@@ -2704,7 +2704,7 @@ object Types {
     protected def prefixString = "MethodType"
   }
 
-  final class ConcreteMethodType(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type, val kind: MethodKinds.MethodKind)
+  final class CachedMethodType(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type, val kind: MethodKinds.MethodKind)
     extends MethodType(paramNames)(paramInfosExp, resultTypeExp)
 
   abstract class LambdaTypeCompanion[N <: Name, PInfo <: Type, LT <: LambdaType] {
@@ -2785,7 +2785,7 @@ object Types {
     }
 
     final def apply(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType = {
-      val mtc = unique(new ConcreteMethodType(paramNames)(paramInfosExp, resultTypeExp, kind))
+      val mtc = unique(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, kind))
       if (kind is JavaKind) mtc else checkValid(mtc)
     }
 
