@@ -2684,15 +2684,13 @@ object Types {
       paramInfosExp: MethodType => List[Type],
       resultTypeExp: MethodType => Type)
     extends MethodOrPoly with TermLambda with NarrowCached { thisMethodType =>
-    import MethodKinds._
 
     type This = MethodType
 
-    def kind: MethodKind
-    final def companion: MethodTypeCompanion = MethodType.withKind(kind)
+    def companion: MethodTypeCompanion
 
-    final override def isJavaMethod: Boolean = kind is JavaKind
-    final override def isImplicitMethod: Boolean = kind is ImplicitKind
+    final override def isJavaMethod: Boolean = companion.isJava
+    final override def isImplicitMethod: Boolean = companion.isImplicit
 
     val paramInfos = paramInfosExp(this)
     val resType = resultTypeExp(this)
@@ -2704,7 +2702,7 @@ object Types {
     protected def prefixString = "MethodType"
   }
 
-  final class CachedMethodType(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type, val kind: MethodKinds.MethodKind)
+  final class CachedMethodType(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type, val companion: MethodTypeCompanion)
     extends MethodType(paramNames)(paramInfosExp, resultTypeExp)
 
   abstract class LambdaTypeCompanion[N <: Name, PInfo <: Type, LT <: LambdaType] {
@@ -2750,10 +2748,10 @@ object Types {
     def syntheticParamName(n: Int) = tpnme.syntheticTypeParamName(n)
   }
 
-  abstract class MethodTypeCompanion extends TermLambdaCompanion[MethodType] {
-    import MethodKinds._
+  abstract class MethodTypeCompanion extends TermLambdaCompanion[MethodType] { self =>
 
-    def kind: MethodKind
+    def isJava: Boolean = false
+    def isImplicit: Boolean = false
 
     /** Produce method type from parameter symbols, with special mappings for repeated
      *  and inline parameters:
@@ -2785,7 +2783,7 @@ object Types {
     }
 
     final def apply(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type)(implicit ctx: Context): MethodType =
-      checkValid(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, kind))
+      checkValid(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, self))
 
     def checkValid(mt: MethodType)(implicit ctx: Context): mt.type = {
       if (Config.checkMethodTypes)
@@ -2798,39 +2796,20 @@ object Types {
     }
   }
 
-  object MethodKinds {
-    type MethodKind = Byte
-
-    val Plain: MethodKind = 0: Byte
-
-    // Flags
-    val JavaKind: MethodKind = 1: Byte
-    val ImplicitKind: MethodKind = 2: Byte
-
-    def makeMethodKind(isJava: Boolean, isImplicit: Boolean): MethodKind = {
-      var mk: Int = Plain
-      if (isJava) mk |= JavaKind
-      if (isImplicit) mk |= ImplicitKind
-      mk.toByte
-    }
-
-    implicit class MethodKindsOps(mk: MethodKind) {
-      def is(that: MethodKind): Boolean = (mk & that) == that
+  object MethodType extends MethodTypeCompanion {
+    def withKind(isJava: Boolean = false, isImplicit: Boolean = false): MethodTypeCompanion = {
+      if (isJava) JavaMethodType
+      else if (isImplicit) ImplicitMethodType
+      else MethodType
     }
   }
 
-  object MethodType extends MethodTypeCompanion { self =>
-    import MethodKinds._
+  object JavaMethodType extends MethodTypeCompanion {
+    override def isJava: Boolean = true
+  }
 
-    def kind: MethodKind = Plain
-
-    private val methodTypeCompanions: mutable.Map[MethodKind, MethodTypeCompanion] = mutable.Map.empty
-    def withKind(methodKind: MethodKind): MethodTypeCompanion =
-      if (methodKind == Plain) this
-      else methodTypeCompanions.getOrElseUpdate(methodKind, new MethodTypeCompanion { def kind = methodKind })
-
-    def withKind(isJava: Boolean = false, isImplicit: Boolean = false): MethodTypeCompanion =
-      withKind(makeMethodKind(isJava, isImplicit))
+  object ImplicitMethodType extends MethodTypeCompanion {
+    override def isImplicit: Boolean = true
   }
 
   /** A ternary extractor for MethodType */

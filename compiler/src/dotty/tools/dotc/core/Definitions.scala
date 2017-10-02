@@ -119,7 +119,7 @@ class Definitions {
           if (name.firstPart.startsWith(str.ImplicitFunction)) {
             val superTrait =
               FunctionType(arity).appliedTo(argParams.map(_.typeRef) ::: resParam.typeRef :: Nil)
-            (MethodType.withKind(isImplicit = true), superTrait :: Nil)
+            (ImplicitMethodType, superTrait :: Nil)
           }
           else (MethodType, Nil)
         val applyMeth =
