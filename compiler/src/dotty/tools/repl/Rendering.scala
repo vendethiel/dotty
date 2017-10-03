@@ -21,7 +21,7 @@ import dotc.core.StdNames.str
  *       `Rendering` is no longer valid.
  */
 private[repl] class Rendering(compiler: ReplCompiler,
-                              private var currentClassLoader: Option[ClassLoader] = None) {
+                              private[this] var currentClassLoader: Option[ClassLoader] = None) {
 
   private def classLoader()(implicit ctx: Context) =
     currentClassLoader.getOrElse {
