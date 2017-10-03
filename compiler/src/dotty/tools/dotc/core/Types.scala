@@ -294,6 +294,9 @@ object Types {
     /** Is this a MethodType which has implicit parameters */
     def isImplicitMethod: Boolean = false
 
+    /** Is this a MethodType for which the parameters will not be used */
+    def isUnusedMethod: Boolean = false
+
 // ----- Higher-order combinators -----------------------------------
 
     /** Returns true if there is a part of this type that satisfies predicate `p`.
@@ -2763,13 +2766,16 @@ object Types {
 
     final override def isJavaMethod: Boolean = companion.isJava
     final override def isImplicitMethod: Boolean = companion.isImplicit
+    final override def isUnusedMethod: Boolean = companion.isUnused
 
     val paramInfos = paramInfosExp(this)
     val resType = resultTypeExp(this)
     assert(resType.exists)
 
-    def computeSignature(implicit ctx: Context): Signature =
-      resultSignature.prepend(paramInfos, isJavaMethod)
+    def computeSignature(implicit ctx: Context): Signature = {
+      val params = if (isUnusedMethod) Nil else paramInfos
+      resultSignature.prepend(params, isJavaMethod)
+    }
 
     protected def prefixString = "MethodType"
   }
@@ -2820,10 +2826,11 @@ object Types {
     def syntheticParamName(n: Int) = tpnme.syntheticTypeParamName(n)
   }
 
-  abstract class MethodTypeCompanion extends TermLambdaCompanion[MethodType] { self =>
-
-    def isJava: Boolean = false
-    def isImplicit: Boolean = false
+  abstract class MethodTypeCompanion(
+      val isJava: Boolean = false,
+      val isImplicit: Boolean = false,
+      val isUnused: Boolean = false)
+    extends TermLambdaCompanion[MethodType] { self =>
 
     /** Produce method type from parameter symbols, with special mappings for repeated
      *  and inline parameters:
@@ -2869,20 +2876,23 @@ object Types {
   }
 
   object MethodType extends MethodTypeCompanion {
-    def withKind(isJava: Boolean = false, isImplicit: Boolean = false): MethodTypeCompanion = {
-      if (isJava) JavaMethodType
+    def withKind(isJava: Boolean = false, isImplicit: Boolean = false, isUnused: Boolean = false): MethodTypeCompanion = {
+      if (isJava) {
+        assert(!isImplicit)
+        assert(!isUnused)
+        JavaMethodType
+      }
+      else if (isImplicit && isUnused) UnusedImplicitMethodType
       else if (isImplicit) ImplicitMethodType
+      else if (isUnused) UnusedMethodType
       else MethodType
     }
   }
 
-  object JavaMethodType extends MethodTypeCompanion {
-    override def isJava: Boolean = true
-  }
-
-  object ImplicitMethodType extends MethodTypeCompanion {
-    override def isImplicit: Boolean = true
-  }
+  object JavaMethodType extends MethodTypeCompanion(isJava = true)
+  object ImplicitMethodType extends MethodTypeCompanion(isImplicit = true)
+  object UnusedMethodType extends MethodTypeCompanion(isUnused = true)
+  object UnusedImplicitMethodType extends MethodTypeCompanion(isImplicit = true, isUnused = true)
 
   /** A ternary extractor for MethodType */
   object MethodTpe {

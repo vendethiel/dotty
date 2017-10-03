@@ -108,10 +108,11 @@ trait NamerContextOps { this: Context =>
     val monotpe =
       (valueParamss :\ resultType) { (params, resultType) =>
         val isImplicit = params.nonEmpty && (params.head is Implicit)
+        val isUnused = params.nonEmpty && params.head.isUnused
         if (isJava)
           for (param <- params)
             if (param.info.isDirectRef(defn.ObjectClass)) param.info = defn.AnyType
-        MethodType.withKind(isJava, isImplicit).fromSymbols(params.asInstanceOf[List[TermSymbol]], resultType)
+        MethodType.withKind(isJava, isImplicit, isUnused).fromSymbols(params.asInstanceOf[List[TermSymbol]], resultType)
       }
     if (typeParams.nonEmpty) PolyType.fromParams(typeParams.asInstanceOf[List[TypeSymbol]], monotpe)
     else if (valueParamss.isEmpty) ExprType(monotpe)
