@@ -54,6 +54,8 @@ class DottyLanguageServer extends LanguageServer
 
   private[this] var myDrivers: mutable.Map[ProjectConfig, InteractiveDriver] = _
 
+  val sources: mutable.Map[URI, String] = new mutable.HashMap
+
   def drivers: Map[ProjectConfig, InteractiveDriver] = thisServer.synchronized {
     if (myDrivers == null) {
       assert(rootUri != null, "`drivers` cannot be called before `initialize`")
@@ -153,6 +155,9 @@ class DottyLanguageServer extends LanguageServer
     val driver = driverFor(uri)
 
     val text = document.getText
+
+    sources += uri -> text
+
     val diags = driver.run(uri, text)
 
     client.publishDiagnostics(new PublishDiagnosticsParams(
@@ -169,6 +174,9 @@ class DottyLanguageServer extends LanguageServer
     assert(change.getRange == null, "TextDocumentSyncKind.Incremental support is not implemented")
 
     val text = change.getText
+
+    sources += uri -> text
+
     val diags = driver.run(uri, text)
 
     client.publishDiagnostics(new PublishDiagnosticsParams(
@@ -179,6 +187,8 @@ class DottyLanguageServer extends LanguageServer
   override def didClose(params: DidCloseTextDocumentParams): Unit = thisServer.synchronized {
     val document = params.getTextDocument
     val uri = new URI(document.getUri)
+
+    sources -= uri
 
     driverFor(uri).close(uri)
   }
@@ -192,6 +202,25 @@ class DottyLanguageServer extends LanguageServer
   override def didSave(params: DidSaveTextDocumentParams): Unit =
     /*thisServer.synchronized*/ {}
 
+  override def executeCommand(params: ExecuteCommandParams) = computeAsync { cancelToken =>
+    val command = params.getCommand
+    val args = params.getArguments.asScala
+
+    import Commands._
+
+    command match {
+      case START_DEBUG_SESSION =>
+        if (!args.isEmpty) {
+          println(s"Unexpected arguments for command $command: $args")
+          null
+        }
+        else
+          DottyDebugServer.newServer(this)
+      case _ =>
+        println(s"Unrecognized command $command with arguments $args")
+        null
+    }
+  }
 
   // FIXME: share code with messages.NotAMember
   override def completion(params: TextDocumentPositionParams) = computeAsync { cancelToken =>

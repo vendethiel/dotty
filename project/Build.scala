@@ -795,11 +795,19 @@ object Build {
       // fork so that the shutdown hook in Main is run when we ctrl+c a run
       // (you need to have `cancelable in Global := true` in your global sbt config to ctrl+c a run)
       fork in run := true,
+      resolvers += "Local Maven Repository" at "file:///home/smarter/.m2/repository",
       libraryDependencies ++= Seq(
         "org.eclipse.lsp4j" % "org.eclipse.lsp4j" % "0.2.0",
+        // "org.eclipse.platform" % "org.eclipse.equinox.app" % "1.3.400",
+        // "org.eclipse.jdt" % "org.eclipse.jdt.core" % "3.12.3",
+        // "org.eclipse.jdt" % "org.eclipse.jdt.debug" % "3.10.1",
+        "com.microsoft.java" % "com.microsoft.java.debug.core" % "0.1.0",
+        "com.microsoft.java" % "com.microsoft.java.debug.plugin" % "0.1.0",
         Dependencies.`jackson-databind`
       ),
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,
+
+      // javaOptions += s"""-Djava.util.logging.config.file=${(baseDirectory.value / "../logging.properties").getAbsolutePath}""",
 
       run := Def.inputTaskDyn {
         val inputArgs = spaceDelimited("<arg>").parsed

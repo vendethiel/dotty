@@ -7,9 +7,12 @@ import { spawn } from 'child_process';
 import * as cpp from 'child-process-promise';
 
 import { commands, workspace, Disposable, ExtensionContext, Uri } from 'vscode';
-import { Executable, LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind } from 'vscode-languageclient';
+import { ExecuteCommandParams, ExecuteCommandRequest, Executable, LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind } from 'vscode-languageclient';
 import * as lc from 'vscode-languageclient';
 import * as vscode from 'vscode';
+
+import { Commands } from './commands'
+import { DottyDebugConfigurationProvider } from './configurationProvider'
 
 let extensionContext: ExtensionContext
 let outputChannel: vscode.OutputChannel
@@ -96,11 +99,22 @@ function run(serverOptions: ServerOptions) {
     }
   }
 
-  outputChannel.dispose()
+  // outputChannel.dispose()
 
   const client = new LanguageClient('dotty', 'Dotty Language Server', serverOptions, clientOptions);
+
+  commands.registerCommand(Commands.EXECUTE_WORKSPACE_COMMAND, (command, ...rest) => {
+		const params: ExecuteCommandParams = {
+			command,
+			arguments: rest
+		}
+		return client.sendRequest(ExecuteCommandRequest.type, params);
+	});
+
 
   // Push the disposable to the context's subscriptions so that the
   // client can be deactivated on extension deactivation
   extensionContext.subscriptions.push(client.start());
+
+  extensionContext.subscriptions.push(vscode.debug.registerDebugConfigurationProvider("dotty", new DottyDebugConfigurationProvider(outputChannel)));
 }
