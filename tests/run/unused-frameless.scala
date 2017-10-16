@@ -18,10 +18,10 @@ final case class R[K <: String, V](v: V)
 trait Selector[L <: HList, K, V]
 
 object Selector {
-  implicit unused def caseFound[T <: HList, K <: String, V]
+  implicit def caseFound[T <: HList, K <: String, V]
   : Selector[R[K, V] :: T, K, V] = null
 
-  implicit unused def caseRecur[H, T <: HList, K <: String, V]
+  implicit def caseRecur[H, T <: HList, K <: String, V]
   (implicit i: Selector[T, K, V])
   : Selector[H :: T, K, V] = null
 }
@@ -31,20 +31,19 @@ object Selector {
 
 trait Dataset[T] {
   def select[A](unused c: Column[T, A]): Dataset[A] =
-    ??? // Use c.label to do an untyped select on actual Spark Dataset, and
+    this.asInstanceOf[Dataset[A]] // Use c.label to do an untyped select on actual Spark Dataset, and
   // cast the result to TypedDataset[A]
 
-  def col[S <: String, A](s: S)(implicit unused ev: Exists[T, s.type, A]) =
+  def col[S <: String, A](s: S)(implicit ev: Exists[T, s.type, A]) =
     new Column[T, A](s) // ev is only here to check than this is safe, it's
   // never used at runtime!
 
   def collect(): Vector[T] =
-    ??? // Uses collect of the underlying Spark structure plus a cast
+    Vector.empty[T] // Uses collect of the underlying Spark structure plus a cast
 }
 
 object Dataset {
-  def create[T](values: Seq[T]): Dataset[T] =
-    ???
+  def create[T](values: Seq[T]): Dataset[T] = new Dataset[T] { }
 }
 
 /** Expression used in `select`-like constructions.
@@ -61,7 +60,7 @@ trait Exists[T, K, V]
 
 object Exists {
   implicit def derive[T, H <: HList, K, V]
-  (implicit unused
+  (implicit
    g: LabelledGeneric[T] { type Repr = H },
    s: Selector[H, K, V]
   ): Exists[T, K, V] = null
@@ -79,17 +78,21 @@ object X4 {
   } = null
 }
 
-object Demo {
-  val source: Vector[X4[Int, String, Double, Boolean]] =
-    Vector(X4(1, "s", 1.1, true), X4(2, "t", 1.2, false))
+object Test {
+  def main(args: Array[String]): Unit = {
+    val source: Vector[X4[Int, String, Double, Boolean]] =
+      Vector(X4(1, "s", 1.1, true), X4(2, "t", 1.2, false))
 
-  val ds: Dataset[X4[Int, String, Double, Boolean]] =
-    Dataset.create(source)
+    val ds: Dataset[X4[Int, String, Double, Boolean]] =
+      Dataset.create(source)
 
-  val D = ds.col("d")
+    unused val D = ds.col("d")
 
-  val outSpark: Vector[Boolean] = ds.select(D).collect()
-  val outColl : Vector[Boolean] = source.map(_.d)
+    val outSpark: Vector[Boolean] = ds.select(D).collect()
+    val outColl : Vector[Boolean] = source.map(_.d)
 
-  assert(outSpark == outColl)
+    assert(outSpark == outColl, (outSpark, outColl))
+
+    println("end")
+  }
 }
