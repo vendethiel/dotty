@@ -110,12 +110,7 @@ trait NamerContextOps { this: Context =>
         val (isImplicit, isUnused) =
           if (params.isEmpty) (false, false)
           else (params.head is Implicit, params.head is Unused)
-        val make =
-          if (isJava) JavaMethodType
-          else if (isImplicit && isUnused) UnusedImplicitMethodType
-          else if (isImplicit) ImplicitMethodType
-          else if (isUnused) UnusedMethodType
-          else MethodType
+        val make = MethodType.maker(isJava, isImplicit, isUnused)
         if (isJava)
           for (param <- params)
             if (param.info.isDirectRef(defn.ObjectClass)) param.info = defn.AnyType
