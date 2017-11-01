@@ -33,7 +33,7 @@ import config.Printers.{ macros => debug }
  *    }
  *
  *    object main$inline {
- *      @static def f(prefix: Tree)(T: TypeTree)(a: Tree)(b: Tree): Tree = body
+ *      @static def f(prefix: Tree)(T: TypeTree)(a: Tree)(b: Tree)(implicit c: Context): Tree = body
  *    }
  */
 
@@ -130,7 +130,7 @@ private[macros] object Transform {
    *    @static
    *    def f(prefix: TermTree)
    *         (T: TypeTree)
-   *         (a: TermTree)(b: TermTree): Tree = body
+   *         (a: TermTree)(b: TermTree)(implicit c: Context): Tree = body
    *
    *  with `this` replaced by `prefix` in `body`
    *
@@ -142,6 +142,7 @@ private[macros] object Transform {
     val treeType = Select(tb, "Tree".toTypeName)
     val termType = Select(tb, "TermTree".toTypeName)
     val typedTreeType = Select(Select(tb, "tpd".toTermName), "Tree".toTypeName)
+    val contextType = Select(tb, "Context".toTypeName)
 
     val prefix = ValDef("prefix".toTermName, if (isAnnotMacroDef) termType else typedTreeType, EmptyTree).withFlags(TermParam)
     val typeParams = for (tdef: TypeDef <- defn.tparams)
@@ -160,9 +161,12 @@ private[macros] object Transform {
         ValDef(vdef.name.toTermName, paramType(vdef), EmptyTree).withMods(vdef.mods | TermParam)
       }
 
+    val ctxParam =
+      ValDef("ctx".toTermName, contextType, EmptyTree).withFlags(Implicit | TermParam)
+
     val params =
-      if (typeParams.size > 0) List(prefix) :: typeParams :: termParams
-      else List(prefix) :: termParams
+      if (typeParams.size > 0) List(prefix) :: typeParams :: (termParams :+ List(ctxParam))
+      else List(prefix) :: (termParams :+ List(ctxParam))
 
     // replace `this` with `prefix`
     val mapper = new UntypedTreeMap {
