@@ -28,6 +28,8 @@ class Run(comp: Compiler, ictx: Context) {
 
   var units: List[CompilationUnit] = _
 
+  var typerTree: ast.tpd.Tree = _
+
   /** Produces the following contexts, from outermost to innermost
    *
    *    bootStrap:   A context with next available runId and a scope consisting of
@@ -123,6 +125,11 @@ class Run(comp: Compiler, ictx: Context) {
           Stats.trackTime(s"$phase ms ") {
             val start = System.currentTimeMillis
             units = phase.runOn(units)
+
+            if (phase.phaseName == "frontend") {
+              typerTree = units.head.tpdTree
+            }
+
             if (ctx.settings.Xprint.value.containsPhase(phase)) {
               for (unit <- units) {
                 lastPrintedTree =

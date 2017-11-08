@@ -53,6 +53,7 @@ class DottyLanguageServer extends LanguageServer
   private[this] var client: LanguageClient = _
 
   private[this] var myDrivers: mutable.Map[ProjectConfig, InteractiveDriver] = _
+  private[this] var myDebugDrivers: mutable.Map[ProjectConfig, InteractiveDriver] = _
 
   val sources: mutable.Map[URI, String] = new mutable.HashMap
 
@@ -65,13 +66,20 @@ class DottyLanguageServer extends LanguageServer
       val defaultFlags = List(/*"-Yplain-printer","-Yprint-pos"*/)
 
       myDrivers = new mutable.HashMap
+      myDebugDrivers = new mutable.HashMap
       for (config <- configs) {
         val classpathFlags = List("-classpath", (config.classDirectory +: config.dependencyClasspath).mkString(File.pathSeparator))
         val settings = defaultFlags ++ config.compilerArguments.toList ++ classpathFlags
-        myDrivers.put(config, new InteractiveDriver(settings))
+        myDrivers.put(config, new InteractiveDriver(new InteractiveCompiler, settings))
+        myDebugDrivers.put(config, new InteractiveDriver(new DebugCompiler, settings))
       }
     }
     myDrivers
+  }
+
+  def debugDrivers = thisServer.synchronized {
+    drivers // initialization
+    myDebugDrivers
   }
 
   /** The driver instance responsible for compiling `uri` */
@@ -86,6 +94,20 @@ class DottyLanguageServer extends LanguageServer
         val config = drivers.keys.head
         println(s"No configuration contains $uri as a source file, arbitrarily choosing ${config.id}")
         drivers(config)
+    }
+  }
+
+  def debugDriverFor(uri: URI): InteractiveDriver = {
+    val matchingConfig =
+      debugDrivers.keys.find(config => config.sourceDirectories.exists(sourceDir =>
+        new File(uri.getPath).getCanonicalPath.startsWith(sourceDir.getCanonicalPath)))
+    matchingConfig match {
+      case Some(config) =>
+        debugDrivers(config)
+      case None =>
+        val config = debugDrivers.keys.head
+        println(s"No configuration contains $uri as a source file, arbitrarily choosing ${config.id}")
+        debugDrivers(config)
     }
   }
 
@@ -383,6 +405,15 @@ object DottyLanguageServer {
     val source = driver.openedFiles(uri)
     if (source.exists) {
       val p = Positions.Position(source.lineToOffset(pos.getLine) + pos.getCharacter)
+      new SourcePosition(source, p)
+    }
+    else NoSourcePosition
+  }
+
+  def sourcePosition(driver: InteractiveDriver, uri: URI, line: Int, column: Int): SourcePosition = {
+    val source = driver.openedFiles(uri)
+    if (source.exists) {
+      val p = Positions.Position(source.lineToOffset(line) + column)
       new SourcePosition(source, p)
     }
     else NoSourcePosition

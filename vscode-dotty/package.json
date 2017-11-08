@@ -39,14 +39,12 @@
     }
   ],
   "contributes": {
-<<<<<<< HEAD
     "configurationDefaults": {
       "[scala]": {
         "editor.tabSize": 2,
         "editor.insertSpaces": true
       }
-    }
-=======
+    },
     "breakpoints": [
       {
         "language": "scala"
@@ -143,7 +141,6 @@
         }
       }
     ]
->>>>>>> wip, unusable
   },
   "scripts": {
     "tsc": "./node_modules/.bin/tsc",
@@ -157,22 +154,12 @@
   ],
   "dependencies": {
     "child-process-promise": "^2.2.1",
-<<<<<<< HEAD
-    "vscode-languageclient": "3.2.1",
-    "vscode-languageserver": "3.2.1"
-  },
-  "devDependencies": {
-    "@types/node": "^8.0.34",
-    "typescript": "^2.5.3",
-    "vscode": "^1.1.5"
-=======
     "vscode-languageclient": "^3.4.5",
     "vscode-languageserver": "^3.4.3"
   },
   "devDependencies": {
-    "@types/node": "^7.0.12",
-    "typescript": "^2.3.2",
+    "@types/node": "^8.0.34",
+    "typescript": "^2.5.3",
     "vscode": "^1.1.6"
->>>>>>> wip, unusable
   }
 }

@@ -222,6 +222,7 @@ object Phases {
     private[this] var myLambdaLiftPhase: Phase = _
     private[this] var myFlattenPhase: Phase = _
     private[this] var myGenBCodePhase: Phase = _
+    private[this] var myTerminalPhase: Phase = _
 
     final def typerPhase = myTyperPhase
     final def picklerPhase = myPicklerPhase
@@ -236,6 +237,7 @@ object Phases {
     final def lambdaLiftPhase = myLambdaLiftPhase
     final def flattenPhase = myFlattenPhase
     final def genBCodePhase = myGenBCodePhase
+    final def terminalPhase = myTerminalPhase
 
     private def setSpecificPhases() = {
       def phaseOfClass(pclass: Class[_]) = phases.find(pclass.isInstance).getOrElse(NoPhase)
@@ -253,6 +255,7 @@ object Phases {
       myExplicitOuterPhase = phaseOfClass(classOf[ExplicitOuter])
       myGettersPhase = phaseOfClass(classOf[Getters])
       myGenBCodePhase =  phaseOfClass(classOf[GenBCode])
+      myTerminalPhase =  phaseOfClass(classOf[TerminalPhase])
     }
 
     final def isAfterTyper(phase: Phase): Boolean = phase.id > typerPhase.id

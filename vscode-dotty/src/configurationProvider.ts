@@ -78,13 +78,13 @@ function resolveClasspath(mainClass, projectName) {
   // return executeDottyLanguageServerCommand(Commands.RESOLVE_CLASSPATH, mainClass, projectName)
   return [
     "/home/smarter/opt/dotty/interfaces/target/classes",
-    "/home/smarter/opt/dotty/library/../out/bootstrap/dotty-library-bootstrapped/scala-0.4/classes",
+    "/home/smarter/opt/dotty/library/../out/bootstrap/dotty-library-bootstrapped/scala-0.5/classes",
     "/usr/lib/jvm/java-8-openjdk-amd64/lib/tools.jar",
-    "/home/smarter/.ivy2/cache/org.scala-lang/scala-library/jars/scala-library-2.12.3.jar",
+    "/home/smarter/.ivy2/cache/org.scala-lang/scala-library/jars/scala-library-2.12.4.jar",
     "/home/smarter/.ivy2/cache/org.scala-lang.modules/scala-asm/bundles/scala-asm-5.2.0-scala-2.jar",
     "/home/smarter/.ivy2/cache/com.typesafe.sbt/sbt-interface/jars/sbt-interface-0.13.15.jar",
     "/home/smarter/.ivy2/cache/org.scala-lang.modules/scala-xml_2.12/bundles/scala-xml_2.12-1.0.6.jar",
-    "/home/smarter/opt/dotty/compiler/../out/bootstrap/dotty-compiler-bootstrapped/scala-0.4/classes"
+    "/home/smarter/opt/dotty/compiler/../out/bootstrap/dotty-compiler-bootstrapped/scala-0.5/classes"
   ]
 }
 

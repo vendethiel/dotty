@@ -24,7 +24,7 @@ import reporting._, reporting.diagnostic.MessageContainer
 import util._
 
 /** A Driver subclass designed to be used from IDEs */
-class InteractiveDriver(settings: List[String]) extends Driver {
+class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driver {
   import tpd._
   import InteractiveDriver._
 
@@ -38,7 +38,16 @@ class InteractiveDriver(settings: List[String]) extends Driver {
     ctx
   }
 
+  private val myDebugInitCtx: Context = {
+    val rootCtx = initCtx.fresh.addMode(Mode.ReadPositions).addMode(Mode.Interactive)
+    rootCtx.setSetting(rootCtx.settings.YretainTrees, true)
+    val ctx = setup(settings.toArray, rootCtx)._2
+    ctx.initialize()(ctx)
+    ctx
+  }
+
   private[this] var myCtx: Context = myInitCtx
+  private[this] var myDebugCtx: Context = myDebugInitCtx
 
   def currentCtx: Context = myCtx
 
@@ -175,8 +184,6 @@ class InteractiveDriver(settings: List[String]) extends Driver {
     trees.toList
   }
 
-  private val compiler: Compiler = new InteractiveCompiler
-
   /** Remove attachments and error out completers. The goal is to avoid
    *  having a completer hanging in a typed tree which can capture the context
    *  of a previous run. Note that typed trees can have untyped or partially
@@ -191,8 +198,8 @@ class InteractiveDriver(settings: List[String]) extends Driver {
           if (!t.symbol.isCompleted) t.symbol.info = UnspecifiedErrorType
           t.symbol.annotations.foreach { annot =>
             /* In some cases annotations are are used on themself (possibly larger cycles).
-            *  This is the case with the java.lang.annotation.Target annotation, would end 
-            *  in an infinite loop while cleaning. The `seen` is added to ensure that those 
+            *  This is the case with the java.lang.annotation.Target annotation, would end
+            *  in an infinite loop while cleaning. The `seen` is added to ensure that those
             *  trees are not cleand twice.
             *  TODO: Find a less expensive way to check for those cycles.
             */
@@ -226,7 +233,7 @@ class InteractiveDriver(settings: List[String]) extends Driver {
 
       run.compileSources(List(source))
       run.printSummary()
-      val t = run.units.head.tpdTree
+      val t = run.typerTree
       cleanup(t)
       myOpenedTrees(uri) = topLevelClassTrees(t, source)
 
@@ -249,4 +256,3 @@ class InteractiveDriver(settings: List[String]) extends Driver {
 object InteractiveDriver {
   def toUri(source: SourceFile) = Paths.get(source.file.path).toUri
 }
-

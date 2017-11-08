@@ -801,8 +801,8 @@ object Build {
         // "org.eclipse.platform" % "org.eclipse.equinox.app" % "1.3.400",
         // "org.eclipse.jdt" % "org.eclipse.jdt.core" % "3.12.3",
         // "org.eclipse.jdt" % "org.eclipse.jdt.debug" % "3.10.1",
-        "com.microsoft.java" % "com.microsoft.java.debug.core" % "0.1.0",
-        "com.microsoft.java" % "com.microsoft.java.debug.plugin" % "0.1.0",
+        "com.microsoft.java" % "com.microsoft.java.debug.core" % "0.2.0",
+        // "com.microsoft.java" % "com.microsoft.java.debug.plugin" % "0.2.0",
         Dependencies.`jackson-databind`
       ),
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value,

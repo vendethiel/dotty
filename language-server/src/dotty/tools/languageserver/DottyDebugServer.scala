@@ -4,8 +4,6 @@ package languageserver
 import com.microsoft.java.debug.core._
 import com.microsoft.java.debug.core.adapter._
 
-import com.microsoft.java.debug.plugin.internal._
-
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
