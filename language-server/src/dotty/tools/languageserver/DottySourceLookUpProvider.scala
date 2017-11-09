@@ -77,5 +77,5 @@ class DottySourceLookUpProvider(languageServer: DottyLanguageServer) extends ISo
       System.err.println("not found")
       ""
     }
-  override def supportsRealtimeBreakpointVerification(): Boolean = false
+  override def supportsRealtimeBreakpointVerification: Boolean = true
 }
