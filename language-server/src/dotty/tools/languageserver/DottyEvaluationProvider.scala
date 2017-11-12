@@ -151,8 +151,10 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
             println("beforeTrees: " + beforeTrees.map(_.show))
             println("afterTrees: " + afterTrees.map(_.show))
             val stats = parse(code)
-            println("#Stats: " + stats)
-            beforeTrees ++ (untpd.Block(stats, Literal(Constant(()))).withPos(debugPos.pos) :: afterTrees)
+            val statsBlock = untpd.Block(stats, Literal(Constant(())))
+            statsBlock.setPosUncheckedRecursively(debugPos.pos)
+            println("#Stats: " + statsBlock)
+            beforeTrees ++ (statsBlock :: afterTrees)
           }
           else
             trees1

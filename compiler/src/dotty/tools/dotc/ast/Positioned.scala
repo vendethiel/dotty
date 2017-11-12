@@ -53,6 +53,21 @@ abstract class Positioned extends DotClass with Product {
    */
   private[dotc] def setPosUnchecked(pos: Position) = curPos = pos
 
+  private[dotty] def setPosUncheckedRecursively(pos: Position): Unit = {
+    curPos = pos
+    def rec(it: Iterator[Any]): Unit =
+      while (it.hasNext) {
+        it.next() match {
+          case p: Positioned =>
+            p.setPosUncheckedRecursively(pos)
+          case xs: List[_] =>
+            rec(xs.iterator)
+          case _ =>
+        }
+      }
+    rec(productIterator)
+  }
+
   /** If any children of this node do not have positions,
    *  fit their positions between the positions of the known subtrees
    *  and transitively visit their children.
