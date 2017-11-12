@@ -6,6 +6,7 @@ import core._
 import Types._, Contexts._, Constants._, Names._, Flags._
 import SymDenotations._, Symbols._, Annotations._, Trees._, Symbols._
 import Denotations._, Decorators._
+import util.Positions.Position
 import dotty.tools.dotc.transform.SymUtils._
 
 /** A map that applies three functions and a substitution together to a tree and
@@ -120,7 +121,7 @@ final class TreeTypeMap(
       }
   }
 
-  override def transformStats(trees: List[tpd.Tree])(implicit ctx: Context) =
+  override def transformStats(trees: List[tpd.Tree], ownerPos: Position)(implicit ctx: Context) =
     transformDefs(trees)._2
 
   private def transformDefs[TT <: tpd.Tree](trees: List[TT])(implicit ctx: Context): (TreeTypeMap, List[TT]) = {

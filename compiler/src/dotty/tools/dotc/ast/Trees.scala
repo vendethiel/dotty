@@ -1150,7 +1150,7 @@ object Trees {
           case Assign(lhs, rhs) =>
             cpy.Assign(tree)(transform(lhs), transform(rhs))
           case Block(stats, expr) =>
-            cpy.Block(tree)(transformStats(stats), transform(expr))
+            cpy.Block(tree)(transformStats(stats, tree.pos), transform(expr))
           case If(cond, thenp, elsep) =>
             cpy.If(tree)(transform(cond), transform(thenp), transform(elsep))
           case Closure(env, meth, tpt) =>
@@ -1205,11 +1205,11 @@ object Trees {
             implicit val ctx = localCtx
             cpy.TypeDef(tree)(name, transform(rhs))
           case tree @ Template(constr, parents, self, _) =>
-            cpy.Template(tree)(transformSub(constr), transform(parents), transformSub(self), transformStats(tree.body))
+            cpy.Template(tree)(transformSub(constr), transform(parents), transformSub(self), transformStats(tree.body, tree.pos))
           case Import(expr, selectors) =>
             cpy.Import(tree)(transform(expr), selectors)
           case PackageDef(pid, stats) =>
-            cpy.PackageDef(tree)(transformSub(pid), transformStats(stats))
+            cpy.PackageDef(tree)(transformSub(pid), transformStats(stats, tree.pos))
           case Annotated(arg, annot) =>
             cpy.Annotated(tree)(transform(arg), transform(annot))
           case Thicket(trees) =>
@@ -1220,7 +1220,7 @@ object Trees {
         }
       }
 
-      def transformStats(trees: List[Tree])(implicit ctx: Context): List[Tree] =
+      def transformStats(trees: List[Tree], ownerPos: Position)(implicit ctx: Context): List[Tree] =
         transform(trees)
       def transform(trees: List[Tree])(implicit ctx: Context): List[Tree] =
         flatten(trees mapConserve (transform(_)))

@@ -24,8 +24,13 @@ object DottyDebugServer {
 
     val providerContext = {
       val c = new ProviderContext
-      c.registerProvider(classOf[ISourceLookUpProvider], new DottySourceLookUpProvider(languageServer))
-      c.registerProvider(classOf[IVirtualMachineManagerProvider], new DottyVirtualMachineManagerProvider)
+      val sourceLookup = new DottySourceLookUpProvider(languageServer)
+      c.registerProvider(classOf[ISourceLookUpProvider],
+        sourceLookup)
+      c.registerProvider(classOf[IVirtualMachineManagerProvider],
+        new DottyVirtualMachineManagerProvider)
+      c.registerProvider(classOf[IEvaluationProvider],
+        new DottyEvaluationProvider(languageServer, sourceLookup))
       c
     }
 

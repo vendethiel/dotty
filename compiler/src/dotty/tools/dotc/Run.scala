@@ -29,6 +29,7 @@ class Run(comp: Compiler, ictx: Context) {
   var units: List[CompilationUnit] = _
 
   var typerTree: ast.tpd.Tree = _
+  var untpdTree: ast.untpd.Tree = _
 
   /** Produces the following contexts, from outermost to innermost
    *
@@ -128,6 +129,7 @@ class Run(comp: Compiler, ictx: Context) {
 
             if (phase.phaseName == "frontend") {
               typerTree = units.head.tpdTree
+              untpdTree = units.head.untpdTree
             }
 
             if (ctx.settings.Xprint.value.containsPhase(phase)) {

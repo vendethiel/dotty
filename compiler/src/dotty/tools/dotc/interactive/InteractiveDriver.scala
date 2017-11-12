@@ -16,7 +16,7 @@ import scala.io.Codec
 
 import dotty.tools.io.{ ClassPath, ClassRepresentation, PlainFile, VirtualFile }
 
-import ast.{Trees, tpd}
+import ast.{Trees, tpd, untpd}
 import core._, core.Decorators._
 import Contexts._, Flags._, Names._, NameOps._, Symbols._, SymDenotations._, Trees._, Types._
 import classpath._
@@ -24,7 +24,7 @@ import reporting._, reporting.diagnostic.MessageContainer
 import util._
 
 /** A Driver subclass designed to be used from IDEs */
-class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driver {
+class InteractiveDriver(compiler: Compiler, val settings: List[String]) extends Driver {
   import tpd._
   import InteractiveDriver._
 
@@ -58,9 +58,11 @@ class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driv
   private val myOpenedTrees = new mutable.LinkedHashMap[URI, List[SourceTree]] {
     override def default(key: URI) = Nil
   }
+  private val myOpenedUntypedTree = new mutable.LinkedHashMap[URI, untpd.Tree]
 
   def openedFiles: Map[URI, SourceFile] = myOpenedFiles
   def openedTrees: Map[URI, List[SourceTree]] = myOpenedTrees
+  def openedUntypedTree: Map[URI, untpd.Tree] = myOpenedUntypedTree
 
   def allTrees(implicit ctx: Context): List[SourceTree] = {
     val fromSource = openedTrees.values.flatten.toList
@@ -169,6 +171,21 @@ class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driv
     names.toList
   }
 
+  private def topLevelUntypedClassTrees(topTree: untpd.Tree): List[untpd.Tree] = {
+    val trees = new mutable.ListBuffer[untpd.Tree]
+
+    def addTrees(tree: untpd.Tree): Unit = tree match {
+      case PackageDef(_, stats) =>
+        stats.foreach(addTrees)
+      case tree: TypeDef =>
+        trees += tree
+      case _ =>
+    }
+    addTrees(topTree)
+
+    trees.toList
+  }
+
   private def topLevelClassTrees(topTree: Tree, source: SourceFile): List[SourceTree] = {
     val trees = new mutable.ListBuffer[SourceTree]
 
@@ -236,6 +253,7 @@ class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driv
       val t = run.typerTree
       cleanup(t)
       myOpenedTrees(uri) = topLevelClassTrees(t, source)
+      myOpenedUntypedTree(uri) = run.untpdTree
 
       reporter.removeBufferedMessages
     }
@@ -250,6 +268,7 @@ class InteractiveDriver(compiler: Compiler, settings: List[String]) extends Driv
   def close(uri: URI): Unit = {
     myOpenedFiles.remove(uri)
     myOpenedTrees.remove(uri)
+    myOpenedUntypedTree.remove(uri)
   }
 }
 
