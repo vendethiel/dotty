@@ -1,0 +1,34 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "dotty",
+      "name": "Debug (Launch)",
+      "request": "launch",
+      "mainClass": "dotty.tools.dotc.Main",
+      "args": "-usejavacp ${workspaceRoot}/tests/pos/HelloWorld.scala"
+      //"args": "-usejavacp ${workspaceRoot}/try/i3452.scala"
+    },
+    {
+      "type": "dotty",
+      "name": "Test",
+      "request": "launch",
+      "mainClass": "Main",
+      "args": "",
+      "env": {
+        "SC_JACK_DEFAULT_INPUTS": "system:capture_1,system:capture_2",
+        "SC_JACK_DEFAULT_OUTPUTS": "system:playback_1,system:playback_2"
+      }
+    },
+    {
+      "type": "dotty",
+      "name": "Debug (Attach)",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 0
+    }
+  ]
+}
