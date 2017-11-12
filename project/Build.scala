@@ -518,6 +518,10 @@ object Build {
                                   "com.novocode" % "junit-interface" % "0.11" % "test",
                                   "org.scala-lang" % "scala-library" % scalacVersion % "test"),
 
+      libraryDependencies ++= Seq(
+        ("de.sciss" %% "scalacollider" % "1.22.4").withDottyCompat()
+      ),
+
       // enable improved incremental compilation algorithm
       incOptions := incOptions.value.withNameHashing(true),
 
