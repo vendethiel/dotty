@@ -4,6 +4,8 @@ package languageserver
 import com.microsoft.java.debug.core._
 import com.microsoft.java.debug.core.adapter._
 
+import scala.collection.JavaConverters._
+
 import java.net.URI
 import java.nio.file._
 import java.nio.charset.StandardCharsets
@@ -101,7 +103,7 @@ object DebugDriver extends Driver {
   override protected def sourcesRequired = false
 }
 
-class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup: DottySourceLookUpProvider) extends IEvaluationProvider {
+class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup: DottySourceLookUpProvider, vmManager: VirtualMachineManager) extends IEvaluationProvider {
   val logger = Logger.getLogger("java-debug")
 
   private def parse(code: String)(implicit ctx: Context): List[untpd.Tree] = {
@@ -118,8 +120,8 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
     parseStats(parser)
   }
 
-  override def eval(code: String, sf: StackFrame, listener: IEvaluationListener): String = {
-    val loc = sf.location
+  override def eval(code: String, stackFrame: StackFrame, context: IDebugAdapterContext, listener: IEvaluationListener): String = {
+    val loc = stackFrame.location
     val line = loc.lineNumber
     println("line: " + line)
     println("sp: " + loc.sourcePath)
@@ -160,13 +162,11 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
       }
     }.transform(tree)
 
-    println("##NEW TREE#########################################")
-    println(newTree.show)
-    println("##DONE#########################################")
+    val path = "/home/smarter/tmp/"
 
     {
       val rootCtx = (new ContextBase).initialCtx
-      val settings = driver.settings ++ List("-Xprint:all", "-d", "/home/smarter/tmp")
+      val settings = driver.settings ++ List("-d", path)
       val runCtx: Context = DebugDriver.setup(settings.toArray, rootCtx)._2
 
       val compiler = new DebugCompiler(debugPos.pos)
@@ -177,17 +177,57 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
       run.printSummary()
     }
 
-    // val diags = driver.run(uri, sourceCode)
-    // println("diags: " + diags)
+    val visVars = stackFrame.visibleVariables
+    println("vars: " + visVars)
+    println("x: " + visVars.asScala.map(stackFrame.getValue))
 
-    // val path = trees.flatMap(tree => NavigateAST.pathTo(pos.pos, tree)).asInstanceOf[List[untpd.Tree]]
-    // System.err.println("pos: " + pos.pos)
-    // System.err.println("path: " + path.map(_.show).mkString("#################\n"))
+    val vm = context.getDebugSession.getVM
+    val stringClass = vm.classesByName("java.lang.String").asScala.head.asInstanceOf[ClassType]
 
-    // ctx.atPhase(ctx.typerPhase) { implicit ctx =>
-    // }
+    val stringArrayType = vm.classesByName("java.lang.String[]").asScala.head.asInstanceOf[ArrayType]
+    val objArrayType = vm.classesByName("java.lang.Object[]").asScala.head.asInstanceOf[ArrayType]
 
-    val res = "duck"
+    val nameArrayRef = stringArrayType.newInstance(visVars.size)
+    val localsArrayRef = objArrayType.newInstance(visVars.size)
+    nameArrayRef.setValues(visVars.asScala.map(v => vm.mirrorOf(v.name)).asJava)
+    localsArrayRef.setValues(visVars.asScala.map(stackFrame.getValue).asJava)
+
+    val threadRef = stackFrame.thread
+
+    val DebugEval = "dotty.runtime.DebugEval"
+
+    // Classload dotty.runtime.DebugEval
+    val classCls = vm.classesByName("java.lang.Class").asScala.head.asInstanceOf[ClassType]
+    val forName = classCls.concreteMethodByName("forName", "(Ljava/lang/String;)Ljava/lang/Class;")
+    try {
+      classCls.invokeMethod(threadRef, forName,
+        List(vm.mirrorOf(DebugEval)).asJava, 0)
+    } catch {
+      case e: InvocationException =>
+        val under = e.exception
+        val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
+        println("##FIRST About to print exception")
+        under.invokeMethod(threadRef, print, List().asJava, 0)
+    }
+
+    val newStackFrame = threadRef.frames.get(0) //handler.EvaluateRequestHandler.refreshStackFrames(stackFrame)
+    // context.getRecyclableIdPool.addObject(threadRef.uniqueID,  new variables.JdiObjectProxy(newStackFrame))
+
+    // Classloaded, can now be used
+    val debugCls = vm.classesByName("dotty.runtime.DebugEval").asScala.head.asInstanceOf[ClassType]
+    val eval = debugCls.methodsByName("eval").get(0) // TODO: use concreteMethodByName
+    try {
+      debugCls.invokeMethod(threadRef, eval,
+        List(vm.mirrorOf(path), newStackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
+    } catch {
+      case e: InvocationException =>
+        val under = e.exception
+        val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
+        println("##About to print exception")
+        under.invokeMethod(threadRef, print, List().asJava, 0)
+    }
+
+    val res = ""
     listener.evaluationComplete(res)
     res
   }
