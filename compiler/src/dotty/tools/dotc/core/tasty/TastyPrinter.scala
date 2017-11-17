@@ -63,7 +63,7 @@ class TastyPrinter(bytes: Array[Byte])(implicit ctx: Context) {
           tag match {
             case RENAMED =>
               printName(); printName()
-            case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM | NAMEDARG | BIND =>
+            case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM | NAMEDARG | BIND | BINDtype =>
               printName(); printTrees()
             case REFINEDtype =>
               printName(); printTree(); printTrees()

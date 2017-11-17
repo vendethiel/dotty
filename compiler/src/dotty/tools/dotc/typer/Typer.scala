@@ -58,9 +58,7 @@ object Typer {
   }
 
   /** Assert tree has a position, unless it is empty or a typed splice */
-  def assertPositioned(tree: untpd.Tree)(implicit ctx: Context) =
-    if (!tree.isEmpty && !tree.isInstanceOf[untpd.TypedSplice] && ctx.typerState.isGlobalCommittable)
-      assert(tree.pos.exists, s"position not set for $tree # ${tree.uniqueId}")
+  def assertPositioned(tree: untpd.Tree)(implicit ctx: Context) = ()
 
   private val ExprOwner = new Property.Key[Symbol]
   private val InsertedApply = new Property.Key[Unit]

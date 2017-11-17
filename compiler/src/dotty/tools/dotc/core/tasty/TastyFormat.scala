@@ -395,6 +395,7 @@ object TastyFormat {
   final val TYPEARGtype = 176
   final val TERMREFin = 177
   final val TYPEREFin = 178
+  final val BINDtype = 179
 
   final val firstSimpleTreeTag = UNITconst
   final val firstNatTreeTag = SHARED
@@ -601,6 +602,7 @@ object TastyFormat {
     case ANNOTATION => "ANNOTATION"
     case PRIVATEqualified => "PRIVATEqualified"
     case PROTECTEDqualified => "PROTECTEDqualified"
+    case BINDtype => "BINDtype"
   }
 
   /** @return If non-negative, the number of leading references (represented as nats) of a length/trees entry.
@@ -608,7 +610,7 @@ object TastyFormat {
    */
   def numRefs(tag: Int) = tag match {
     case VALDEF | DEFDEF | TYPEDEF | TYPEPARAM | PARAM | NAMEDARG | RETURN | BIND |
-         SELFDEF | REFINEDtype | TERMREFin | TYPEREFin => 1
+         SELFDEF | REFINEDtype | TERMREFin | TYPEREFin | BINDtype => 1
     case RENAMED | PARAMtype => 2
     case POLYtype | METHODtype | TYPELAMBDAtype => -1
     case _ => 0

@@ -253,8 +253,7 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
               SuperType(readType(), readType())
             case TYPEARGtype =>
               TypeArgRef(readType(), readType().asInstanceOf[TypeRef], readNat())
-            case BIND =>
-              ctx.error("Should never happen, should be in tree")
+            case BINDtype =>
               val sym = ctx.newSymbol(ctx.owner, readName().toTypeName, BindDefinedType, readType())
               registerSym(start, sym)
               if (currentAddr != end) readType()
@@ -279,6 +278,9 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
       }
 
       def readSimpleType(): Type = (tag: @switch) match {
+        case IDENT =>
+          readName()
+          readType()
         case TYPEREFdirect | TERMREFdirect =>
           NamedType(NoPrefix, readSymRef())
         case TYPEREFsymbol | TERMREFsymbol =>
@@ -419,8 +421,40 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
         val end = readEnd()
         val name = readName()
         val info = new Completer(ctx.owner, subReader(start, end))
+//        ctx.newSymbol(ctx.owner, readName().toTypeName, BindDefinedType, readType())
         val sym = ctx.newSymbol(ctx.owner, name, EmptyFlags, info)
+//        println(">>>>>>>>>>>> term bind")
+//        println(start)
+//        println(tag)
+//        println(end)
+//        println(name)
+//        println(name.isTermName)
+//        println(sym)
+//        println(ctx.owner)
+//        println("<<<")
+//        println()
+//        println()
         registerSym(start, sym)
+        sym
+      case BINDtype =>
+        val start = currentAddr
+        val tag = readByte()
+        val end = readEnd()
+        val name = readName().toTypeName
+        val info = new Completer(ctx.owner, subReader(start, end))
+        val sym = ctx.newSymbol(ctx.owner, name, EmptyFlags, info)
+//        println(">>>>>>>>>>>> type bind")
+//        println(start)
+//        println(tag)
+//        println(end)
+//        println(name)
+//        println(name.isTermName)
+//        println(sym)
+//        println(ctx.owner)
+//        println("<<<")
+//        println()
+//        println()
+//        registerSym(start, sym)
         sym
       case tag =>
         throw new Error(s"illegal createSymbol at $currentAddr, tag = $tag")
@@ -990,7 +1024,7 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
             case REPEATED =>
               val elemtpt = readTpt()
               SeqLiteral(until(end)(readTerm()), elemtpt)
-            case BIND =>
+            case BIND | BINDtype =>
               val name = readName()
               val sym = symbolAt(start).asTerm
               skipTree()// skip type

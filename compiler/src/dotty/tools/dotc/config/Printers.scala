@@ -28,7 +28,7 @@ object Printers {
   val config: Printer = noPrinter
   val transforms: Printer = noPrinter
   val cyclicErrors: Printer = noPrinter
-  val pickling: Printer = noPrinter
+  val pickling: Printer = new Printer
   val inlining: Printer = noPrinter
   val exhaustivity: Printer = noPrinter
   val patmatch: Printer = noPrinter

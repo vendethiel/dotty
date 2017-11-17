@@ -144,26 +144,14 @@ class TreePickler(pickler: TastyPickler) {
       pickleConstant(value)
     case tpe: NamedType =>
       val sym = tpe.symbol
-      def pickleDirectRef() = {
-        writeByte(if (tpe.isType) TYPEREFdirect else TERMREFdirect)
-        pickleSymRef(sym)
-      }
       if (sym.is(Flags.Package)) {
         writeByte(if (tpe.isType) TYPEREFpkg else TERMREFpkg)
         pickleName(sym.fullName)
       }
-      else if (tpe.prefix == NoPrefix)
-//        if (sym is Flags.BindDefinedType) {
-//          registerDef(sym)
-//          writeByte(BIND)
-//          withLength {
-//            pickleName(sym.name)
-//            pickleType(sym.info)
-//            pickleDirectRef()
-//          }
-//        }
-//        else
-          pickleDirectRef()
+      else if (tpe.prefix == NoPrefix) {
+        writeByte(if (tpe.isType) TYPEREFdirect else TERMREFdirect)
+        pickleSymRef(sym)
+      }
       else if (isLocallyDefined(sym)) {
         writeByte(if (tpe.isType) TYPEREFsymbol else TERMREFsymbol)
         pickleSymRef(sym); pickleType(tpe.prefix)
@@ -407,7 +395,8 @@ class TreePickler(pickler: TastyPickler) {
           withLength { pickleTree(call); pickleTree(expansion); bindings.foreach(pickleTree) }
         case Bind(name, body) =>
           registerDef(tree.symbol)
-          writeByte(BIND)
+          val tag = if (name.isTermName) BIND else BINDtype
+          writeByte(tag)
           withLength { pickleName(name); pickleType(tree.symbol.info); pickleTree(body) }
         case Alternative(alts) =>
           writeByte(ALTERNATIVE)
