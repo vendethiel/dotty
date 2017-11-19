@@ -25,8 +25,13 @@ class ReadTastyTreesFromClasses extends FrontEnd {
         tree(className).flatMap {
           case (clsd, unpickled) =>
             if (unpickled.isEmpty) None
-            else Some(CompilationUnit.mkCompilationUnit(clsd, unpickled, forceTrees = true))
-
+            else {
+              val unit = CompilationUnit.mkCompilationUnit(clsd, unpickled, forceTrees = true)
+              val pickled = clsd.symbol.asClass.unpickler.unpickler.bytes
+              clsd.symbol.asClass.unpickler = null
+              unit.pickled += (clsd.symbol.asClass -> pickled)
+              Some(unit)
+            }
         }
       }
       // The TASTY section in a/b/C.class may either contain a class a.b.C, an object a.b.C, or both.
