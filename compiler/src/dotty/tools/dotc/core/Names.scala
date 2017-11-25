@@ -35,7 +35,7 @@ object Names {
    *  in a name table. A derived term name adds a tag, and possibly a number
    *  or a further simple name to some other name.
    */
-  abstract class Name extends Designator with PreName {
+  abstract class Name extends Designator with PreName with Serializable {
 
     /** A type for names of the same kind as this name */
     type ThisName <: Name
@@ -158,7 +158,7 @@ object Names {
     override def asType(implicit ctx: Context) = asTypeName
 
     override def hashCode = System.identityHashCode(this)
-    override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+    // override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
   }
 
   /** Names for terms, can be simple or derived */
@@ -291,8 +291,26 @@ object Names {
   }
 
   /** A simple name is essentiall an interned string */
-  final class SimpleName(val start: Int, val length: Int, @sharable private[Names] var next: SimpleName) extends TermName {
+  final class SimpleName(var start: Int, var length: Int, @sharable private[Names] var next: SimpleName) extends TermName {
     // `next` is @sharable because it is only modified in the synchronized block of termName.
+
+    override def equals(that: Any) = that match {
+      case that: SimpleName =>
+        start == that.start && length == that.length
+      case _ =>
+        super.equals(that)
+    }
+
+    private def writeObject(out: java.io.ObjectOutputStream) {
+      out.writeUTF(this.toString)
+    }
+    private def readObject(in: java.io.ObjectInputStream) {
+      val str = in.readUTF()
+      val n = termName(str)
+      start = n.start
+      length = n.length
+      next = n.next
+    }
 
     /** The n'th character */
     def apply(n: Int) = chrs(start + n)
@@ -432,6 +450,12 @@ object Names {
   }
 
   final class TypeName(val toTermName: TermName) extends Name {
+    override def equals(that: Any) = that match {
+      case that: TypeName =>
+        toTermName == that.toTermName
+      case _ =>
+        super.equals(that)
+    }
 
     type ThisName = TypeName
 

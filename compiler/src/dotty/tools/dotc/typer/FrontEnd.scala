@@ -45,6 +45,19 @@ class FrontEnd extends Phase {
     printer.println("parsed:\n" + unit.untpdTree.show)
     if (Config.checkPositions)
       unit.untpdTree.checkPos(nonOverlapping = !unit.isJava && !ctx.reporter.hasErrors)
+    val a = java.nio.file.Paths.get(ctx.settings.outputDir.value).resolve(unit.source.file.path)
+    val b = a.resolveSibling(a.getFileName.toString.stripSuffix(".scala") + ".untasty")
+    val os = java.nio.file.Files.newOutputStream(b)
+    val oos = new java.io.ObjectOutputStream(os)
+    oos.writeObject(unit.untpdTree)
+    oos.close()
+
+    // val is = java.nio.file.Files.newInputStream(b)
+    // val ois = new java.io.ObjectInputStream(is)
+    // import ast.untpd._
+    // import Names._
+    // val u = ois.readObject().asInstanceOf[ast.untpd.Tree]
+    // println("==: " + (unit.untpdTree == u))
   }
 
   def enterSyms(implicit ctx: Context) = monitor("indexing") {

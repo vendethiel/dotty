@@ -215,7 +215,7 @@ object Trees {
     override def toText(printer: Printer) = printer.toText(this)
 
     override def hashCode(): Int = uniqueId // for debugging; was: System.identityHashCode(this)
-    override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
+    // override def equals(that: Any) = this eq that.asInstanceOf[AnyRef]
 
     override def clone: Tree[T] = {
       val tree = super.clone.asInstanceOf[Tree[T]]
