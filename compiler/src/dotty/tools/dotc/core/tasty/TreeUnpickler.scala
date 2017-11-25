@@ -17,7 +17,7 @@ import scala.annotation.{tailrec, switch}
 import scala.collection.mutable.ListBuffer
 import scala.collection.{ mutable, immutable }
 import config.Printers.pickling
-import typer.Checking
+import typer.{Checking, Typer}
 import config.Config
 
 /** Unpickler for typed trees
@@ -25,7 +25,7 @@ import config.Config
  *  @param tastyName       the nametable
  *  @param posUNpicklerOpt the unpickler for positions, if it exists
  */
-class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpicklerOpt: Option[PositionUnpickler]) {
+class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpicklerOpt: Option[PositionUnpickler], typer: Typer) {
   import TastyFormat._
   import TreeUnpickler._
   import tpd._
@@ -610,6 +610,29 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
     private def readNewDef()(implicit ctx: Context): Tree = {
       val start = currentAddr
       val sym = symAtAddr(start)
+
+      if (ctx.settings.fromTasty.value && sym.name.toString == "different") {
+        import untpd._
+        val u = untpd.DefDef(
+          sym.name.asTermName, Nil, Nil, Ident(defn.UnitClass.name),
+          Block(
+            List(
+              Ident(termName("same")),
+              untpd.ValDef(termName("myVal"), TypeTree(), Literal(Constant(42)))
+            ),
+            Apply(Ident(termName("println")),
+            List(InfixOp(Ident(termName("myVal")), Ident(termName("+")), Ident(termName("x")))))))
+            // List(InfixOp(Literal(Constant(2)), Ident(termName("+")), Ident(termName("x")))))))
+          .withPos(Position(0, 0))
+        // typer.typedDefDef(u, sym)
+        sym.info = new typer.Completer(u)
+        println("info: " + sym.info)
+        skipTree()
+        return typer.typedDefDef(u, sym)(ctx.withOwner(sym))
+        // val xtree = typer.expanded(u)
+        // return xtree.removeAttachment(typer.TypedAhead).get
+      }
+
       val tag = readByte()
       val end = readEnd()
 

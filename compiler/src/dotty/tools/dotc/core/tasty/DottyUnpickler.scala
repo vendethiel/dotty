@@ -11,16 +11,17 @@ import util.{SourceFile, NoSource}
 import Annotations.Annotation
 import core.Mode
 import classfile.ClassfileParser
+import typer.Typer
 
 object DottyUnpickler {
 
   /** Exception thrown if classfile is corrupted */
   class BadSignature(msg: String) extends RuntimeException(msg)
 
-  class TreeSectionUnpickler(posUnpickler: Option[PositionUnpickler])
+  class TreeSectionUnpickler(posUnpickler: Option[PositionUnpickler], typer: Typer)
   extends SectionUnpickler[TreeUnpickler]("ASTs") {
     def unpickle(reader: TastyReader, nameAtRef: NameTable) =
-      new TreeUnpickler(reader, nameAtRef, posUnpickler)
+      new TreeUnpickler(reader, nameAtRef, posUnpickler, typer)
   }
 
   class PositionsSectionUnpickler extends SectionUnpickler[PositionUnpickler]("Positions") {
@@ -32,13 +33,13 @@ object DottyUnpickler {
 /** A class for unpickling Tasty trees and symbols.
  *  @param bytes         the bytearray containing the Tasty file from which we unpickle
  */
-class DottyUnpickler(bytes: Array[Byte]) extends ClassfileParser.Embedded {
+class DottyUnpickler(bytes: Array[Byte], typer: Typer) extends ClassfileParser.Embedded {
   import tpd._
   import DottyUnpickler._
 
   val unpickler = new TastyUnpickler(bytes)
   private val posUnpicklerOpt = unpickler.unpickle(new PositionsSectionUnpickler)
-  private val treeUnpickler = unpickler.unpickle(new TreeSectionUnpickler(posUnpicklerOpt)).get
+  private val treeUnpickler = unpickler.unpickle(new TreeSectionUnpickler(posUnpicklerOpt, typer)).get
 
   /** Enter all toplevel classes and objects into their scopes
    *  @param roots          a set of SymDenotations that should be overwritten by unpickling

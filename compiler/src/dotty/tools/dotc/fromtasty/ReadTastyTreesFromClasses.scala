@@ -16,9 +16,9 @@ class ReadTastyTreesFromClasses extends FrontEnd {
   override def isTyper = false
 
   override def runOn(units: List[CompilationUnit])(implicit ctx: Context): List[CompilationUnit] =
-    units.flatMap(readTASTY)
+    units.flatMap(unit => readTASTY(ctx.fresh.setCompilationUnit(unit)))
 
-  def readTASTY(unit: CompilationUnit)(implicit ctx: Context): Option[CompilationUnit] = unit match {
+  def readTASTY(implicit ctx: Context): Option[CompilationUnit] = ctx.compilationUnit match {
     case unit: TASTYCompilationUnit =>
       val className = unit.className.toTypeName
       def compilationUnit(className: TypeName): Option[CompilationUnit] = {

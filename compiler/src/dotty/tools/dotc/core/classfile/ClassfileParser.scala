@@ -755,7 +755,7 @@ class ClassfileParser(
       }
 
       def unpickleTASTY(bytes: Array[Byte]): Some[Embedded]  = {
-        val unpickler = new tasty.DottyUnpickler(bytes)
+        val unpickler = new tasty.DottyUnpickler(bytes, ctx.typer)
         unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))
         Some(unpickler)
       }
