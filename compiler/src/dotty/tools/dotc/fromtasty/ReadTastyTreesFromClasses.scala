@@ -10,17 +10,20 @@ import dotty.tools.dotc.core.NameOps._
 import dotty.tools.dotc.core.SymDenotations.ClassDenotation
 import dotty.tools.dotc.core._
 import dotty.tools.dotc.typer.FrontEnd
+import dotty.tools.dotc.ast.DiffAST
 
 class ReadTastyTreesFromClasses extends FrontEnd {
 
   override def isTyper = false
 
   override def runOn(units: List[CompilationUnit])(implicit ctx: Context): List[CompilationUnit] =
-    units.flatMap(unit => readTASTY(ctx.fresh.setCompilationUnit(unit)))
+    units.flatMap(unit => readTASTY(ctx.fresh.setCompilationUnit(unit).addMode(Mode.ReadPositions)))
 
   def readTASTY(implicit ctx: Context): Option[CompilationUnit] = ctx.compilationUnit match {
-    case unit: TASTYCompilationUnit =>
-      val className = unit.className.toTypeName
+    case unit =>
+      val className =
+        if (DiffAST.used) typeName(ctx.settings.incremental.value)
+        else unit.asInstanceOf[TASTYCompilationUnit].className.toTypeName
       def compilationUnit(className: TypeName): Option[CompilationUnit] = {
         tree(className).flatMap {
           case (clsd, unpickled) =>
@@ -39,7 +42,11 @@ class ReadTastyTreesFromClasses extends FrontEnd {
       // Note that if both the class and the object are present, then loading the class will also load
       // the object, this is why we use orElse here, otherwise we could load the object twice and
       // create ambiguities!
-      compilationUnit(className).orElse(compilationUnit(className.moduleClassName))
+      val c = compilationUnit(className).orElse(compilationUnit(className.moduleClassName))
+      if (c.isEmpty) {
+        ctx.error(s"No TASTY found for class $className")
+      }
+      c
   }
 
   private def tree(className: TypeName)(implicit ctx: Context): Option[(ClassDenotation, tpd.Tree)] = {
@@ -47,6 +54,7 @@ class ReadTastyTreesFromClasses extends FrontEnd {
     ctx.base.staticRef(className) match {
       case clsd: ClassDenotation =>
         val cls = clsd.symbol.asClass
+        val ic = clsd.infoOrCompleter
         def cannotUnpickle(reason: String) =
           ctx.error(s"class $className cannot be unpickled because $reason")
         def tryToLoad = clsd.infoOrCompleter match {

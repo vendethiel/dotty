@@ -19,6 +19,7 @@ import scala.collection.{ mutable, immutable }
 import config.Printers.pickling
 import typer.{Checking, Typer}
 import config.Config
+import ast.DiffAST
 
 /** Unpickler for typed trees
  *  @param reader          the reader from which to unpickle
@@ -611,22 +612,23 @@ class TreeUnpickler(reader: TastyReader, nameAtRef: NameRef => TermName, posUnpi
       val start = currentAddr
       val sym = symAtAddr(start)
 
-      if (ctx.settings.fromTasty.value && sym.name.toString == "different") {
+      if (DiffAST.used && DiffAST.newDef.contains(sym.name)) {
         import untpd._
-        val u = untpd.DefDef(
-          sym.name.asTermName, Nil, Nil, Ident(defn.UnitClass.name),
-          Block(
-            List(
-              Ident(termName("same")),
-              untpd.ValDef(termName("myVal"), TypeTree(), Literal(Constant(42)))
-            ),
-            Apply(Ident(termName("println")),
-            List(InfixOp(Ident(termName("myVal")), Ident(termName("+")), Ident(termName("x")))))))
-            // List(InfixOp(Literal(Constant(2)), Ident(termName("+")), Ident(termName("x")))))))
-          .withPos(Position(0, 0))
+        // val u = untpd.DefDef(
+        //   sym.name.asTermName, Nil, Nil, Ident(defn.UnitClass.name),
+        //   Block(
+        //     List(
+        //       Ident(termName("same")),
+        //       untpd.ValDef(termName("myVal"), TypeTree(), Literal(Constant(42)))
+        //     ),
+        //     Apply(Ident(termName("println")),
+        //     List(InfixOp(Ident(termName("myVal")), Ident(termName("+")), Ident(termName("x")))))))
+        //     // List(InfixOp(Literal(Constant(2)), Ident(termName("+")), Ident(termName("x")))))))
+        //   .withPos(Position(0, 0))
+        val u = DiffAST.newDef(sym.name)
         // typer.typedDefDef(u, sym)
         sym.info = new typer.Completer(u)
-        println("info: " + sym.info)
+        // println("info: " + sym.info)
         skipTree()
         return typer.typedDefDef(u, sym)(ctx.withOwner(sym))
         // val xtree = typer.expanded(u)

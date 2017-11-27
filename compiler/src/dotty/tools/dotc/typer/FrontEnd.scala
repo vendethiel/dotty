@@ -12,6 +12,8 @@ import config.Printers.{typr, default}
 import util.Stats._
 import scala.util.control.NonFatal
 import ast.Trees._
+import ast.DiffAST
+import java.nio.file._
 
 class FrontEnd extends Phase {
 
@@ -45,19 +47,26 @@ class FrontEnd extends Phase {
     printer.println("parsed:\n" + unit.untpdTree.show)
     if (Config.checkPositions)
       unit.untpdTree.checkPos(nonOverlapping = !unit.isJava && !ctx.reporter.hasErrors)
-    val a = java.nio.file.Paths.get(ctx.settings.outputDir.value).resolve(unit.source.file.path)
-    val b = a.resolveSibling(a.getFileName.toString.stripSuffix(".scala") + ".untasty")
-    val os = java.nio.file.Files.newOutputStream(b)
-    val oos = new java.io.ObjectOutputStream(os)
-    oos.writeObject(unit.untpdTree)
-    oos.close()
+    val a = Paths.get(ctx.settings.outputDir.value).resolve(unit.source.file.path)
+    val untasty = a.resolveSibling(a.getFileName.toString.stripSuffix(".scala") + ".untasty")
 
-    // val is = java.nio.file.Files.newInputStream(b)
-    // val ois = new java.io.ObjectInputStream(is)
-    // import ast.untpd._
-    // import Names._
-    // val u = ois.readObject().asInstanceOf[ast.untpd.Tree]
-    // println("==: " + (unit.untpdTree == u))
+    if (ctx.settings.incremental.value != "" && Files.exists(untasty)) {
+      val is = java.nio.file.Files.newInputStream(untasty)
+      val ois = new java.io.ObjectInputStream(is)
+      val time = System.nanoTime
+      val untastyTree = ois.readObject().asInstanceOf[ast.untpd.Tree]
+      val sec = (System.nanoTime - time)/(1000.0*1000.0)
+      ctx.echo(s"Read untasty file: $untasty in $sec ms")
+
+      DiffAST.used = true
+      DiffAST(untastyTree, unit.untpdTree)
+    } else {
+      val os = Files.newOutputStream(untasty)
+      val oos = new java.io.ObjectOutputStream(os)
+      ctx.echo(s"Writing untasty file: $untasty")
+      oos.writeObject(unit.untpdTree)
+      oos.close()
+    }
   }
 
   def enterSyms(implicit ctx: Context) = monitor("indexing") {
@@ -97,15 +106,21 @@ class FrontEnd extends Phase {
     }
     unitContexts foreach (parse(_))
     record("parsedTrees", ast.Trees.ntrees)
-    remaining = unitContexts
-    while (remaining.nonEmpty) {
-      enterSyms(remaining.head)
-      remaining = remaining.tail
+
+    if (DiffAST.used) {
+      val phase = new fromtasty.ReadTastyTreesFromClasses
+      phase.runOn(units)
+    } else {
+      remaining = unitContexts
+      while (remaining.nonEmpty) {
+        enterSyms(remaining.head)
+        remaining = remaining.tail
+      }
+      unitContexts.foreach(enterAnnotations(_))
+      unitContexts.foreach(typeCheck(_))
+      record("total trees after typer", ast.Trees.ntrees)
+      unitContexts.map(_.compilationUnit).filterNot(discardAfterTyper)
     }
-    unitContexts.foreach(enterAnnotations(_))
-    unitContexts.foreach(typeCheck(_))
-    record("total trees after typer", ast.Trees.ntrees)
-    unitContexts.map(_.compilationUnit).filterNot(discardAfterTyper)
   }
 
   override def run(implicit ctx: Context): Unit = {
