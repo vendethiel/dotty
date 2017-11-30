@@ -65,6 +65,6 @@ class Quotes extends MiniPhase {
   }
 
   // TODO improve string representation
-  private def bytesToString(bytes: Array[Byte]): String = bytes.map(_.toString).mkString(",")
+  private def bytesToString(bytes: Array[Byte]): String = bytes.map(b => f"$b%02X").mkString
 
 }

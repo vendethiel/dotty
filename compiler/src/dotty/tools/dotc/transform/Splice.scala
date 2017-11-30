@@ -48,6 +48,6 @@ class Splice extends MiniPhase {
   }
 
   // TODO improve string representation
-  private def stringToBytes(str: String): Array[Byte] = str.split(',').iterator.map(java.lang.Byte.parseByte).toArray
+  private def stringToBytes(str: String): Array[Byte] = str.sliding(2, 2).map(a => Integer.parseInt(a.mkString, 16).toByte).toArray
 
 }
