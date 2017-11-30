@@ -1109,4 +1109,10 @@ class Definitions {
 
   def ErasedPhantom_UNIT(implicit ctx: Context) = ErasedPhantomClass.linkedClass.requiredValue("UNIT")
 
+  // ----- Quotes -----------------------------------------------------------
+
+  lazy val Quote: TermSymbol = ctx.requiredModule("dotty.Quote")
+  lazy val QuoteApply: TermSymbol = Quote.requiredMethod("apply")
+  lazy val QuoteExpr: TypeSymbol = Quote.requiredClass("Expr")
+
 }
