@@ -1115,4 +1115,6 @@ class Definitions {
   lazy val QuoteApply: TermSymbol = Quote.requiredMethod("apply")
   lazy val QuoteExpr: TypeSymbol = Quote.requiredClass("Expr")
 
+  lazy val Splice: TermSymbol = ctx.requiredModule("dotty.Splice")
+  lazy val SpliceApply: TermSymbol = Splice.requiredMethod("apply")
 }

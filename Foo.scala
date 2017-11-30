@@ -1,8 +1,9 @@
 class Foo {
 
   def foo: Unit = {
-    dotty.Quote[Int] {
+    dotty.Splice[Int](dotty.Quote[Int] {
       identity(4)
-    }
+    })
+
   }
 }

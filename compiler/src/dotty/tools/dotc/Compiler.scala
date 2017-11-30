@@ -46,6 +46,7 @@ class Compiler {
       List(new PostTyper),          // Additional checks and cleanups after type checking
       List(new sbt.ExtractAPI),     // Sends a representation of the API of classes to sbt via callbacks
       List(new Quotes),             // TODO
+      List(new Splice),             // TODO
       List(new Pickler),            // Generate TASTY info
       List(new LinkAll),            // Reload compilation units from TASTY for library code (if needed)
       List(new FirstTransform,      // Some transformations to put trees into a canonical form

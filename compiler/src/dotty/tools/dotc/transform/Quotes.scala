@@ -1,17 +1,18 @@
 package dotty.tools.dotc.transform
 
+import java.nio.charset.StandardCharsets
+
 import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.core.Constants._
 import dotty.tools.dotc.core.Contexts._
-import dotty.tools.dotc.core.Definitions._
 import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.Names._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.core.Symbols._
-import dotty.tools.dotc.core.tasty.{PositionPickler, TastyPickler, TastyPrinter}
+import dotty.tools.dotc.core.tasty.{DottyUnpickler, PositionPickler, TastyPickler, TastyPrinter}
 import dotty.tools.dotc.config.Printers._
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
-
-import scala.collection.mutable.ListBuffer
 
 /** TODO
  */
@@ -22,32 +23,48 @@ class Quotes extends MiniPhase {
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
-      case fun: TypeApply if fun.symbol eq defn.QuoteApply =>
-        val tastyString = Literal(Constant(new String(pickle(tree.args.head))))
-        val exprTpe = defn.QuoteExpr.typeRef.appliedTo(fun.args.head.tpe)
-        tpd.New(exprTpe, tastyString :: Nil)
+      case fun: TypeApply if fun.symbol eq defn.QuoteApply => quote(tree.args.head, fun.args.head.tpe)
       case _ => tree
     }
   }
 
-  private def pickle(tree: tpd.Tree)(implicit ctx: Context): Array[Byte] = {
+  private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
+    val tastyBytes = pickle(tree)
+    val tastyString = Literal(Constant(bytesToString(tastyBytes)))
+    val exprTpe = defn.QuoteExpr.typeRef.appliedTo(tpe)
+    tpd.New(exprTpe, tastyString :: Nil)
+  }
+
+  private def pickle(tree0: tpd.Tree)(implicit ctx: Context): Array[Byte] = {
+    val tree = encapsulateQuote(tree0)
     val pickler = new TastyPickler()
     val treePkl = pickler.treePkl
     treePkl.pickle(tree :: Nil)
     treePkl.compactify()
     pickler.addrOfTree = treePkl.buf.addrOfTree
     pickler.addrOfSym = treePkl.addrOfSym
-    if (tree.pos.exists)
-      new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil)
+    // if (tree.pos.exists)
+    //   new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil)
 
     // other pickle sections go here.
     val pickled = pickler.assembleParts()
 
     if (pickling ne noPrinter) {
-      println(i"**** pickled quote of \n${tree.show}")
+      println(i"**** pickled quote of \n${tree0.show}")
       new TastyPrinter(pickled).printContents()
     }
 
     pickled
   }
+
+  private def encapsulateQuote(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = {
+    val quoteName = "quotedCode1".toTermName
+    val quotePackage = defn.RootPackage
+    val quotedVal = tpd.SyntheticValDef(quoteName, tree)(ctx.withOwner(quotePackage))
+    tpd.PackageDef(tpd.ref(quotePackage).asInstanceOf[tpd.Ident], quotedVal :: Nil)
+  }
+
+  // TODO improve string representation
+  private def bytesToString(bytes: Array[Byte]): String = bytes.map(_.toString).mkString(",")
+
 }
