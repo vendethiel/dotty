@@ -1,7 +1,9 @@
+import dotty.meta._
+
 class Foo {
 
   def foo: Unit = {
-    dotty.Splice[Int](dotty.Quote[Int] {
+    splice[Int](quote[Int] {
       identity(4)
     })
 

@@ -23,7 +23,7 @@ class Quotes extends MiniPhase {
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
-      case fun: TypeApply if fun.symbol eq defn.QuoteApply => quote(tree.args.head, fun.args.head.tpe)
+      case fun: TypeApply if fun.symbol eq defn.MetaQuote => quote(tree.args.head, fun.args.head.tpe)
       case _ => tree
     }
   }
@@ -31,7 +31,7 @@ class Quotes extends MiniPhase {
   private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
     val tastyBytes = pickle(tree)
     val tastyString = Literal(Constant(bytesToString(tastyBytes)))
-    val exprTpe = defn.QuoteExpr.typeRef.appliedTo(tpe)
+    val exprTpe = defn.MetaExpr.typeRef.appliedTo(tpe)
     tpd.New(exprTpe, tastyString :: Nil)
   }
 

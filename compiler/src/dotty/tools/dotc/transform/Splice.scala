@@ -20,7 +20,7 @@ class Splice extends MiniPhase {
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
-      case fun: TypeApply if fun.symbol eq defn.SpliceApply =>
+      case fun: TypeApply if fun.symbol eq defn.MetaSplice =>
         tree.args.head match {
           case Apply(TypeApply(_, _), List(Literal(Constant(str: String)))) => // TODO add guards checking that this is a Quote.Expr constructor
             val splicedCode = unpickle(stringToBytes(str))

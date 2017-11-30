@@ -1111,10 +1111,9 @@ class Definitions {
 
   // ----- Quotes -----------------------------------------------------------
 
-  lazy val Quote: TermSymbol = ctx.requiredModule("dotty.Quote")
-  lazy val QuoteApply: TermSymbol = Quote.requiredMethod("apply")
-  lazy val QuoteExpr: TypeSymbol = Quote.requiredClass("Expr")
+  lazy val MetaPackage: TermSymbol = ctx.requiredPackage("dotty.meta")
+  lazy val MetaQuote: TermSymbol = MetaPackage.requiredMethod("quote")
+  lazy val MetaSplice: TermSymbol = MetaPackage.requiredMethod("splice")
+  lazy val MetaExpr: TypeSymbol = ctx.requiredClass("dotty.meta.Expr")
 
-  lazy val Splice: TermSymbol = ctx.requiredModule("dotty.Splice")
-  lazy val SpliceApply: TermSymbol = Splice.requiredMethod("apply")
 }
