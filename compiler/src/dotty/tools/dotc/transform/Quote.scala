@@ -9,6 +9,7 @@ import dotty.tools.dotc.core.Constants._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Names._
+import dotty.tools.dotc.core.Flags._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.tasty.{DottyUnpickler, PositionPickler, TastyPickler, TastyPrinter}
@@ -62,7 +63,10 @@ class Quote extends MiniPhase {
     val quoteName = "quotedCode1".toTermName
     val quotePackage = defn.RootPackage
     val quotedVal = tpd.SyntheticValDef(quoteName, tree)(ctx.withOwner(quotePackage))
-    tpd.PackageDef(tpd.ref(quotePackage).asInstanceOf[tpd.Ident], quotedVal :: Nil)
+    val methodType = MethodType(Nil)(_ => Nil, _ => tree.tpe)
+    val sym = ctx.newSymbol(quotePackage, quoteName, Method, methodType).asTerm
+    val quotedDef = tpd.DefDef(sym, tree)(ctx.withOwner(quotePackage))
+    tpd.PackageDef(tpd.ref(quotePackage).asInstanceOf[tpd.Ident], quotedDef :: Nil)
   }
 
 }

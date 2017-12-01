@@ -76,6 +76,6 @@ class Splice extends MiniPhase {
   }
 
   private def revealQuote(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = tree match {
-    case PackageDef(_, (vdef @ ValDef(_, _, _)) :: Nil) => vdef.rhs
+    case PackageDef(_, (vdef @ DefDef(_, _, _, _, _)) :: Nil) => vdef.rhs
   }
 }
