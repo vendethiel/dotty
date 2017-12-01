@@ -111,7 +111,7 @@ object Build {
       "-feature",
       "-deprecation",
       "-unchecked",
-      "-Xfatal-warnings",
+      // "-Xfatal-warnings",
       "-encoding", "UTF8",
       "-language:existentials,higherKinds,implicitConversions"
     ),
