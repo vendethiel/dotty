@@ -45,6 +45,7 @@ class Compiler {
       List(new sbt.ExtractDependencies), // Sends information on classes' dependencies to sbt via callbacks
       List(new PostTyper),          // Additional checks and cleanups after type checking
       List(new sbt.ExtractAPI),     // Sends a representation of the API of classes to sbt via callbacks
+      List(new QuoteSplices),       // TODO
       List(new Pickler),            // Generate TASTY info
       List(new LinkAll),            // Reload compilation units from TASTY for library code (if needed)
       List(new Splice),             // TODO

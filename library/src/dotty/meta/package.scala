@@ -11,4 +11,7 @@ package object meta {
   def splice[T](expr: Expr[T]): T =
     throw new Exception("Runtime splicing is not supported yet")
 
+  def spliceHole[T](id: Int): T =
+    throw new Exception(s"Splice hole $id was not filled with expression")
+
 }

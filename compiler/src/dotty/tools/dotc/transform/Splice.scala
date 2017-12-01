@@ -2,16 +2,15 @@ package dotty.tools.dotc.transform
 
 import java.net.URLClassLoader
 
+import dotty.meta.TastyString
 import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.ast.tpd
-import dotty.tools.dotc.config.Printers._
 import dotty.tools.dotc.core.Constants._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Symbols._
-import dotty.tools.dotc.core.Types._
-import dotty.tools.dotc.core.tasty.{DottyUnpickler, TastyPickler, TastyPrinter}
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
+import dotty.tools.dotc.core.tasty.Quotes._
 
 /** TODO
  */
@@ -24,7 +23,7 @@ class Splice extends MiniPhase {
     tree.fun match {
       case fun: TypeApply if fun.symbol eq defn.MetaSplice =>
         def splice(str: String): Tree = {
-          val splicedCode = unpickle(new dotty.meta.Expr(str).tasty)
+          val splicedCode = revealQuote(unpickle(new dotty.meta.Expr(str, Nil).tasty)) // TODO add args
           transformAllDeep(splicedCode)
         }
         tree.args.head match {
@@ -36,46 +35,98 @@ class Splice extends MiniPhase {
           case Apply(quote, arg :: Nil) if quote.symbol == defn.MetaQuote => arg
           case Inlined(_, _, Apply(quote, arg :: Nil)) if quote.symbol == defn.MetaQuote => arg
 
+          case quote: Apply => reflectQuote(quote)
+          case quote: RefTree => reflectQuote(quote)
           case _ => tree
         }
       case _ => tree
     }
   }
 
+  private def reflectQuote(tree: Tree)(implicit ctx: Context): Tree = {
+    if (!tree.tpe.derivesFrom(defn.MetaExpr) ||
+        tree.symbol == defn.MetaQuote ||
+        tree.symbol.isConstructor)
+      return tree
+    val sym = tree.symbol
+    try {
+      val urls = ctx.settings.classpath.value.split(':').map(cp => java.nio.file.Paths.get(cp).toUri.toURL)
+      val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
+      val clazz = classLoader.loadClass(sym.owner.showFullName)
+      val args: List[AnyRef] = tree match {
+        case Apply(_, args) =>
+          args.map {
+            case arg @ Apply(_, quote :: Nil) if arg.symbol eq defn.MetaQuote =>
+              val tasty = pickle(encapsulateQuote(quote))
+              val tastyString = TastyString.tastyToString(tasty)
+              new dotty.meta.Expr(tastyString, Nil) // TODO add args?
+            case Literal(Constant(c)) => c.asInstanceOf[AnyRef]
+            case arg @ Apply(Select(Apply(_, quote :: Nil), _), Apply(_, splice :: Nil) :: Nil) if arg.symbol eq defn.MetaExprSpliced =>
+              val tasty = pickle(encapsulateQuote(quote))
+              val tastyString = TastyString.tastyToString(tasty)
 
-  override def transformSelect(tree: tpd.Select)(implicit ctx: Context) = transformRefTree(tree)
 
-  override def transformIdent(tree: tpd.Ident)(implicit ctx: Context) = transformRefTree(tree)
-
-  private def transformRefTree(tree: RefTree)(implicit ctx: Context): Tree = {
-    if (tree.tpe.derivesFrom(defn.MetaExpr)) reflectQuote(tree.symbol).getOrElse(tree)
-    else tree
-  }
-
-  private def reflectQuote(sym: Symbol)(implicit ctx: Context): Option[Tree] = {
-    val urls = ctx.settings.classpath.value.split(':').map(cp => java.nio.file.Paths.get(cp).toUri.toURL)
-    val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
-    val clazz = classLoader.loadClass(sym.owner.showFullName)
-    val method = clazz.getDeclaredMethod(sym.name.toString)
-    val expr = method.invoke(null).asInstanceOf[dotty.meta.Expr[_]]
-    println(expr.tastyString)
-    val code = unpickle(expr.tasty)
-    Some(ref(defn.MetaQuote).appliedToType(code.tpe).appliedTo(code))
-  }
+              println()
+              println(splice.show)
+              println(splice)
+              println()
+              println(encapsulateQuote(splice).show)
+              println()
+              println()
+              val tasty2 = pickle(encapsulateQuote(splice))
+              val tastyString2 = TastyString.tastyToString(tasty2)
 
 
-  private def unpickle(bytes: Array[Byte])(implicit ctx: Context): tpd.Tree = {
-    val unpickler = new DottyUnpickler(bytes)
-    unpickler.enter(roots = Set(defn.RootPackage))
-    val quote = revealQuote(unpickler.body.head)
-    if (pickling ne noPrinter) {
-      println(i"**** unpickled quote for \n${quote.show}")
-      new TastyPrinter(bytes).printContents()
+              val spliceExpr = new dotty.meta.Expr(tastyString2, Nil)
+              // TODO Support multiple expr
+              new dotty.meta.Expr(tastyString, Nil).spliced(spliceExpr)
+            case arg => ???
+          }
+        case _ => Nil
+      }
+      val paramClasses = sym.signature.paramsSig.map { param =>
+        if (param.toString == "scala.Int") 0.getClass // TODO
+        else classLoader.loadClass(param.toString)
+      }
+      val method = clazz.getDeclaredMethod(sym.name.toString, paramClasses: _*)
+      val expr = method.invoke(null, args: _*).asInstanceOf[dotty.meta.Expr[_]]
+
+      foo(expr)
+    } catch {
+      case _: NoSuchMethodException =>
+        ctx.error(s"Could not find macro ${sym.showFullName} in classpath", tree.pos)
+        tree
+      case _: ClassNotFoundException =>
+        ctx.error(s"Could not find macro class ${sym.owner.showFullName} in classpath", tree.pos)
+        tree
     }
-    quote
   }
 
-  private def revealQuote(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = tree match {
-    case PackageDef(_, (vdef @ DefDef(_, _, _, _, _)) :: Nil) => vdef.rhs
+  private def foo(expr: dotty.meta.Expr[_])(implicit ctx: Context): Tree = {
+    val splices = expr.splices.map(foo)
+    val code = revealQuote(unpickle(expr.tasty))
+    spliceIn(code, splices)
+
   }
+
+  private def spliceIn(code: Tree, splices: List[Tree])(implicit ctx: Context): Tree = {
+    if (splices.isEmpty) code
+    else {
+      new TreeMap() {
+        private[this] var splicesLeft = splices
+        override def transform(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = {
+          splicesLeft match {
+            case splice :: rest =>
+              if (tree.symbol eq defn.MetaSpliceHole) {
+                splicesLeft = rest
+                splice
+              }
+              else super.transform(tree)
+            case Nil => tree
+          }
+        }
+      }.transform(code)
+    }
+  }
+
 }
