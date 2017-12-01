@@ -56,14 +56,16 @@ class Extract(exprPos: Position) extends MacroTransform with IdentityDenotTransf
             case tree: DefDef =>
               defs = tree :: defs
             case tree: Block =>
-              assert(expr == null)
+              // FIXME: Somehow this triggers on TypeComparer:172, expr is duplicated?
+              assert(expr == null, s"Old: $expr\nNew: $tree")
               expr = tree
               exprOwner = ctx.owner
           }
           tree
         }
-        else
+        else {
           super.transform(tree)
+        }
     }
   }
 

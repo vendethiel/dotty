@@ -226,21 +226,24 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
       // Classloaded, can now be used
       val debugCls = vm.classesByName("dotty.runtime.DebugEval").asScala.head.asInstanceOf[ClassType]
       val eval = debugCls.methodsByName("eval").get(0) // TODO: use concreteMethodByName
-      try {
-        debugCls.invokeMethod(threadRef, eval,
-          List(vm.mirrorOf(path), newStackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
-      } catch {
-        case e: InvocationException =>
-          exception = e
-          val under = e.exception
-          val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
-          println("##About to print exception")
-          under.invokeMethod(threadRef, print, List().asJava, 0)
-      }
-    }
 
-    val res = ""
-    listener.evaluationComplete(vm.mirrorOf(res), exception)
+      val res =
+        try {
+          debugCls.invokeMethod(threadRef, eval,
+            List(vm.mirrorOf(path), newStackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
+        } catch {
+          case e: InvocationException =>
+            exception = e
+            val under = e.exception
+            val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
+            println("##About to print exception")
+            under.invokeMethod(threadRef, print, List().asJava, 0)
+            null
+        }
+      listener.evaluationComplete(res, exception)
+    } else {
+      listener.evaluationComplete(null, exception)
+    }
   }
 
   override def isInEvaluation(thread: ThreadReference) = false
