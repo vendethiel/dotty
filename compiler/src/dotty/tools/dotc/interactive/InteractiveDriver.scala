@@ -177,7 +177,7 @@ class InteractiveDriver(compiler: Compiler, val settings: List[String]) extends 
     def addTrees(tree: untpd.Tree): Unit = tree match {
       case PackageDef(_, stats) =>
         stats.foreach(addTrees)
-      case tree: TypeDef =>
+      case tree: untpd.TypeDef =>
         trees += tree
       case _ =>
     }

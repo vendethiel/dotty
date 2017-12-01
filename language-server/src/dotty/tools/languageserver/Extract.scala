@@ -6,7 +6,7 @@ import scala.collection.mutable
 import dotc.ast.{TreeTypeMap, Trees, tpd}
 import dotc.core._, dotc.core.Decorators._
 import dotc.transform.{ CtxLazy, MacroTransform }
-import dotc.transform.TreeTransforms._, Phases.Phase
+import Phases.Phase
 import Types._, Contexts._, Constants._, Names._, NameOps._, Flags._, DenotTransformers._
 import SymDenotations._, Symbols._, StdNames._, Annotations._, Trees._, Scopes._, Denotations._
 import dotc.util.Positions._
