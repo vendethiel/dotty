@@ -1,5 +1,7 @@
 package dotty.tools.dotc.transform
 
+import java.net.URLClassLoader
+
 import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.config.Printers._
@@ -26,18 +28,41 @@ class Splice extends MiniPhase {
           transformAllDeep(splicedCode)
         }
         tree.args.head match {
-          case Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String)))) =>
-            splice(tastyStr) // splice explicit quote
-          case Inlined(_, _, Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String))))) =>
-            splice(tastyStr) // splice explicit inlined quote
-          case Inlined(_, _, Apply(quote, arg :: Nil)) if quote.symbol == defn.MetaQuote =>
-            arg
-          case _ =>
-            tree
+          // splice explicit quotes
+          case Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String)))) => splice(tastyStr)
+          case Inlined(_, _, Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String))))) => splice(tastyStr)
+
+          // splice quotes with code ~'x --> x
+          case Apply(quote, arg :: Nil) if quote.symbol == defn.MetaQuote => arg
+          case Inlined(_, _, Apply(quote, arg :: Nil)) if quote.symbol == defn.MetaQuote => arg
+
+          case _ => tree
         }
       case _ => tree
     }
   }
+
+
+  override def transformSelect(tree: tpd.Select)(implicit ctx: Context) = transformRefTree(tree)
+
+  override def transformIdent(tree: tpd.Ident)(implicit ctx: Context) = transformRefTree(tree)
+
+  private def transformRefTree(tree: RefTree)(implicit ctx: Context): Tree = {
+    if (tree.tpe.derivesFrom(defn.MetaExpr)) reflectQuote(tree.symbol).getOrElse(tree)
+    else tree
+  }
+
+  private def reflectQuote(sym: Symbol)(implicit ctx: Context): Option[Tree] = {
+    val urls = ctx.settings.classpath.value.split(':').map(cp => java.nio.file.Paths.get(cp).toUri.toURL)
+    val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
+    val clazz = classLoader.loadClass(sym.owner.showFullName)
+    val method = clazz.getDeclaredMethod(sym.name.toString)
+    val expr = method.invoke(null).asInstanceOf[dotty.meta.Expr[_]]
+    println(expr.tastyString)
+    val code = unpickle(expr.tasty)
+    Some(ref(defn.MetaQuote).appliedToType(code.tpe).appliedTo(code))
+  }
+
 
   private def unpickle(bytes: Array[Byte])(implicit ctx: Context): tpd.Tree = {
     val unpickler = new DottyUnpickler(bytes)
