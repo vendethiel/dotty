@@ -47,7 +47,7 @@ object DottyDebugServer {
       val clientSocket = serverSocket.accept()
 
       val ps = new ProtocolServer(clientSocket.getInputStream, clientSocket.getOutputStream, providerContext)
-      ps.start()
+      ps.run()
     }
 
     val port = serverSocket.getLocalPort

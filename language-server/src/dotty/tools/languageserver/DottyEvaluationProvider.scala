@@ -120,7 +120,11 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
     parseStats(parser)
   }
 
-  override def eval(code: String, stackFrame: StackFrame, context: IDebugAdapterContext, listener: IEvaluationListener): String = {
+  // TODO: Figure out if this can be implemented.
+  override def cancelEvaluation(threadRef: ThreadReference): Unit = {}
+
+  // override def eval(code: String, stackFrame: StackFrame, context: IDebugAdapterContext, listener: IEvaluationListener): String = {
+  override def eval(projectName: String, code: String, stackFrame: StackFrame, listener: IEvaluationListener): Unit = {
     val loc = stackFrame.location
     val line = loc.lineNumber
     println("line: " + line)
@@ -183,7 +187,8 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
     println("vars: " + visVars)
     println("x: " + visVars.asScala.map(stackFrame.getValue))
 
-    val vm = context.getDebugSession.getVM
+    val vm = stackFrame.thread.virtualMachine
+    // val vm = context.getDebugSession.getVM
     val stringClass = vm.classesByName("java.lang.String").asScala.head.asInstanceOf[ClassType]
 
     val stringArrayType = vm.classesByName("java.lang.String[]").asScala.head.asInstanceOf[ArrayType]
@@ -201,37 +206,41 @@ class DottyEvaluationProvider(languageServer: DottyLanguageServer, sourceLookup:
     // Classload dotty.runtime.DebugEval
     val classCls = vm.classesByName("java.lang.Class").asScala.head.asInstanceOf[ClassType]
     val forName = classCls.concreteMethodByName("forName", "(Ljava/lang/String;)Ljava/lang/Class;")
+    var exception: Exception = null
     try {
       classCls.invokeMethod(threadRef, forName,
         List(vm.mirrorOf(DebugEval)).asJava, 0)
     } catch {
       case e: InvocationException =>
+        exception = e
         val under = e.exception
         val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
         println("##FIRST About to print exception")
         under.invokeMethod(threadRef, print, List().asJava, 0)
     }
 
-    val newStackFrame = threadRef.frames.get(0) //handler.EvaluateRequestHandler.refreshStackFrames(stackFrame)
-    // context.getRecyclableIdPool.addObject(threadRef.uniqueID,  new variables.JdiObjectProxy(newStackFrame))
+    if (exception == null) {
+      val newStackFrame = threadRef.frames.get(0) //handler.EvaluateRequestHandler.refreshStackFrames(stackFrame)
+                                                  // context.getRecyclableIdPool.addObject(threadRef.uniqueID,  new variables.JdiObjectProxy(newStackFrame))
 
-    // Classloaded, can now be used
-    val debugCls = vm.classesByName("dotty.runtime.DebugEval").asScala.head.asInstanceOf[ClassType]
-    val eval = debugCls.methodsByName("eval").get(0) // TODO: use concreteMethodByName
-    try {
-      debugCls.invokeMethod(threadRef, eval,
-        List(vm.mirrorOf(path), newStackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
-    } catch {
-      case e: InvocationException =>
-        val under = e.exception
-        val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
-        println("##About to print exception")
-        under.invokeMethod(threadRef, print, List().asJava, 0)
+      // Classloaded, can now be used
+      val debugCls = vm.classesByName("dotty.runtime.DebugEval").asScala.head.asInstanceOf[ClassType]
+      val eval = debugCls.methodsByName("eval").get(0) // TODO: use concreteMethodByName
+      try {
+        debugCls.invokeMethod(threadRef, eval,
+          List(vm.mirrorOf(path), newStackFrame.thisObject, nameArrayRef, localsArrayRef).asJava, 0)
+      } catch {
+        case e: InvocationException =>
+          exception = e
+          val under = e.exception
+          val print = under.`type`.asInstanceOf[ClassType].methodsByName("printStackTrace").get(0)
+          println("##About to print exception")
+          under.invokeMethod(threadRef, print, List().asJava, 0)
+      }
     }
 
     val res = ""
-    listener.evaluationComplete(res)
-    res
+    listener.evaluationComplete(vm.mirrorOf(res), exception)
   }
 
   override def isInEvaluation(thread: ThreadReference) = false
