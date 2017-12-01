@@ -16,15 +16,22 @@ import dotty.tools.dotc.transform.MegaPhase.MiniPhase
 class Splice extends MiniPhase {
   import tpd._
 
-  override def phaseName: String = "quotes"
+  override def phaseName: String = "splice"
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
       case fun: TypeApply if fun.symbol eq defn.MetaSplice =>
+        def splice(str: String): Tree = {
+          val splicedCode = unpickle(new dotty.meta.Expr(str).tasty)
+          transformAllDeep(splicedCode)
+        }
         tree.args.head match {
-          case Apply(TypeApply(_, _), List(Literal(Constant(str: String)))) => // TODO add guards checking that this is a Quote.Expr constructor
-            val splicedCode = unpickle(stringToBytes(str))
-            transformAllDeep(splicedCode)
+          case Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String)))) =>
+            splice(tastyStr) // splice explicit quote
+          case Inlined(_, _, Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String))))) =>
+            splice(tastyStr) // splice explicit inlined quote
+          case Inlined(_, _, Apply(quote, arg :: Nil)) if quote.symbol == defn.MetaQuote =>
+            arg
           case _ =>
             tree
         }
@@ -46,8 +53,4 @@ class Splice extends MiniPhase {
   private def revealQuote(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = tree match {
     case PackageDef(_, (vdef @ ValDef(_, _, _)) :: Nil) => vdef.rhs
   }
-
-  // TODO improve string representation
-  private def stringToBytes(str: String): Array[Byte] = str.sliding(2, 2).map(a => Integer.parseInt(a.mkString, 16).toByte).toArray
-
 }

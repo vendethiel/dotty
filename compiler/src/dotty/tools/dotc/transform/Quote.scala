@@ -16,10 +16,10 @@ import dotty.tools.dotc.transform.MegaPhase.MiniPhase
 
 /** TODO
  */
-class Quotes extends MiniPhase {
+class Quote extends MiniPhase {
   import tpd._
 
-  override def phaseName: String = "quotes"
+  override def phaseName: String = "quote"
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
@@ -30,7 +30,7 @@ class Quotes extends MiniPhase {
 
   private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
     val tastyBytes = pickle(tree)
-    val tastyString = Literal(Constant(bytesToString(tastyBytes)))
+    val tastyString = Literal(Constant(dotty.meta.Expr(tastyBytes).tastyString))
     val exprTpe = defn.MetaExpr.typeRef.appliedTo(tpe)
     tpd.New(exprTpe, tastyString :: Nil)
   }
@@ -63,8 +63,5 @@ class Quotes extends MiniPhase {
     val quotedVal = tpd.SyntheticValDef(quoteName, tree)(ctx.withOwner(quotePackage))
     tpd.PackageDef(tpd.ref(quotePackage).asInstanceOf[tpd.Ident], quotedVal :: Nil)
   }
-
-  // TODO improve string representation
-  private def bytesToString(bytes: Array[Byte]): String = bytes.map(b => f"$b%02X").mkString
 
 }
