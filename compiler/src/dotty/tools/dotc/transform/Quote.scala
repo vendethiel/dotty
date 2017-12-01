@@ -2,6 +2,7 @@ package dotty.tools.dotc.transform
 
 import java.nio.charset.StandardCharsets
 
+import dotty.meta.TastyString
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.core.Constants._
@@ -30,7 +31,7 @@ class Quote extends MiniPhase {
 
   private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
     val tastyBytes = pickle(tree)
-    val tastyString = Literal(Constant(dotty.meta.Expr(tastyBytes).tastyString))
+    val tastyString = Literal(Constant(TastyString.tastyToString(tastyBytes)))
     val exprTpe = defn.MetaExpr.typeRef.appliedTo(tpe)
     tpd.New(exprTpe, tastyString :: Nil)
   }

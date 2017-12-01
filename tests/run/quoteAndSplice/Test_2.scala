@@ -4,8 +4,8 @@ import quotes.Quotes_1._
 
 object Test {
   def main(args: Array[String]): Unit = {
-    splice(printHello)
-    splice(inlinePrintHello)
+    splice(printHello) // get quote through reflective call to printHello
+    splice(inlinePrintHello)  // just inline
   }
 }
 
