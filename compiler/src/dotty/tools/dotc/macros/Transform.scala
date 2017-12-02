@@ -28,12 +28,16 @@ import config.Printers.{ macros => debug }
  *
  *  to:
  *
- *    class main {
+ *    class macros {
  *      <macro> def f[T](a: A)(b: B): C = ???
  *    }
  *
- *    object main$inline {
- *      @static def f(prefix: Tree)(T: TypeTree)(a: Tree)(b: Tree)(implicit c: Context): Tree = body
+ *    object macros$inline {
+ *      @static
+ *      def f(prefix: scala.gestalt.tpd.Tree)
+ *           (T: scala.gestalt.tpd.Tree)
+ *           (a: scala.gestalt.tpd.Tree)
+ *           (b: scala.gestalt.tpd.Tree): scala.gestalt.untpd.Tree = body
  *    }
  */
 
@@ -128,9 +132,10 @@ private[macros] object Transform {
    *  will be implemented by
    *
    *    @static
-   *    def f(prefix: TermTree)
-   *         (T: TypeTree)
-   *         (a: TermTree)(b: TermTree)(implicit c: Context): Tree = body
+   *    def f(prefix: scala.gestalt.tpd.Tree)
+   *         (T: scala.gestalt.tpd.Tree)
+   *         (a: scala.gestalt.tpd.Tree)
+             (b: scala.gestalt.tpd.Tree): scala.gestalt.untpd.Tree = body
    *
    *  with `this` replaced by `prefix` in `body`
    *
@@ -138,9 +143,9 @@ private[macros] object Transform {
   private def createImplMethod(defn: DefDef, isAnnotMacroDef: Boolean)(implicit ctx: Context): DefDef = {
     val Apply(_, rhs :: Nil) = defn.rhs
 
-    val tb = Select(Select(Ident("scala".toTermName), "gestalt".toTermName), "api".toTermName)
-    val treeType = Select(tb, "Tree".toTypeName)
-    val termType = Select(tb, "TermTree".toTypeName)
+    val tb = Select(Ident("scala".toTermName), "gestalt".toTermName)
+    val treeType = Select(Select(tb, "untpd".toTermName), "Tree".toTypeName)
+    val termType = Select(Select(tb, "untpd".toTermName), "TermTree".toTypeName)
     val typedTreeType = Select(Select(tb, "tpd".toTermName), "Tree".toTypeName)
     val contextType = Select(tb, "Context".toTypeName)
 

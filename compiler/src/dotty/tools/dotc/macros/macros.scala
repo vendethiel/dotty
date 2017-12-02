@@ -128,23 +128,6 @@ package object macros {
    *
    *  @note The returned tree NEEDs desugaring
    *
-   *  Macro definition is transformed from:
-   *
-   *    class macros {
-   *      def f[T](a: A)(b: B): C = meta {
-   *        body
-   *      }
-   *    }
-   *
-   *  to:
-   *
-   *    class main {
-   *      <macro> def f[T](a: A)(b: B): C = ???
-   *    }
-   *
-   *    object main$inline {
-   *      @static def f(prefix: scala.meta.Term)(T: scala.meta.Type)(a: scala.meta.Term)(b: scala.meta.Term): scala.meta.Tree = body
-   *    }
    */
   def transform(tree: Tree)(implicit ctx: Context): Tree = {
     tree match {

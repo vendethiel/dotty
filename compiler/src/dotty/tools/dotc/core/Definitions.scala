@@ -667,14 +667,14 @@ class Definitions {
   def ShowAsInfixAnnot(implicit ctx: Context) = ShowAsInfixAnotType.symbol.asClass
 
   // macro-related definitions
-  def QuasiquoteHelper(implicit ctx: Context) = ctx.requiredClass("scala.gestalt.api.QuasiquoteHelper")
+  def QuasiquoteHelper(implicit ctx: Context) = ctx.requiredClass("scala.gestalt.QuasiquoteHelper")
   def q(implicit ctx: Context) = QuasiquoteHelper.requiredValue("q").info.classSymbol
   def t(implicit ctx: Context) = QuasiquoteHelper.requiredValue("t").info.classSymbol
 
   lazy val ToolboxType = ctx.requiredClassRef("scala.gestalt.core.Toolbox")
   def Toolbox(implicit ctx: Context) = ToolboxType.symbol.asClass
 
-  def WeakTypeTag(implicit ctx: Context) = Toolbox.info.member("WeakTypeTag".toTypeName).symbol
+  def WeakTypeTag(implicit ctx: Context) = ctx.requiredClass("scala.gestalt.api.WeakTypeTag")
 
   // convenient one-parameter method types
   def methOfAny(tp: Type) = MethodType(List(AnyType), tp)
