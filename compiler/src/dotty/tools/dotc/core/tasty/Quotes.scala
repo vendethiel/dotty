@@ -2,10 +2,8 @@ package dotty.tools.dotc.core.tasty
 
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.ast.Trees._
-
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
-
 import dotty.tools.dotc.core.Flags._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.core.Symbols._

@@ -2,7 +2,6 @@ package dotty.tools.dotc.transform
 
 import java.net.URLClassLoader
 
-import dotty.meta.TastyString
 import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Constants._
@@ -11,6 +10,8 @@ import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase
 import dotty.tools.dotc.core.tasty.Quotes._
+
+import dotty.meta._
 
 /** TODO
  */
@@ -23,7 +24,7 @@ class Splice extends MiniPhase {
     tree.fun match {
       case fun: TypeApply if fun.symbol eq defn.MetaSplice =>
         def splice(str: String): Tree = {
-          val splicedCode = revealQuote(unpickle(new dotty.meta.Expr(str, Nil).tasty)) // TODO add args
+          val splicedCode = revealQuote(unpickle(new Expr(str, Nil).tasty)) // TODO add args
           transformAllDeep(splicedCode)
         }
         tree.args.head match {
@@ -55,32 +56,20 @@ class Splice extends MiniPhase {
       val clazz = classLoader.loadClass(sym.owner.showFullName)
       val args: List[AnyRef] = tree match {
         case Apply(_, args) =>
+          def expr(tree: Tree): Expr[_] = tree match {
+            case tree @ Apply(_, quote :: Nil) if tree.symbol eq defn.MetaQuote =>
+              val tasty = pickle(encapsulateQuote(quote))
+              val tastyString = TastyString.tastyToString(tasty)
+              new Expr(tastyString, Nil)
+            case tree @ Apply(Select(inner, _), spliced :: Nil) if tree.symbol eq defn.MetaExprSpliced =>
+              expr(inner).spliced(expr(spliced))
+          }
+
           args.map {
-            case arg @ Apply(_, quote :: Nil) if arg.symbol eq defn.MetaQuote =>
-              val tasty = pickle(encapsulateQuote(quote))
-              val tastyString = TastyString.tastyToString(tasty)
-              new dotty.meta.Expr(tastyString, Nil) // TODO add args?
             case Literal(Constant(c)) => c.asInstanceOf[AnyRef]
-            case arg @ Apply(Select(Apply(_, quote :: Nil), _), Apply(_, splice :: Nil) :: Nil) if arg.symbol eq defn.MetaExprSpliced =>
-              val tasty = pickle(encapsulateQuote(quote))
-              val tastyString = TastyString.tastyToString(tasty)
-
-
-              println()
-              println(splice.show)
-              println(splice)
-              println()
-              println(encapsulateQuote(splice).show)
-              println()
-              println()
-              val tasty2 = pickle(encapsulateQuote(splice))
-              val tastyString2 = TastyString.tastyToString(tasty2)
-
-
-              val spliceExpr = new dotty.meta.Expr(tastyString2, Nil)
-              // TODO Support multiple expr
-              new dotty.meta.Expr(tastyString, Nil).spliced(spliceExpr)
-            case arg => ???
+            case arg =>
+              if (arg.symbol == defn.MetaQuote || arg.symbol == defn.MetaExprSpliced) expr(arg)
+              else ???
           }
         case _ => Nil
       }
@@ -89,7 +78,7 @@ class Splice extends MiniPhase {
         else classLoader.loadClass(param.toString)
       }
       val method = clazz.getDeclaredMethod(sym.name.toString, paramClasses: _*)
-      val expr = method.invoke(null, args: _*).asInstanceOf[dotty.meta.Expr[_]]
+      val expr = method.invoke(null, args: _*).asInstanceOf[Expr[_]]
 
       foo(expr)
     } catch {
@@ -102,7 +91,7 @@ class Splice extends MiniPhase {
     }
   }
 
-  private def foo(expr: dotty.meta.Expr[_])(implicit ctx: Context): Tree = {
+  private def foo(expr: Expr[_])(implicit ctx: Context): Tree = {
     val splices = expr.splices.map(foo)
     val code = revealQuote(unpickle(expr.tasty))
     spliceIn(code, splices)
