@@ -7,6 +7,8 @@ object Test {
     val x: Int = 4
     println(splice(pow(quote(3), 5)))
     println(splice(pow(quote(splice(quote(2 + splice(quote(4)) + splice(quote(7)))) + splice(quote(3))), 3)))
+    println(splice(pow(quote(x), 5)))
+    println(splice(pow(quote(x + splice(quote(x + 1))), 5)))
   }
 }
 

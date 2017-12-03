@@ -26,7 +26,7 @@ class Quote extends MiniPhase {
   private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
     val tastyBytes = pickle(encapsulateQuote(tree))
     val tastyString = Literal(Constant(TastyString.tastyToString(tastyBytes)))
-    val exprTpe = defn.MetaExpr.typeRef.appliedTo(tpe)
+    val exprTpe = defn.MetaTastyExpr.typeRef.appliedTo(tpe)
     tpd.New(exprTpe, tastyString :: ref(defn.NilModuleRef) :: Nil)
   }
 }

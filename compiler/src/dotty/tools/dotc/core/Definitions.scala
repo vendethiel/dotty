@@ -1116,6 +1116,7 @@ class Definitions {
   lazy val MetaSplice: TermSymbol = MetaPackage.requiredMethod("splice")
   lazy val MetaSpliceHole: TermSymbol = MetaPackage.requiredMethod("spliceHole")
   lazy val MetaExpr: TypeSymbol = ctx.requiredClass("dotty.meta.Expr")
-  lazy val MetaExprSpliced: TermSymbol = MetaExpr.requiredMethod("spliced".toTermName)
+  lazy val MetaTastyExpr: TypeSymbol = ctx.requiredClass("dotty.meta.TastyExpr")
+  lazy val MetaExprSpliced: TermSymbol = MetaTastyExpr.requiredMethod("spliced".toTermName)
 
 }
