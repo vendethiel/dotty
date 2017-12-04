@@ -24,7 +24,7 @@ class Splice extends MiniPhase {
     tree.fun match {
       case Select(splicedCode, _) if tree.symbol eq defn.MetaExprSplice =>
         def splice(str: String): Tree = {
-          val splicedCode = revealQuote(unpickle(new TastyExpr(str, Nil).tasty)) // TODO add args
+          val splicedCode = revealQuote(unpickle(new TastyExpr(str, Nil).tasty))
           transformAllDeep(splicedCode)
         }
         splicedCode match {
@@ -38,7 +38,6 @@ class Splice extends MiniPhase {
 
           case quote: Apply => reflectQuote(quote, tree)
           case quote: RefTree => reflectQuote(quote, tree)
-          case _ => tree
         }
       case _ => tree
     }
@@ -84,7 +83,7 @@ class Splice extends MiniPhase {
       val method = clazz.getDeclaredMethod(sym.name.toString, paramClasses: _*)
       val expr = method.invoke(null, args: _*).asInstanceOf[Expr[_]]
 
-      foo(expr)
+      exprToTree(expr)
     } catch {
       case _: NoSuchMethodException =>
         ctx.error(s"Could not find macro ${sym.showFullName} in classpath", tree.pos)
@@ -95,14 +94,13 @@ class Splice extends MiniPhase {
     }
   }
 
-  private def foo(expr: Expr[_])(implicit ctx: Context): Tree = {
-    val splices = expr.splices.map(foo)
+  private def exprToTree(expr: Expr[_])(implicit ctx: Context): Tree = {
+    val splices = expr.splices.map(exprToTree)
     val code = expr match {
       case expr: RawExpr => expr.tree
       case expr: TastyExpr[_] => revealQuote(unpickle(expr.tasty))
     }
     spliceIn(code, splices)
-
   }
 
   private def spliceIn(code: Tree, splices: List[Tree])(implicit ctx: Context): Tree = {

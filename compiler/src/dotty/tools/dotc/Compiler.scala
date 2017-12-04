@@ -49,7 +49,7 @@ class Compiler {
       List(new Pickler),            // Generate TASTY info
       List(new LinkAll),            // Reload compilation units from TASTY for library code (if needed)
       List(new Splice),             // TODO
-      List(new Quote),              // TODO
+      List(new SerializeQuotes),    // TODO
       List(new FirstTransform,      // Some transformations to put trees into a canonical form
            new CheckReentrant,      // Internal use only: Check that compiled program has no data races involving global vars
            new ElimJavaPackages),   // Eliminate syntactic references to Java packages

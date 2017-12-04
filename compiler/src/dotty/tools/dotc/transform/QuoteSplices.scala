@@ -2,7 +2,6 @@ package dotty.tools.dotc.transform
 
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.ast.Trees._
-import dotty.tools.dotc.core.Constants._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.transform.MegaPhase.MiniPhase

@@ -11,19 +11,17 @@ import dotty.tools.dotc.core.tasty.Quotes._
 
 /** TODO
  */
-class Quote extends MiniPhase {
+class SerializeQuotes extends MiniPhase {
   import tpd._
 
-  override def phaseName: String = "quote"
+  override def phaseName: String = "serializeQuotes"
 
-  override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
-    tree.fun match {
-      case fun: TypeApply if fun.symbol eq defn.MetaQuote => quote(tree.args.head, fun.args.head.tpe)
-      case _ => tree
-    }
+  override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = tree.fun match {
+    case fun: TypeApply if fun.symbol eq defn.MetaQuote => serializeQuote(tree.args.head, fun.args.head.tpe)
+    case _ => tree
   }
 
-  private def quote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
+  private def serializeQuote(tree: tpd.Tree, tpe: Type)(implicit ctx: Context): tpd.Tree = {
     val tastyBytes = pickle(encapsulateQuote(tree))
     val tastyString = Literal(Constant(TastyString.tastyToString(tastyBytes)))
     val exprTpe = defn.MetaTastyExpr.typeRef.appliedTo(tpe)
