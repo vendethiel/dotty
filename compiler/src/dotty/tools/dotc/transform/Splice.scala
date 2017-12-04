@@ -22,12 +22,12 @@ class Splice extends MiniPhase {
 
   override def transformApply(tree: tpd.Apply)(implicit ctx: Context): tpd.Tree = {
     tree.fun match {
-      case fun: TypeApply if fun.symbol eq defn.MetaSplice =>
+      case Select(splicedCode, _) if tree.symbol eq defn.MetaExprSplice =>
         def splice(str: String): Tree = {
           val splicedCode = revealQuote(unpickle(new TastyExpr(str, Nil).tasty)) // TODO add args
           transformAllDeep(splicedCode)
         }
-        tree.args.head match {
+        splicedCode match {
           // splice explicit quotes
           case Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String)))) => splice(tastyStr)
           case Inlined(_, _, Apply(TypeApply(_, _), List(Literal(Constant(tastyStr: String))))) => splice(tastyStr)
@@ -36,19 +36,19 @@ class Splice extends MiniPhase {
           case Apply(quote, arg :: Nil) if quote.symbol == defn.MetaQuote => arg
           case Inlined(_, _, Apply(quote, arg :: Nil)) if quote.symbol == defn.MetaQuote => arg
 
-          case quote: Apply => reflectQuote(quote)
-          case quote: RefTree => reflectQuote(quote)
+          case quote: Apply => reflectQuote(quote, tree)
+          case quote: RefTree => reflectQuote(quote, tree)
           case _ => tree
         }
       case _ => tree
     }
   }
 
-  private def reflectQuote(tree: Tree)(implicit ctx: Context): Tree = {
+  private def reflectQuote(tree: Tree, fallback: Tree)(implicit ctx: Context): Tree = {
     if (!tree.tpe.derivesFrom(defn.MetaExpr) ||
         tree.symbol == defn.MetaQuote ||
         tree.symbol.isConstructor)
-      return ref(defn.MetaSplice).appliedToType(tree.tpe).appliedTo(tree)
+      return fallback
     val sym = tree.symbol
     try {
       val urls = ctx.settings.classpath.value.split(':').map(cp => java.nio.file.Paths.get(cp).toUri.toURL)
@@ -72,7 +72,7 @@ class Splice extends MiniPhase {
                   if (arg.tpe.derivesFrom(defn.MetaExpr)) "Quote needs to be explicit"
                   else "Value needs to be a explicit"
                 ctx.error(msg, arg.pos)
-                return ref(defn.MetaSplice).appliedToType(tree.tpe).appliedTo(tree)
+                return fallback
               }
           }
         case _ => Nil

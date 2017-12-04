@@ -1,6 +1,7 @@
 package dotty.tools.dotc.transform
 
 import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.core.Constants._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Symbols._
@@ -28,9 +29,8 @@ class QuoteSplices extends MiniPhase {
     private[this] var id = -1
     var splices: List[Tree] = Nil
     override def transform(tree: tpd.Tree)(implicit ctx: Context): tpd.Tree = tree match {
-      case tree: Apply if tree.symbol eq defn.MetaSplice =>
+      case Apply(Select(splicedCode, _), _) if tree.symbol eq defn.MetaExprSplice =>
         id += 1
-        val splicedCode = tree.args.head
         splices = splicedCode :: splices
         ref(defn.MetaSpliceHole).appliedToType(tree.tpe.widen).appliedTo(Literal(Constant(id)))
       case _ => super.transform(tree)

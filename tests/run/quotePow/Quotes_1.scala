@@ -8,11 +8,11 @@ object Quotes_1 {
   private def powRec(x: Expr[Int], n: Int): Expr[Int] = {
     if (n == 0) quote(1)
     else if (n % 2 == 0) quote {
-      val a: Int = splice(powRec(x, n / 2))
+      val a: Int = ~powRec(x, n / 2)
       a * a
     } else quote {
-      val a: Int = splice(powRec(x, n - 1))
-      a * splice(x)
+      val a: Int = ~powRec(x, n - 1)
+      a * ~x
     }
   }
 
