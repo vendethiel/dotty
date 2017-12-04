@@ -58,7 +58,7 @@ class Splice extends MiniPhase {
         case Apply(_, args) =>
           def expr(tree: Tree, splices: List[RawExpr]): RawExpr = tree match {
             case tree @ Apply(_, quote :: Nil) if tree.symbol eq defn.MetaQuote =>
-              new RawExpr(quote, splices)
+              new RawExpr(quote, splices.reverse)
             case tree @ Apply(Select(inner, _), spliced :: Nil) if tree.symbol eq defn.MetaExprSpliced =>
               expr(inner, expr(spliced, Nil) :: splices)
           }
