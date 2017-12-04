@@ -32,7 +32,7 @@ class QuoteSplices extends MiniPhase {
       case Apply(Select(splicedCode, _), _) if tree.symbol eq defn.MetaExprSplice =>
         id += 1
         splices = splicedCode :: splices
-        ref(defn.MetaSpliceHole).appliedToType(tree.tpe.widen).appliedTo(Literal(Constant(id)))
+        ref(defn.MetaSpliceHole).appliedToType(tree.tpe.widen)
       case _ => super.transform(tree)
     }
   }
