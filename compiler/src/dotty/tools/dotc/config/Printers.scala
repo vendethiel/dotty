@@ -27,7 +27,7 @@ object Printers {
   val inlining: Printer = noPrinter
   val overload: Printer = noPrinter
   val patmatch: Printer = noPrinter
-  val pickling: Printer = noPrinter
+  val pickling: Printer = new Printer
   val simplify: Printer = noPrinter
   val subtyping: Printer = noPrinter
   val transforms: Printer = noPrinter

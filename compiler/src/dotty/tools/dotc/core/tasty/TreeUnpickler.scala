@@ -202,7 +202,8 @@ class TreeUnpickler(reader: TastyReader,
     def readType()(implicit ctx: Context): Type = {
       val start = currentAddr
       val tag = readByte()
-      pickling.println(s"reading type ${astTagToString(tag)} at $start")
+      pickling.println((" " * indent) + s"reading type ${astTagToString(tag)} at $start")
+      indent += 2
 
       def registeringType[T](tp: Type, op: => T): T = {
         typeAtAddr(start) = tp
@@ -358,7 +359,9 @@ class TreeUnpickler(reader: TastyReader,
           ExprType(readType())
       }
 
-      if (tag < firstLengthTreeTag) readSimpleType() else readLengthType()
+      val t = if (tag < firstLengthTreeTag) readSimpleType() else readLengthType()
+      indent -= 2
+      t
     }
 
     private def readSymNameRef()(implicit ctx: Context): Type = {
@@ -456,7 +459,7 @@ class TreeUnpickler(reader: TastyReader,
       val rhsIsEmpty = noRhs(end)
       if (!rhsIsEmpty) skipTree()
       val (givenFlags, annots, privateWithin) = readModifiers(end)
-      pickling.println(i"creating symbol $name at $start with flags $givenFlags")
+      pickling.println((" " * indent) + i"creating symbol $name at $start with flags $givenFlags")
       val flags = normalizeFlags(tag, givenFlags, name, isAbsType, rhsIsEmpty)
       def adjustIfModule(completer: LazyType) =
         if (flags is Module) ctx.adjustModuleCompleter(completer, name) else completer
@@ -669,7 +672,8 @@ class TreeUnpickler(reader: TastyReader,
       def ta =  ctx.typeAssigner
 
       val name = readName()
-      pickling.println(s"reading def of $name at $start")
+      pickling.println((" " * indent) + s"reading def of $name at $start")
+      indent += 2
       val tree: MemberDef = tag match {
         case DEFDEF =>
           val tparams = readParams[TypeDef](TYPEPARAM)(localCtx)
@@ -743,6 +747,7 @@ class TreeUnpickler(reader: TastyReader,
         // Child annotations for local classes and enum values are not pickled, so
         // need to be re-established here.
         sym.registerIfChild(late = true)
+      indent -= 2
       tree
     }
 
@@ -868,7 +873,8 @@ class TreeUnpickler(reader: TastyReader,
     def readTerm()(implicit ctx: Context): Tree = {  // TODO: rename to readTree
       val start = currentAddr
       val tag = readByte()
-      pickling.println(s"reading term ${astTagToString(tag)} at $start")
+      pickling.println((" " * indent) + s"reading term ${astTagToString(tag)} at $start")
+      indent += 2
 
       def readPathTerm(): Tree = {
         goto(start)
@@ -1003,6 +1009,7 @@ class TreeUnpickler(reader: TastyReader,
               UnApply(fn, implicitArgs, argPats, patType)
             case REFINEDtpt =>
               val refineCls = ctx.newRefinedClassSymbol(coordAt(start))
+              println((" " * indent) + "refineCls: " + refineCls + " " + refineCls.id)
               typeAtAddr(start) = refineCls.typeRef
               val parent = readTpt()
               val refinements = readStats(refineCls, end)(localContext(refineCls))
@@ -1047,6 +1054,8 @@ class TreeUnpickler(reader: TastyReader,
       val tree = if (tag < firstLengthTreeTag) readSimpleTerm() else readLengthTerm()
       if (!tree.isInstanceOf[TypTree]) // FIXME: Necessary to avoid self-type cyclic reference in tasty_tools
         tree.overwriteType(tree.tpe.simplified)
+
+      indent -= 2
       setPos(start, tree)
     }
 
@@ -1168,6 +1177,7 @@ class TreeUnpickler(reader: TastyReader,
 }
 
 object TreeUnpickler {
+  private var indent = 0
 
   /** An enumeration indicating which subtrees should be added to an OwnerTree. */
   type MemberDefMode = Int
