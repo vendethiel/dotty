@@ -33,6 +33,20 @@ class QuoteDriver extends Driver {
     method.invoke(instance).asInstanceOf[T]
   }
 
+  def compiled[T](expr: Expr[T], showable: Boolean): Expr[T] = {
+    val ctx: Context = initCtx.fresh
+    // TODO enable optimisation?
+    // ctx.settings.optimise.update(true)(ctx)
+
+    val outDir = new VirtualDirectory("(memory)", None)
+
+    new ExprCompiler(outDir).newRun(ctx).compileExpr(expr)
+
+    val showed = if (showable) show(expr) else null
+    new CompiledQuoted[T](outDir.toList.head.toByteArray, showed)
+  }
+
+
   def show(expr: Expr[_]): String = {
     val ctx: Context = initCtx.fresh
     ctx.settings.color.update("never")(ctx) // TODO support colored show
