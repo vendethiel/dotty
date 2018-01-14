@@ -116,29 +116,43 @@ trait TypeAssigner {
           val lo = ctx.typeComparer.instanceType(tp.origin, fromBelow = variance >= 0)
           val lo1 = apply(lo)
           if (lo1 ne lo) lo1 else tp
+        case tp: LazyRef =>
+          mapOver(tp.ref)
         case _ =>
           mapOver(tp)
       }
+
+      private[this] var widenings: Set[Type] = Set()
 
       /** Three deviations from standard derivedSelect:
        *   1. We first try a widening conversion to the type's info with
        *      the original prefix. Since the original prefix is known to
        *      be a subtype of the returned prefix, this can improve results.
+       *      However, we never try this more than once for a type in order to
+       *      avoid looping, see pos/i2941.scala.
        *   2. Then, if the approximation result is a singleton reference C#x.type, we
        *      replace by the widened type, which is usually more natural.
        *   3. Finally, we need to handle the case where the prefix type does not have a member
        *      named `tp.name` anymmore. In that case, we need to fall back to Bot..Top.
        */
       override def derivedSelect(tp: NamedType, pre: Type) =
-        if (pre eq tp.prefix)
-          tp
-        else tryWiden(tp, tp.prefix).orElse {
-          if (tp.isTerm && variance > 0 && !pre.isSingleton)
-          	apply(tp.info.widenExpr)
-          else if (upper(pre).member(tp.name).exists)
-            super.derivedSelect(tp, pre)
-          else
-            range(tp.bottomType, tp.topType)
+        if (pre eq tp.prefix) tp
+        else {
+          def derived =
+            if (tp.isTerm && variance > 0 && !pre.isSingleton)
+          	  apply(tp.info.widenExpr)
+            else if (upper(pre).member(tp.name).exists)
+              super.derivedSelect(tp, pre)
+            else
+              range(tp.bottomType, tp.topType)
+          if (widenings.contains(tp))
+            derived
+          else {
+            widenings += tp
+            val widened = tryWiden(tp, tp.prefix)
+            widenings -= tp
+            if (widened.exists) widened else derived
+          }
         }
     }
 
