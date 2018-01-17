@@ -320,6 +320,10 @@ class ReifyQuotes extends MacroTransform {
             quotation(quotedTree, tree)
           case Select(body, _) if tree.symbol.isSplice =>
             splice(body, tree)
+          case tree: TypeTree if tree.tpe.typeSymbol.isSplice =>
+            // FIXME handle nested spliced type like TypeTree(List[t.unary_~])
+            val splicedType = tree.tpe.asInstanceOf[TypeRef].prefix.termSymbol
+            splice(ref(splicedType), tree)
           case Block(stats, _) =>
             val last = enteredSyms
             stats.foreach(markDef)
