@@ -23,11 +23,12 @@ case class Layout(path: String, content: SourceFile) extends Template
 case class Include(path: String, content: SourceFile) extends Template
 
 case class LiquidTemplate(path: String, content: SourceFile) extends Template with ResourceFinder {
+  import LiquidTemplate._
+
   import scala.collection.JavaConverters._
   import dotc.printing.Highlighting._
   import liqp.Template
   import liqp.filters.Filter
-  import liqp.parser.Flavor.JEKYLL
   import java.util.{ HashMap, Map => JMap }
   import filters._
   import tags._
@@ -85,7 +86,7 @@ case class LiquidTemplate(path: String, content: SourceFile) extends Template wi
 
   def render(params: Map[String, AnyRef], includes: Map[String, Include])(implicit ctx: Context): Option[String] =
     protectedRender {
-      Template.parse(show, JEKYLL)
+      Template.parse(show, parseSettings)
         .`with`(ResourceInclude(params, includes))
         .`with`(RenderReference(params))
         .`with`(RenderLink(params))
@@ -96,7 +97,10 @@ case class LiquidTemplate(path: String, content: SourceFile) extends Template wi
 }
 
 object LiquidTemplate {
-  import liqp.parser.LiquidParser
+  import liqp.ParseSettings
+  import liqp.parser.{ Flavor, LiquidParser }
+
+  private val parseSettings = new ParseSettings.Builder().withFlavor(Flavor.JEKYLL).build()
 
   private val _tokens: Map[String, String] = Map(
     "TagStart" -> "{%",
