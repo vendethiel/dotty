@@ -131,9 +131,9 @@ object JavaParsers {
     }
 
     def makeSyntheticParam(count: Int, tpt: Tree): ValDef =
-      makeParam(nme.syntheticParamName(count), tpt)
-    def makeParam(name: TermName, tpt: Tree): ValDef =
-      ValDef(name, tpt, EmptyTree).withMods(Modifiers(Flags.JavaDefined | Flags.ParamAccessor))
+      makeParam(nme.syntheticParamName(count), tpt, EmptyTree)
+    def makeParam(name: TermName, tpt: Tree, default: Tree): ValDef =
+      ValDef(name, tpt, default).withMods(Modifiers(Flags.JavaDefined | Flags.ParamAccessor))
 
     def makeConstructor(formals: List[Tree], tparams: List[TypeDef], flags: FlagSet = Flags.JavaDefined) = {
       val vparams = formals.zipWithIndex.map { case (p, i) => makeSyntheticParam(i + 1, p) }
@@ -772,7 +772,7 @@ object JavaParsers {
       val name = identForType()
       val (statics, body) = typeBody(AT, name, List())
       val constructorParams = body.collect {
-        case dd: DefDef => makeParam(dd.name, dd.tpt)
+        case dd: DefDef => makeParam(dd.name, dd.tpt, dd.rhs)
       }
       val constr = DefDef(nme.CONSTRUCTOR,
         List(), List(constructorParams), TypeTree(), EmptyTree).withMods(Modifiers(Flags.JavaDefined))
@@ -818,7 +818,7 @@ object JavaParsers {
           unimplementedExpr).withMods(Modifiers(Flags.JavaDefined | Flags.JavaStatic | Flags.Method)),
         DefDef(
           nme.valueOf, List(),
-          List(List(makeParam("x".toTermName, TypeTree(StringType)))),
+          List(List(makeParam("x".toTermName, TypeTree(StringType), EmptyTree))),
           enumType,
           unimplementedExpr).withMods(Modifiers(Flags.JavaDefined | Flags.JavaStatic | Flags.Method)))
       accept(RBRACE)
