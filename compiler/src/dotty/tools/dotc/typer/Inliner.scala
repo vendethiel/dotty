@@ -159,9 +159,18 @@ object Inliner {
                 ctx.error("Cannot use private constructors in inline methods", tree.pos)
                 tree // TODO: create a proper accessor for the private constructor
               } else {
+                /** If expected type `tree.tpe.widen` is an implicit function type, turn
+                  *  `tree` into an implicit closure. See i2723.scala.
+                  */
+                def handleImplicitFunction(tree: Tree) = {
+                  val ifpt = defn.asImplicitFunctionType(tree.tpe.widen)
+                  if (ifpt.exists) ctx.typer.makeImplicitFunction(untpd.TypedSplice(tree), ifpt)
+                  else tree
+                }
                 addAccessor(tree, methPart, targs, argss,
                     accessedType = methPart.tpe.widen,
-                    rhs = (qual, tps, argss) => qual.appliedToTypes(tps).appliedToArgss(argss))
+                    rhs = (qual, tps, argss) =>
+                      handleImplicitFunction(qual.appliedToTypes(tps).appliedToArgss(argss)))
               }
             } else {
               // TODO: Handle references to non-public types.
