@@ -324,7 +324,7 @@ object desugar {
         decompose(
           defDef(
             addEvidenceParams(
-              cpy.DefDef(ddef)(tparams = constrTparams),
+              cpy.DefDef(ddef)(tparams = constrTparams.map(_.clone.asInstanceOf[TypeDef])),
               evidenceParams(constr1).map(toDefParam))))
       case stat =>
         stat
@@ -341,14 +341,14 @@ object desugar {
       (if (args.isEmpty) tycon else AppliedTypeTree(tycon, args))
         .withPos(cdef.pos.startPos)
 
-    def appliedRef(tycon: Tree, tparams: List[TypeDef] = constrTparams) =
+    def appliedRef(tycon: Tree, tparams: List[TypeDef] = constrTparams.map(_.clone.asInstanceOf[TypeDef])) =
       appliedTypeTree(tycon, tparams map refOfDef)
 
     // a reference to the class type bound by `cdef`, with type parameters coming from the constructor
-    val classTypeRef = appliedRef(classTycon)
+    def classTypeRef = appliedRef(classTycon)
 
     // a reference to `enumClass`, with type parameters coming from the case constructor
-    lazy val enumClassTypeRef = enumClass.primaryConstructor.info match {
+    def enumClassTypeRef = enumClass.primaryConstructor.info match {
       case info: PolyType =>
         if (constrTparams.isEmpty)
           interpolatedEnumParent(cdef.pos.startPos)
@@ -364,7 +364,7 @@ object desugar {
     }
 
     // new C[Ts](paramss)
-    lazy val creatorExpr = New(classTypeRef, constrVparamss nestedMap refOfDef)
+    def creatorExpr = New(classTypeRef, constrVparamss nestedMap refOfDef)
 
     // Methods to add to a case class C[..](p1: T1, ..., pN: Tn)(moreParams)
     //     def _1 = this.p1
@@ -488,7 +488,7 @@ object desugar {
           else
             // todo: also use anyRef if constructor has a dependent method type (or rule that out)!
             (constrVparamss :\ (if (isEnumCase) applyResultTpt else classTypeRef)) (
-              (vparams, restpe) => Function(vparams map (_.tpt), restpe))
+              (vparams, restpe) => Function(vparams map (_.tpt.clone), restpe))
         def widenedCreatorExpr =
           (creatorExpr /: widenDefs)((rhs, meth) => Apply(Ident(meth.name), rhs :: Nil))
         val applyMeths =
@@ -535,7 +535,7 @@ object desugar {
       else
         // implicit wrapper is typechecked in same scope as constructor, so
         // we can reuse the constructor parameters; no derived params are needed.
-        DefDef(className.toTermName, constrTparams, constrVparamss, classTypeRef, creatorExpr)
+        DefDef(className.toTermName, constrTparams.map(_.clone.asInstanceOf[TypeDef]), constrVparamss.nestedMap(_.clone.asInstanceOf[ValDef]), classTypeRef, creatorExpr)
           .withMods(companionMods | Synthetic | Implicit)
           .withPos(cdef.pos) :: Nil
 

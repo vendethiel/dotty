@@ -226,6 +226,7 @@ object Trees {
     override def clone: Tree[T] = {
       val tree = super.clone.asInstanceOf[Tree[T]]
       tree.myUniqueId = nxId
+      tree.removeAttachment(untpd.References)
       tree
     }
   }
