@@ -303,7 +303,8 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     /** Splice new method reference into existing application */
     def spliceMeth(meth: Tree, app: Tree): Tree = app match {
       case Apply(fn, args) =>
-        spliceMeth(meth, fn).appliedToArgs(args)
+        // FIXME: clone isn't enough, should be deep copy
+        spliceMeth(meth, fn).appliedToArgs(args.map(_.clone))
       case TypeApply(fn, targs) =>
         // Note: It is important that the type arguments `targs` are passed in new trees
         // instead of being spliced in literally. Otherwise, a type argument to a default

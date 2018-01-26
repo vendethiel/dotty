@@ -233,6 +233,12 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
       this
     }
 
+    override def clone: DerivedTypeTree = {
+      val tree = super.clone.asInstanceOf[DerivedTypeTree]
+      tree.watching(myWatched.asInstanceOf[DefTree])
+      tree
+    }
+
     /** A hook to ensure that all necessary symbols are completed so that
      *  OriginalSymbol attachments are propagated to this tree
      */

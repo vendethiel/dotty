@@ -193,7 +193,7 @@ object desugar {
     }
 
     def normalizedVparamss = meth1.vparamss map (_ map (vparam =>
-      cpy.ValDef(vparam)(rhs = EmptyTree)))
+      cpy.ValDef(vparam)(rhs = EmptyTree, tpt = vparam.tpt.clone)))
 
     def dropContextBound(tparam: TypeDef) = tparam.rhs match {
       case ContextBounds(tbounds, _) => cpy.TypeDef(tparam)(rhs = tbounds)
