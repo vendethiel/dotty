@@ -117,7 +117,8 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
           transformSelect(cpy.Select(tree)(qual select pkg.packageObj.symbol, tree.name), targs)
         case _ =>
           val tree1 = super.transform(tree)
-          constToLiteral(tree1) match {
+          // FIXME: non-mutating versionf of constToLiteral ?
+          constToLiteral(tree1.clone) match {
             case _: Literal => tree1
             case _ => superAcc.transformSelect(tree1, targs)
           }
