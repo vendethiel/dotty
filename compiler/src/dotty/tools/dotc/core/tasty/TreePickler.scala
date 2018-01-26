@@ -330,6 +330,7 @@ class TreePickler(pickler: TastyPickler) {
   def pickleTree(tree: Tree)(implicit ctx: Context): Unit = {
     val addr = registerTreeAddr(tree)
     if (addr != currentAddr) {
+      assert(false, s"Shared tree at addr $addr and $currentAddr: $tree#${tree.uniqueId} in ${ctx.compilationUnit}")
       writeByte(SHAREDterm)
       writeRef(addr)
     }
