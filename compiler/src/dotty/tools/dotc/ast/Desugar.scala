@@ -96,7 +96,7 @@ object desugar {
   }
 
   /** A type definition copied from `tdef` with a rhs typetree derived from it */
-  def derivedTypeParam(tdef: TypeDef, suffix: String = ""): TypeDef =
+  def derivedTypeParam(tdef: TypeDef, suffix: String = "")(implicit ctx: Context): TypeDef =
     cpy.TypeDef(tdef)(
       name = tdef.name ++ suffix,
       rhs = new DerivedFromParamTree(suffix).withPos(tdef.rhs.pos).watching(tdef)
@@ -107,7 +107,7 @@ object desugar {
     TypeDef(sym.name, new DerivedFromParamTree("").watching(sym)).withFlags(TypeParam)
 
   /** A value definition copied from `vdef` with a tpt typetree derived from it */
-  def derivedTermParam(vdef: ValDef) =
+  def derivedTermParam(vdef: ValDef)(implicit ctx: Context) =
     cpy.ValDef(vdef)(
       tpt = new DerivedFromParamTree("") withPos vdef.tpt.pos watching vdef)
 

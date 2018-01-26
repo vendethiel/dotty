@@ -463,9 +463,9 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   val cpyBetweenPhases = new TimeTravellingTreeCopier
 
   class TypedTreeCopier extends TreeCopier {
-    def postProcess(tree: Tree, copied: untpd.Tree): copied.ThisTree[Type] =
+    def postProcess(tree: Tree, copied: untpd.Tree)(implicit ctx: Context): copied.ThisTree[Type] =
       copied.withTypeUnchecked(tree.tpe)
-    def postProcess(tree: Tree, copied: untpd.MemberDef): copied.ThisTree[Type] =
+    def postProcess(tree: Tree, copied: untpd.MemberDef)(implicit ctx: Context): copied.ThisTree[Type] =
       copied.withTypeUnchecked(tree.tpe)
 
     override def Select(tree: Tree)(qualifier: Tree, name: Name)(implicit ctx: Context): Select = {
@@ -636,7 +636,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     def isValueOrPattern(implicit ctx: Context) =
       tree.isValue || tree.isPattern
 
-    def isValueType: Boolean =
+    def isValueType(implicit ctx: Context): Boolean =
       tree.isType && tree.tpe.isValueType
 
     def isInstantiation: Boolean = tree match {
@@ -872,7 +872,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   }
 
   implicit class ListOfTreeDecorator(val xs: List[tpd.Tree]) extends AnyVal {
-    def tpes: List[Type] = xs map (_.tpe)
+    def tpes(implicit ctx: Context): List[Type] = xs map (_.tpe)
   }
 
   // convert a numeric with a toXXX method
@@ -969,7 +969,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   }
 
   @tailrec
-  def sameTypes(trees: List[tpd.Tree], trees1: List[tpd.Tree]): Boolean = {
+  def sameTypes(trees: List[tpd.Tree], trees1: List[tpd.Tree])(implicit ctx: Context): Boolean = {
     if (trees.isEmpty) trees.isEmpty
     else if (trees1.isEmpty) trees.isEmpty
     else (trees.head.tpe eq trees1.head.tpe) && sameTypes(trees.tail, trees1.tail)

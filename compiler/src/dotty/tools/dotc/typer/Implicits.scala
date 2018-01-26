@@ -284,8 +284,8 @@ object Implicits {
 
   /** A failed search */
   case class SearchFailure(tree: Tree) extends SearchResult {
-    final def isAmbiguous = tree.tpe.isInstanceOf[AmbiguousImplicits]
-    final def reason = tree.tpe.asInstanceOf[SearchFailureType]
+    final def isAmbiguous(implicit ctx: Context) = tree.tpe.isInstanceOf[AmbiguousImplicits]
+    final def reason(implicit ctx: Context) = tree.tpe.asInstanceOf[SearchFailureType]
   }
 
   object SearchFailure {
@@ -293,7 +293,7 @@ object Implicits {
       val id =
         if (tpe.isInstanceOf[AmbiguousImplicits]) "/* ambiguous */"
         else "/* missing */"
-      SearchFailure(untpd.SearchFailureIdent(id.toTermName).withTypeUnchecked(tpe))
+      SearchFailure(untpd.SearchFailureIdent(id.toTermName).withTypeUnchecked(tpe)(null))
     }
   }
 

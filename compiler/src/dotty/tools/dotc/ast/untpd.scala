@@ -415,94 +415,94 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
   class UntypedTreeCopier extends TreeCopier {
 
-    def postProcess(tree: Tree, copied: Tree): copied.ThisTree[Untyped] =
+    def postProcess(tree: Tree, copied: Tree)(implicit ctx: Context): copied.ThisTree[Untyped] =
       copied.asInstanceOf[copied.ThisTree[Untyped]]
 
-    def postProcess(tree: Tree, copied: MemberDef): copied.ThisTree[Untyped] = {
+    def postProcess(tree: Tree, copied: MemberDef)(implicit ctx: Context): copied.ThisTree[Untyped] = {
       tree match {
         case tree: MemberDef => copied.withMods(tree.rawMods)
         case _ => copied
       }
     }.asInstanceOf[copied.ThisTree[Untyped]]
 
-    def ModuleDef(tree: Tree)(name: TermName, impl: Template) = tree match {
+    def ModuleDef(tree: Tree)(name: TermName, impl: Template)(implicit ctx: Context) = tree match {
       case tree: ModuleDef if (name eq tree.name) && (impl eq tree.impl) => tree
       case _ => finalize(tree, untpd.ModuleDef(name, impl))
     }
-    def ParsedTry(tree: Tree)(expr: Tree, handler: Tree, finalizer: Tree) = tree match {
+    def ParsedTry(tree: Tree)(expr: Tree, handler: Tree, finalizer: Tree)(implicit ctx: Context) = tree match {
       case tree: ParsedTry
         if (expr eq tree.expr) && (handler eq tree.handler) && (finalizer eq tree.finalizer) => tree
       case _ => finalize(tree, untpd.ParsedTry(expr, handler, finalizer))
     }
-    def SymbolLit(tree: Tree)(str: String) = tree match {
+    def SymbolLit(tree: Tree)(str: String)(implicit ctx: Context) = tree match {
       case tree: SymbolLit if str == tree.str => tree
       case _ => finalize(tree, untpd.SymbolLit(str))
     }
-    def InterpolatedString(tree: Tree)(id: TermName, segments: List[Tree]) = tree match {
+    def InterpolatedString(tree: Tree)(id: TermName, segments: List[Tree])(implicit ctx: Context) = tree match {
       case tree: InterpolatedString if (id eq tree.id) && (segments eq tree.segments) => tree
       case _ => finalize(tree, untpd.InterpolatedString(id, segments))
     }
-    def Function(tree: Tree)(args: List[Tree], body: Tree) = tree match {
+    def Function(tree: Tree)(args: List[Tree], body: Tree)(implicit ctx: Context) = tree match {
       case tree: Function if (args eq tree.args) && (body eq tree.body) => tree
       case _ => finalize(tree, untpd.Function(args, body))
     }
-    def InfixOp(tree: Tree)(left: Tree, op: Ident, right: Tree) = tree match {
+    def InfixOp(tree: Tree)(left: Tree, op: Ident, right: Tree)(implicit ctx: Context) = tree match {
       case tree: InfixOp if (left eq tree.left) && (op eq tree.op) && (right eq tree.right) => tree
       case _ => finalize(tree, untpd.InfixOp(left, op, right))
     }
-    def PostfixOp(tree: Tree)(od: Tree, op: Ident) = tree match {
+    def PostfixOp(tree: Tree)(od: Tree, op: Ident)(implicit ctx: Context) = tree match {
       case tree: PostfixOp if (od eq tree.od) && (op eq tree.op) => tree
       case _ => finalize(tree, untpd.PostfixOp(od, op))
     }
-    def PrefixOp(tree: Tree)(op: Ident, od: Tree) = tree match {
+    def PrefixOp(tree: Tree)(op: Ident, od: Tree)(implicit ctx: Context) = tree match {
       case tree: PrefixOp if (op eq tree.op) && (od eq tree.od) => tree
       case _ => finalize(tree, untpd.PrefixOp(op, od))
     }
-    def Parens(tree: Tree)(t: Tree) = tree match {
+    def Parens(tree: Tree)(t: Tree)(implicit ctx: Context) = tree match {
       case tree: Parens if t eq tree.t => tree
       case _ => finalize(tree, untpd.Parens(t))
     }
-    def Tuple(tree: Tree)(trees: List[Tree]) = tree match {
+    def Tuple(tree: Tree)(trees: List[Tree])(implicit ctx: Context) = tree match {
       case tree: Tuple if trees eq tree.trees => tree
       case _ => finalize(tree, untpd.Tuple(trees))
     }
-    def Throw(tree: Tree)(expr: Tree) = tree match {
+    def Throw(tree: Tree)(expr: Tree)(implicit ctx: Context) = tree match {
       case tree: Throw if expr eq tree.expr => tree
       case _ => finalize(tree, untpd.Throw(expr))
     }
-    def Quote(tree: Tree)(expr: Tree) = tree match {
+    def Quote(tree: Tree)(expr: Tree)(implicit ctx: Context) = tree match {
       case tree: Quote if expr eq tree.expr => tree
       case _ => finalize(tree, untpd.Quote(expr))
     }
-    def WhileDo(tree: Tree)(cond: Tree, body: Tree) = tree match {
+    def WhileDo(tree: Tree)(cond: Tree, body: Tree)(implicit ctx: Context) = tree match {
       case tree: WhileDo if (cond eq tree.cond) && (body eq tree.body) => tree
       case _ => finalize(tree, untpd.WhileDo(cond, body))
     }
-    def DoWhile(tree: Tree)(body: Tree, cond: Tree) = tree match {
+    def DoWhile(tree: Tree)(body: Tree, cond: Tree)(implicit ctx: Context) = tree match {
       case tree: DoWhile if (body eq tree.body) && (cond eq tree.cond) => tree
       case _ => finalize(tree, untpd.DoWhile(body, cond))
     }
-    def ForYield(tree: Tree)(enums: List[Tree], expr: Tree) = tree match {
+    def ForYield(tree: Tree)(enums: List[Tree], expr: Tree)(implicit ctx: Context) = tree match {
       case tree: ForYield if (enums eq tree.enums) && (expr eq tree.expr) => tree
       case _ => finalize(tree, untpd.ForYield(enums, expr))
     }
-    def ForDo(tree: Tree)(enums: List[Tree], body: Tree) = tree match {
+    def ForDo(tree: Tree)(enums: List[Tree], body: Tree)(implicit ctx: Context) = tree match {
       case tree: ForDo if (enums eq tree.enums) && (body eq tree.body) => tree
       case _ => finalize(tree, untpd.ForDo(enums, body))
     }
-    def GenFrom(tree: Tree)(pat: Tree, expr: Tree) = tree match {
+    def GenFrom(tree: Tree)(pat: Tree, expr: Tree)(implicit ctx: Context) = tree match {
       case tree: GenFrom if (pat eq tree.pat) && (expr eq tree.expr) => tree
       case _ => finalize(tree, untpd.GenFrom(pat, expr))
     }
-    def GenAlias(tree: Tree)(pat: Tree, expr: Tree) = tree match {
+    def GenAlias(tree: Tree)(pat: Tree, expr: Tree)(implicit ctx: Context) = tree match {
       case tree: GenAlias if (pat eq tree.pat) && (expr eq tree.expr) => tree
       case _ => finalize(tree, untpd.GenAlias(pat, expr))
     }
-    def ContextBounds(tree: Tree)(bounds: TypeBoundsTree, cxBounds: List[Tree]) = tree match {
+    def ContextBounds(tree: Tree)(bounds: TypeBoundsTree, cxBounds: List[Tree])(implicit ctx: Context) = tree match {
       case tree: ContextBounds if (bounds eq tree.bounds) && (cxBounds eq tree.cxBounds) => tree
       case _ => finalize(tree, untpd.ContextBounds(bounds, cxBounds))
     }
-    def PatDef(tree: Tree)(mods: Modifiers, pats: List[Tree], tpt: Tree, rhs: Tree) = tree match {
+    def PatDef(tree: Tree)(mods: Modifiers, pats: List[Tree], tpt: Tree, rhs: Tree)(implicit ctx: Context) = tree match {
       case tree: PatDef if (mods eq tree.mods) && (pats eq tree.pats) && (tpt eq tree.tpt) && (rhs eq tree.rhs) => tree
       case _ => finalize(tree, untpd.PatDef(mods, pats, tpt, rhs))
     }
