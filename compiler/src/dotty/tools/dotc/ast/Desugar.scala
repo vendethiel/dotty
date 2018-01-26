@@ -331,8 +331,8 @@ object desugar {
     }
     def anyRef = ref(defn.AnyRefAlias.typeRef)
 
-    val derivedTparams = constrTparams.map(derivedTypeParam(_))
-    val derivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
+    def mkDerivedTparams = constrTparams.map(derivedTypeParam(_))
+    def mkDerivedVparamss = constrVparamss.nestedMap(derivedTermParam(_))
     val arity = constrVparamss.head.length
 
     val classTycon: Tree = new TypeRefTree // watching is set at end of method
@@ -400,11 +400,11 @@ object desugar {
         else {
           def copyDefault(vparam: ValDef) =
             makeAnnotated("scala.annotation.unchecked.uncheckedVariance", refOfDef(vparam))
-          val copyFirstParams = derivedVparamss.head.map(vparam =>
+          val copyFirstParams = mkDerivedVparamss.head.map(vparam =>
             cpy.ValDef(vparam)(rhs = copyDefault(vparam)))
-          val copyRestParamss = derivedVparamss.tail.nestedMap(vparam =>
+          val copyRestParamss = mkDerivedVparamss.tail.nestedMap(vparam =>
             cpy.ValDef(vparam)(rhs = EmptyTree))
-          DefDef(nme.copy, derivedTparams, copyFirstParams :: copyRestParamss, TypeTree(), creatorExpr)
+          DefDef(nme.copy, mkDerivedTparams, copyFirstParams :: copyRestParamss, TypeTree(), creatorExpr)
             .withMods(synthetic) :: Nil
         }
       }
@@ -494,12 +494,12 @@ object desugar {
         val applyMeths =
           if (mods is Abstract) Nil
           else
-            DefDef(nme.apply, derivedTparams, derivedVparamss, applyResultTpt, widenedCreatorExpr)
+            DefDef(nme.apply, mkDerivedTparams, mkDerivedVparamss, applyResultTpt, widenedCreatorExpr)
               .withFlags(Synthetic | (constr1.mods.flags & DefaultParameterized)) :: widenDefs
         val unapplyMeth = {
           val unapplyParam = makeSyntheticParameter(tpt = classTypeRef)
           val unapplyRHS = if (arity == 0) Literal(Constant(true)) else Ident(unapplyParam.name)
-          DefDef(nme.unapply, derivedTparams, (unapplyParam :: Nil) :: Nil, TypeTree(), unapplyRHS)
+          DefDef(nme.unapply, mkDerivedTparams, (unapplyParam :: Nil) :: Nil, TypeTree(), unapplyRHS)
             .withMods(synthetic)
         }
         companionDefs(parent, applyMeths ::: unapplyMeth :: companionMeths)
@@ -548,9 +548,9 @@ object desugar {
     val cdef1 = addEnumFlags {
       val originalTparamsIt = originalTparams.toIterator
       val originalVparamsIt = originalVparamss.toIterator.flatten
-      val tparamAccessors = derivedTparams.map(_.withMods(originalTparamsIt.next().mods))
+      val tparamAccessors = mkDerivedTparams.map(_.withMods(originalTparamsIt.next().mods))
       val caseAccessor = if (isCaseClass) CaseAccessor else EmptyFlags
-      val vparamAccessors = derivedVparamss match {
+      val vparamAccessors = mkDerivedVparamss match {
         case first :: rest =>
           first.map(_.withMods(originalVparamsIt.next().mods | caseAccessor)) ++
           rest.flatten.map(_.withMods(originalVparamsIt.next().mods))
