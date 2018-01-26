@@ -143,7 +143,7 @@ object Trees {
     def withTypeUnchecked(tpe: Type)(implicit ctx: Context): ThisTree[Type] = {
       val tree =
         if (myTpe == null ||
-          (myTpe.asInstanceOf[AnyRef] eq tpe.asInstanceOf[AnyRef]))
+          (myTpe.asInstanceOf[Type] eql tpe.asInstanceOf[Type]))
           this.asInstanceOf[Tree[Type]]
         else {
           val c = clone.asInstanceOf[Tree[Type]]
