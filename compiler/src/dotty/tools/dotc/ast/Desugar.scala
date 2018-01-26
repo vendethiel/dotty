@@ -1095,12 +1095,12 @@ object desugar {
         else Apply(ref(tupleTypeRef.classSymbol.companionModule.termRef), ts)
       case WhileDo(cond, body) =>
         // { <label> def while$(): Unit = if (cond) { body; while$() } ; while$() }
-        val call = Apply(Ident(nme.WHILE_PREFIX), Nil).withPos(tree.pos)
+        def call = Apply(Ident(nme.WHILE_PREFIX), Nil).withPos(tree.pos)
         val rhs = If(cond, Block(body, call), unitLiteral)
         labelDefAndCall(nme.WHILE_PREFIX, rhs, call)
       case DoWhile(body, cond) =>
         // { label def doWhile$(): Unit = { body; if (cond) doWhile$() } ; doWhile$() }
-        val call = Apply(Ident(nme.DO_WHILE_PREFIX), Nil).withPos(tree.pos)
+        def call = Apply(Ident(nme.DO_WHILE_PREFIX), Nil).withPos(tree.pos)
         val rhs = Block(body, If(cond, call, unitLiteral))
         labelDefAndCall(nme.DO_WHILE_PREFIX, rhs, call)
       case ForDo(enums, body) =>
