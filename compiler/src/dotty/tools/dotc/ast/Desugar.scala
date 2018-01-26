@@ -593,7 +593,7 @@ object desugar {
       expandEnumModule(moduleName, impl, mods, mdef.pos)
     else {
       val clsName = moduleName.moduleClassName
-      val clsRef = Ident(clsName)
+      def clsRef = Ident(clsName)
       val modul = ValDef(moduleName, clsRef, New(clsRef, Nil))
         .withMods(mods.toTermFlags & RetainedModuleValFlags | ModuleValCreationFlags)
         .withPos(mdef.pos.startPos)
