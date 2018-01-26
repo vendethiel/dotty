@@ -256,6 +256,17 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
   // ------ Creation methods for untyped only -----------------
 
+  var ApplyCount = 0
+  def Apply(fun: Tree, args: List[Tree]): Apply = {
+    ApplyCount += 1
+    new Apply(fun, args)
+  }
+  var TypeApplyCount = 0
+  def TypeApply(fun: Tree, args: List[Tree]): TypeApply = {
+    TypeApplyCount += 1
+    new TypeApply(fun, args)
+  }
+
   def Ident(name: Name): Ident = new Ident(name)
   def BackquotedIdent(name: Name): BackquotedIdent = new BackquotedIdent(name)
   def SearchFailureIdent(name: Name): SearchFailureIdent = new SearchFailureIdent(name)
@@ -263,8 +274,8 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
   def SelectWithSig(qualifier: Tree, name: Name, sig: Signature): Select = new SelectWithSig(qualifier, name, sig)
   def This(qual: Ident): This = new This(qual)
   def Super(qual: Tree, mix: Ident): Super = new Super(qual, mix)
-  def Apply(fun: Tree, args: List[Tree]): Apply = new Apply(fun, args)
-  def TypeApply(fun: Tree, args: List[Tree]): TypeApply = new TypeApply(fun, args)
+
+
   def Literal(const: Constant): Literal = new Literal(const)
   def New(tpt: Tree): New = new New(tpt)
   def Typed(expr: Tree, tpt: Tree): Typed = new Typed(expr, tpt)
