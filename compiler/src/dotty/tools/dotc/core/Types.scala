@@ -23,6 +23,7 @@ import reporting.diagnostic.Message
 import reporting.diagnostic.messages.CyclicReferenceInvolving
 import ast.tpd._
 import ast.TreeTypeMap
+import ast.Trees.inAnnot
 import printing.Texts._
 import ast.untpd
 import dotty.tools.dotc.transform.Erasure
@@ -3895,7 +3896,7 @@ object Types {
     }
 
     def mapOver(annot: Annotation): Annotation =
-      annot.derivedAnnotation(mapOver(annot.tree))
+      inAnnot { annot.derivedAnnotation(mapOver(annot.tree)) }
 
     def mapOver(tree: Tree): Tree = treeTypeMap(tree)
 

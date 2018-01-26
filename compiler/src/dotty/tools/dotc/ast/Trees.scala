@@ -38,6 +38,16 @@ object Trees {
   type LazyTree = AnyRef     /* really: Tree | Lazy[Tree] */
   type LazyTreeList = AnyRef /* really: List[Tree] | Lazy[List[Tree]] */
 
+  private[this] var myIsInAnnot = false
+  private[dotc] def isInAnnot = myIsInAnnot
+  private[dotc] def inAnnot[T](op: => T): T = {
+    val saved = isInAnnot
+    myIsInAnnot = true
+    val ret = op
+    myIsInAnnot = saved
+    ret
+  }
+
   /** Trees take a parameter indicating what the type of their `tpe` field
    *  is. Two choices: `Type` or `Untyped`.
    *  Untyped trees have type `Tree[Untyped]`.
@@ -147,7 +157,7 @@ object Trees {
           this.asInstanceOf[Tree[Type]]
         else {
           val c = clone.asInstanceOf[Tree[Type]]
-          if (ctx != null && ctx.isAfterTyper) {
+          if (!isInAnnot && ctx != null && ctx.isAfterTyper) {
             this.overwriteType(null)
           }
           c
@@ -1085,7 +1095,7 @@ object Trees {
       }
       def Annotated(tree: Tree)(arg: Tree, annot: Tree)(implicit ctx: Context): Annotated = tree match {
         case tree: Annotated if (arg eq tree.arg) && (annot eq tree.annot) => tree
-        case _ => finalize(tree, untpd.Annotated(arg, annot))
+        case _ => inAnnot { finalize(tree, untpd.Annotated(arg, annot)) }
       }
       def Thicket(tree: Tree)(trees: List[Tree])(implicit ctx: Context): Thicket = tree match {
         case tree: Thicket if trees eq tree.trees => tree
@@ -1218,7 +1228,7 @@ object Trees {
           case PackageDef(pid, stats) =>
             cpy.PackageDef(tree)(transformSub(pid), transformStats(stats))
           case Annotated(arg, annot) =>
-            cpy.Annotated(tree)(transform(arg), transform(annot))
+            inAnnot { cpy.Annotated(tree)(transform(arg), transform(annot)) }
           case Thicket(trees) =>
             val trees1 = transform(trees)
             if (trees1 eq trees) tree else Thicket(trees1)

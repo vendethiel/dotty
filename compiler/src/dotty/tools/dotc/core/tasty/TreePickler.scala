@@ -247,7 +247,7 @@ class TreePickler(pickler: TastyPickler) {
       withLength { pickleType(tpe.lo, richTypes); pickleType(tpe.hi, richTypes) }
     case tpe: AnnotatedType =>
       writeByte(ANNOTATEDtype)
-      withLength { pickleType(tpe.tpe, richTypes); pickleTree(tpe.annot.tree) }
+      withLength { pickleType(tpe.tpe, richTypes); inAnnot { pickleTree(tpe.annot.tree) } }
     case tpe: AndOrType =>
       writeByte(if (tpe.isAnd) ANDtype else ORtype)
       withLength { pickleType(tpe.tp1, richTypes); pickleType(tpe.tp2, richTypes) }
@@ -329,7 +329,7 @@ class TreePickler(pickler: TastyPickler) {
 
   def pickleTree(tree: Tree)(implicit ctx: Context): Unit = {
     val addr = registerTreeAddr(tree)
-    if (addr != currentAddr) {
+    if (addr != currentAddr && !isInAnnot) {
       assert(false, s"Shared tree at addr $addr and $currentAddr: $tree#${tree.uniqueId} in ${ctx.compilationUnit}")
       writeByte(SHAREDterm)
       writeRef(addr)
@@ -630,7 +630,7 @@ class TreePickler(pickler: TastyPickler) {
   def pickleAnnotation(owner: Symbol, ann: Annotation)(implicit ctx: Context) =
     if (!isUnpicklable(owner, ann)) {
       writeByte(ANNOTATION)
-      withLength { pickleType(ann.symbol.typeRef); pickleTree(ann.tree) }
+      withLength { pickleType(ann.symbol.typeRef); inAnnot { pickleTree(ann.tree) } }
     }
 
   def pickle(trees: List[Tree])(implicit ctx: Context) = {
