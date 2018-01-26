@@ -750,7 +750,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       val Apply(Select(lhs, name), rhss) = tree
       val lhs1 = typedExpr(lhs)
       val liftedDefs = new mutable.ListBuffer[Tree]
-      val lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, lhs1))
+      def lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, lhs1.clone))
       val assign = untpd.Assign(lhs2,
           untpd.Apply(untpd.Select(lhs2, name.asSimpleName.dropRight(1)), rhss))
       wrapDefs(liftedDefs, typed(assign))
