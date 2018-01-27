@@ -1071,7 +1071,7 @@ object Parsers {
 
         def wrapPlaceholders(t: Tree) = try
           if (placeholderParams.isEmpty) t
-          else new WildcardFunction(placeholderParams.reverse, t)
+          else new WildcardFunction(placeholderParams.reverse, deepCopy(t))
         finally placeholderParams = saved
 
         val t = expr1(location)
