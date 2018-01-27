@@ -660,7 +660,9 @@ object desugar {
    *  If the original pattern variable carries a type annotation, so does the corresponding
    *  ValDef or DefDef.
    */
-  def makePatDef(original: Tree, mods: Modifiers, pat: Tree, rhs: Tree)(implicit ctx: Context): Tree = pat match {
+  def makePatDef(original: Tree, mods: Modifiers, pat: Tree, rhs0: Tree)(implicit ctx: Context): Tree = {
+    val rhs = deepCopy(rhs0)
+    pat match {
     case IdPattern(named, tpt) =>
       derivedValDef(original, named, tpt, rhs, mods)
     case _ =>
@@ -695,7 +697,7 @@ object desugar {
               else derivedValDef(original, named, tpt, selector(n), mods)
           flatTree(firstDef :: restDefs)
       }
-  }
+  }}
 
   /** Expand variable identifier x to x @ _ */
   def patternVar(tree: Tree)(implicit ctx: Context) = {
