@@ -1001,7 +1001,8 @@ object desugar {
       /** rhs.name with a pattern filter on rhs unless `pat` is irrefutable when
        *  matched against `rhs`.
        */
-      def rhsSelect(gen: GenFrom, name: TermName) = {
+      def rhsSelect(gen0: GenFrom, name: TermName) = {
+        val gen = deepCopy(gen0)
         val rhs = if (isIrrefutableGenFrom(gen)) gen.expr else makePatFilter(gen.expr, gen.pat)
         Select(rhs, name)
       }
