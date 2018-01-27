@@ -444,8 +444,33 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
     }
     def Function(tree: Tree)(args: List[Tree], body: Tree)(implicit ctx: Context) = tree match {
       case tree: Function if !alwaysCopy && (args eq tree.args) && (body eq tree.body) => tree
-      case _ => finalize(tree, untpd.Function(args, body))
+      case _ =>
+        val tree1 = tree match {
+          case _: ImplicitFunction =>
+            new ImplicitFunction(args, body)
+          case _: WildcardFunction if args.head.isInstanceOf[ValDef] =>
+            new WildcardFunction(args.asInstanceOf[List[ValDef @unchecked]], body)
+          case _ =>
+            untpd.Function(args, body)
+        }
+        finalize(tree, tree1)
     }
+
+    override def Block(tree: Tree)(stats: List[Tree], expr: Tree)(implicit ctx: Context): Block = tree match {
+      // FIXME: duplication with overriden method
+      case tree: Block if !alwaysCopy && (stats eq tree.stats) && (expr eq tree.expr) => tree
+      case _ =>
+        val tree1 = tree match {
+          case _: InfixOpBlock if stats.length == 1 =>
+            new InfixOpBlock(stats.head, expr)
+          case _: XMLBlock =>
+            new XMLBlock(stats, expr)
+          case _ =>
+            untpd.Block(stats, expr)
+        }
+        finalize(tree, tree1)
+    }
+
     def InfixOp(tree: Tree)(left: Tree, op: Ident, right: Tree)(implicit ctx: Context) = tree match {
       case tree: InfixOp if !alwaysCopy && (left eq tree.left) && (op eq tree.op) && (right eq tree.right) => tree
       case _ => finalize(tree, untpd.InfixOp(left, op, right))
