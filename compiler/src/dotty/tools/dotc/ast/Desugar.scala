@@ -660,11 +660,10 @@ object desugar {
    *  If the original pattern variable carries a type annotation, so does the corresponding
    *  ValDef or DefDef.
    */
-  def makePatDef(original: Tree, mods: Modifiers, pat: Tree, rhs0: Tree)(implicit ctx: Context): Tree = {
-    val rhs = deepCopy(rhs0)
+  def makePatDef(original: Tree, mods: Modifiers, pat: Tree, rhs: Tree)(implicit ctx: Context): Tree = {
     pat match {
     case IdPattern(named, tpt) =>
-      derivedValDef(original, named, tpt, rhs, mods)
+      derivedValDef(original, named, tpt, deepCopy(rhs), mods)
     case _ =>
       val rhsUnchecked = makeAnnotated("scala.unchecked", rhs)
       val vars = getVariables(pat)
@@ -674,9 +673,9 @@ object desugar {
       }
       val ids = for ((named, _) <- vars) yield Ident(named.name)
       val caseDef = CaseDef(pat, EmptyTree, makeTuple(ids))
-      val matchExpr =
+      val matchExpr = deepCopy(
         if (forallResults(rhs, isMatchingTuple)) rhs
-        else Match(rhsUnchecked, caseDef :: Nil)
+        else Match(rhsUnchecked, caseDef :: Nil))
       vars match {
         case Nil =>
           matchExpr
