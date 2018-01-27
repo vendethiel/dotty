@@ -205,7 +205,7 @@ object desugar {
         def defaultGetter: DefDef =
           DefDef(
             name = DefaultGetterName(meth.name, n),
-            tparams = meth.tparams.map(tparam => dropContextBound(toDefParam(tparam))),
+            tparams = meth.tparams.map(tparam => deepCopy(dropContextBound(toDefParam(tparam)))),
             vparamss = takeUpTo(normalizedVparamss.nestedMap(toDefParam), n),
             tpt = TypeTree(),
             rhs = vparam.rhs
