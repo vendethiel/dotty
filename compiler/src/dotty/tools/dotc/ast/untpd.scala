@@ -514,6 +514,12 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
         cpy.Ident(tree)(name)
       case Select(qualifier, name) =>
         cpy.Select(tree)(qualifier, name)
+      case This(qual) =>
+        cpy.This(tree)(qual)
+      case Literal(const) =>
+        cpy.Literal(tree)(const)
+      case TypeTree() =>
+        tree.clone
       case _ =>
         super.transform(tree)
     }
