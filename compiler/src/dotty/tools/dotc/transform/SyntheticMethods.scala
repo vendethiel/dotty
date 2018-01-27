@@ -137,7 +137,7 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
         CaseDef(Literal(Constant(i)), EmptyTree, Select(This(clazz), nme.selectorName(i)))
       }
 
-      Match(index.clone, (cases :+ defaultCase).toList)
+      Match(deepCopy(index), (cases :+ defaultCase).toList)
     }
 
     /** The class
@@ -172,7 +172,7 @@ class SyntheticMethods(thisPhase: DenotTransformer) {
       val matchExpr = Match(that, List(matchingCase, defaultCase))
       if (isDerivedValueClass(clazz)) matchExpr
       else {
-        val eqCompare = This(clazz).select(defn.Object_eq).appliedTo(that.clone.asInstance(defn.ObjectType))
+        val eqCompare = This(clazz).select(defn.Object_eq).appliedTo(deepCopy(that))
         eqCompare or matchExpr
       }
     }

@@ -303,8 +303,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     /** Splice new method reference into existing application */
     def spliceMeth(meth: Tree, app: Tree): Tree = app match {
       case Apply(fn, args) =>
-        // FIXME: clone isn't enough, should be deep copy
-        spliceMeth(meth, fn).appliedToArgs(args.map(_.clone))
+        spliceMeth(meth, fn).appliedToArgs(args.map(deepCopy))
       case TypeApply(fn, targs) =>
         // Note: It is important that the type arguments `targs` are passed in new trees
         // instead of being spliced in literally. Otherwise, a type argument to a default
@@ -343,7 +342,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     def findDefaultGetter(n: Int)(implicit ctx: Context): Tree = {
       val meth = methRef.symbol.asTerm
       val receiver: Tree = methPart(normalizedFun) match {
-        case Select(receiver, _) => receiver.clone // FIXME: not deep
+        case Select(receiver, _) => deepCopy(receiver)
         case mr => mr.tpe.normalizedPrefix match {
           case mr: TermRef => ref(mr)
           case mr =>
@@ -750,7 +749,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
       val Apply(Select(lhs, name), rhss) = tree
       val lhs1 = typedExpr(lhs)
       val liftedDefs = new mutable.ListBuffer[Tree]
-      def lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, lhs1.clone))
+      def lhs2 = untpd.TypedSplice(LiftComplex.liftAssigned(liftedDefs, deepCopy(lhs1)))
       val assign = untpd.Assign(lhs2,
           untpd.Apply(untpd.Select(lhs2, name.asSimpleName.dropRight(1)), rhss))
       wrapDefs(liftedDefs, typed(assign))

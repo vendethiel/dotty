@@ -1137,7 +1137,8 @@ object Trees {
     protected def inlineContext(call: Tree)(implicit ctx: Context): Context = ctx
 
     class DeepCopy extends TreeMap(inst.deepCpy)
-    def deepCopy(tree: Tree)(implicit ctx: Context): Tree = (new DeepCopy).transform(tree)
+    def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T =
+      (new DeepCopy).transform(tree).asInstanceOf[T]
 
     abstract class TreeMap(val cpy: TreeCopier = inst.cpy) {
 
