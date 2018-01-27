@@ -508,6 +508,22 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
     }
   }
 
+  class UntypedDeepCopy extends UntypedTreeMap(untpd.deepCpy) {
+    override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
+      case Ident(name) =>
+        cpy.Ident(tree)(name)
+      case Select(qualifier, name) =>
+        cpy.Select(tree)(qualifier, name)
+      case _ =>
+        super.transform(tree)
+    }
+  }
+  override def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T = {
+    val x = (new UntypedDeepCopy).transform(tree).asInstanceOf[T]
+    assert(x ne tree, tree)
+    x
+  }
+
   abstract class UntypedTreeMap(cpy: UntypedTreeCopier = untpd.cpy) extends TreeMap(cpy) {
     override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
       case ModuleDef(name, impl) =>
