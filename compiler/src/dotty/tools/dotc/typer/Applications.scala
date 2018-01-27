@@ -303,7 +303,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
     /** Splice new method reference into existing application */
     def spliceMeth(meth: Tree, app: Tree): Tree = app match {
       case Apply(fn, args) =>
-        spliceMeth(meth, fn).appliedToArgs(args.map(deepCopy))
+        spliceMeth(meth, fn).appliedToArgs(args)
       case TypeApply(fn, targs) =>
         // Note: It is important that the type arguments `targs` are passed in new trees
         // instead of being spliced in literally. Otherwise, a type argument to a default
@@ -431,7 +431,7 @@ trait Applications extends Compatibility { self: Typer with Dynamic =>
             if (getter.isEmpty) missingArg(n)
             else {
               val substParam = addTyped(
-                  treeToArg(spliceMeth(getter withPos normalizedFun.pos, normalizedFun)),
+                  treeToArg(deepCopy(spliceMeth(getter withPos normalizedFun.pos, normalizedFun))),
                   formal)
               matchArgs(args1, formals1.mapconserve(substParam), n + 1)
             }

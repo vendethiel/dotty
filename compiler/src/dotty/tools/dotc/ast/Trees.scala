@@ -1149,9 +1149,9 @@ object Trees {
         case Ident(name) =>
           cpy.Ident(tree)(name)
         case Select(qualifier, name) =>
-          cpy.Select(tree)(qualifier, name)
+          cpy.Select(tree)(transform(qualifier), name)
         case This(qual) =>
-          cpy.This(tree)(qual)
+          cpy.This(tree)(untpd.deepCopy(qual))
         case Literal(const) =>
           cpy.Literal(tree)(const)
         case TypeTree() =>
