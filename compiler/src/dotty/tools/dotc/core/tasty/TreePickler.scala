@@ -547,7 +547,7 @@ class TreePickler(pickler: TastyPickler) {
           pickleTree(tp)
         case Annotated(tree, annot) =>
           writeByte(ANNOTATEDtpt)
-          withLength { pickleTree(tree); pickleTree(annot.tree) }
+          withLength { pickleTree(tree); inAnnot { pickleTree(annot.tree) } }
         case LambdaTypeTree(tparams, body) =>
           writeByte(LAMBDAtpt)
           withLength { pickleParams(tparams); pickleTree(body) }

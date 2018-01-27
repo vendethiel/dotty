@@ -1105,7 +1105,7 @@ object Trees {
       }
       def Annotated(tree: Tree)(arg: Tree, annot: Tree)(implicit ctx: Context): Annotated = tree match {
         case tree: Annotated if !alwaysCopy && (arg eq tree.arg) && (annot eq tree.annot) => tree
-        case _ => inAnnot { finalize(tree, untpd.Annotated(arg, annot)) }
+        case _ => finalize(tree, untpd.Annotated(arg, annot))
       }
       def Thicket(tree: Tree)(trees: List[Tree])(implicit ctx: Context): Thicket = tree match {
         case tree: Thicket if !alwaysCopy && (trees eq tree.trees) => tree
@@ -1260,7 +1260,7 @@ object Trees {
           case PackageDef(pid, stats) =>
             cpy.PackageDef(tree)(transformSub(pid), transformStats(stats))
           case Annotated(arg, annot) =>
-            inAnnot { cpy.Annotated(tree)(transform(arg), transform(annot)) }
+            cpy.Annotated(tree)(transform(arg), inAnnot { transform(annot) })
           case Thicket(trees) =>
             val trees1 = transform(trees)
             if (trees1 eq trees) tree else Thicket(trees1)

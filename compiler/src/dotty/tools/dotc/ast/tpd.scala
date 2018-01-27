@@ -297,7 +297,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     ta.assignType(untpd.PackageDef(pid, stats), pid)
 
   def Annotated(arg: Tree, annot: Tree)(implicit ctx: Context): Annotated =
-    inAnnot { ta.assignType(untpd.Annotated(arg, annot), arg, annot) }
+    ta.assignType(untpd.Annotated(arg, annot), arg, annot)
 
   def Throw(expr: Tree)(implicit ctx: Context): Tree =
     ref(defn.throwMethod).appliedTo(expr)
