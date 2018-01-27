@@ -27,8 +27,8 @@ class Driver extends DotClass {
       try {
         val run = compiler.newRun
         run.compile(fileNames)
-        println("Allocated Apply: " + dotty.tools.dotc.ast.untpd.ApplyCount)
-        println("Allocated TypeApply: " + dotty.tools.dotc.ast.untpd.TypeApplyCount)
+        println("Allocated Apply: " + dotty.tools.dotc.ast.Trees.ApplyCount)
+        println("Allocated TypeApply: " + dotty.tools.dotc.ast.Trees.TypeApplyCount)
         run.printSummary()
       }
       catch {

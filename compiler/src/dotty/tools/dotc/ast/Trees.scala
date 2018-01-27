@@ -432,16 +432,24 @@ object Trees {
     def forwardTo = fun
   }
 
+  var ApplyCount = 0
+
   /** fun(args) */
   case class Apply[-T >: Untyped] private[ast] (fun: Tree[T], args: List[Tree[T]])
     extends GenericApply[T] {
     type ThisTree[-T >: Untyped] = Apply[T]
+
+    ApplyCount += 1
   }
+
+  var TypeApplyCount = 0
 
   /** fun[args] */
   case class TypeApply[-T >: Untyped] private[ast] (fun: Tree[T], args: List[Tree[T]])
     extends GenericApply[T] {
     type ThisTree[-T >: Untyped] = TypeApply[T]
+
+    TypeApplyCount += 1
   }
 
   /** const */
@@ -1136,9 +1144,21 @@ object Trees {
      */
     protected def inlineContext(call: Tree)(implicit ctx: Context): Context = ctx
 
-    class DeepCopy extends TreeMap(inst.deepCpy)
-    def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T =
-      (new DeepCopy).transform(tree).asInstanceOf[T]
+    class DeepCopy extends TreeMap(inst.deepCpy) {
+      override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
+        case Ident(name) =>
+          cpy.Ident(tree)(name)
+        case Select(qualifier, name) =>
+          cpy.Select(tree)(qualifier, name)
+        case _ =>
+          super.transform(tree)
+      }
+    }
+    def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T = {
+      val x = (new DeepCopy).transform(tree).asInstanceOf[T]
+      assert(x ne tree, tree)
+      x
+    }
 
     abstract class TreeMap(val cpy: TreeCopier = inst.cpy) {
 
