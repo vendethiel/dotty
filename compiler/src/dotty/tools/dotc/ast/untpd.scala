@@ -534,13 +534,15 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
   }
 
   class UntypedDeepCopy extends UntypedTreeMap(untpd.deepCpy) {
+    def apply[T <: Tree](tree: T)(implicit ctx: Context): T = transform(tree).asInstanceOf[T]
+
     override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
       case Ident(name) =>
         cpy.Ident(tree)(name)
       case Select(qualifier, name) =>
         cpy.Select(tree)(transform(qualifier), name)
       case This(qual) =>
-        cpy.This(tree)(untpd.deepCopy(qual))
+        cpy.This(tree)(apply(qual))
       case Literal(const) =>
         cpy.Literal(tree)(const)
       case TypeTree() =>
@@ -548,18 +550,18 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
       // Need to transform op too, it's an Ident
       case InfixOp(left, op, right) =>
-        cpy.InfixOp(tree)(transform(left), untpd.deepCopy(op), transform(right))
+        cpy.InfixOp(tree)(transform(left), apply(op), transform(right))
       case PostfixOp(od, op) =>
-        cpy.PostfixOp(tree)(transform(od), untpd.deepCopy(op))
+        cpy.PostfixOp(tree)(transform(od), apply(op))
       case PrefixOp(op, od) =>
-        cpy.PrefixOp(tree)(untpd.deepCopy(op), transform(od))
+        cpy.PrefixOp(tree)(apply(op), transform(od))
 
       case _ =>
         super.transform(tree)
     }
   }
   override def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T = {
-    val x = (new UntypedDeepCopy).transform(tree).asInstanceOf[T]
+    val x = (new UntypedDeepCopy).apply(tree)
     assert(x ne tree, tree)
     x
   }

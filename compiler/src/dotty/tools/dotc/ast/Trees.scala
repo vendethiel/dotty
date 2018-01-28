@@ -1163,13 +1163,15 @@ object Trees {
     protected def inlineContext(call: Tree)(implicit ctx: Context): Context = ctx
 
     class DeepCopy extends TreeMap(inst.deepCpy) {
+      def apply[T <: Tree](tree: T)(implicit ctx: Context): T = transform(tree).asInstanceOf[T]
+
       override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
         case Ident(name) =>
           cpy.Ident(tree)(name)
         case Select(qualifier, name) =>
           cpy.Select(tree)(transform(qualifier), name)
         case This(qual) =>
-          cpy.This(tree)(untpd.deepCopy(qual))
+          cpy.This(tree)(untpd.deepCpy.Ident(qual)(qual.name))
         case Literal(const) =>
           cpy.Literal(tree)(const)
         case TypeTree() =>
@@ -1179,7 +1181,7 @@ object Trees {
       }
     }
     def deepCopy[T <: Tree](tree: T)(implicit ctx: Context): T = {
-      val x = (new DeepCopy).transform(tree).asInstanceOf[T]
+      val x = (new DeepCopy).apply(tree)
       assert(x ne tree, tree)
       x
     }
