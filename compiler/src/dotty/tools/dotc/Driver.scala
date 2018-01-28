@@ -27,8 +27,16 @@ class Driver extends DotClass {
       try {
         val run = compiler.newRun
         run.compile(fileNames)
+        println("Allocated Ident: " + dotty.tools.dotc.ast.Trees.IdentCount)
+        println("Allocated Select: " + dotty.tools.dotc.ast.Trees.SelectCount)
         println("Allocated Apply: " + dotty.tools.dotc.ast.Trees.ApplyCount)
         println("Allocated TypeApply: " + dotty.tools.dotc.ast.Trees.TypeApplyCount)
+
+        dotty.tools.dotc.ast.Trees.IdentCount = 0
+        dotty.tools.dotc.ast.Trees.SelectCount = 0
+        dotty.tools.dotc.ast.Trees.ApplyCount = 0
+        dotty.tools.dotc.ast.Trees.TypeApplyCount = 0
+
         run.printSummary()
       }
       catch {

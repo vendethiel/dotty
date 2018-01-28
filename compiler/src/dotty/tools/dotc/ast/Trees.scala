@@ -380,6 +380,8 @@ object Trees {
 
   // ----------- Tree case classes ------------------------------------
 
+  var IdentCount = 0
+
   /** name */
   case class Ident[-T >: Untyped] private[ast] (name: Name)
     extends RefTree[T] {
@@ -388,6 +390,8 @@ object Trees {
 
     /** Is this a `BackquotedIdent` ? */
     def isBackquoted: Boolean = false
+
+    IdentCount += 1
   }
 
   class BackquotedIdent[-T >: Untyped] private[ast] (name: Name)
@@ -402,10 +406,14 @@ object Trees {
     override def toString = s"SearchFailureIdent($name)"
   }
 
+  var SelectCount = 0
+
   /** qualifier.name, or qualifier#name, if qualifier is a type */
   case class Select[-T >: Untyped] private[ast] (qualifier: Tree[T], name: Name)
     extends RefTree[T] {
     type ThisTree[-T >: Untyped] = Select[T]
+
+    SelectCount += 1
   }
 
   class SelectWithSig[-T >: Untyped] private[ast] (qualifier: Tree[T], name: Name, val sig: Signature)
