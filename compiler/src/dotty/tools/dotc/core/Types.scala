@@ -3625,6 +3625,8 @@ object Types {
     def msg(implicit ctx: Context): Message
   }
 
+  object PoisonType extends UncachedGroundType with ValueType
+
   object ErrorType {
     def apply(msg: => Message)(implicit ctx: Context): ErrorType = {
       val et = new ErrorType {

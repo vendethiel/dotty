@@ -102,7 +102,7 @@ object Trees {
      *   an UnAssignedTypeException is thrown. (Overridden by empty trees)
      */
     def tpe(implicit ctx: Context): T @uncheckedVariance = {
-      if (myTpe == null)
+      if (myTpe == null || myTpe == PoisonType)
         throw new UnAssignedTypeException(this)
       myTpe
     }
@@ -158,7 +158,7 @@ object Trees {
         else {
           val c = clone.asInstanceOf[Tree[Type]]
           if (!isInAnnot && ctx != null && ctx.isAfterTyper) {
-            this.overwriteType(null)
+            this.asInstanceOf[ThisTree[Type]].overwriteType(PoisonType)
           }
           c
         }
