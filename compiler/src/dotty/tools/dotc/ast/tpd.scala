@@ -457,6 +457,23 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       } else foldOver(sym, tree)
   }
 
+  val linearCpy: LinearTypedTreeCopier =
+    new LinearTypedTreeCopier
+
+  class LinearTypedTreeCopier extends TypedTreeCopier {
+    override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
+      case tree: Apply =>
+        // if (!((fun eq tree.fun) && (args eq tree.args)))
+        //   tree.init(fun, args)
+        val tree1 = tree.clone.asInstanceOf[Apply]
+        tree.overwriteType(PoisonType)
+
+        super.Apply(tree1)(fun, args)
+      case _ =>
+        super.Apply(tree)(fun, args)
+    }
+  }
+
   override val cpy: TypedTreeCopier = // Type ascription needed to pick up any new members in TreeCopier (currently there are none)
     new TypedTreeCopier
 
@@ -619,7 +636,8 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
 
   class TimeTravellingTreeCopier extends TypedTreeCopier {
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply =
-      ta.assignType(untpdCpy.Apply(tree)(fun, args), fun, args)
+      linearCpy.Apply(tree)(fun, args)
+      // ta.assignType(untpdCpy.Apply(tree)(fun, args), fun, args)
       // Note: Reassigning the original type if `fun` and `args` have the same types as before
       // does not work here: The computed type depends on the widened function type, not
       // the function type itself. A treetransform may keep the function type the
