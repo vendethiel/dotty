@@ -93,7 +93,7 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
 
     def isCheckable(t: New) = !inJavaAnnot && !noCheckNews.contains(t)
 
-    private def transformAnnot(annot: Tree)(implicit ctx: Context): Tree = {
+    private def transformAnnot(annot: Tree)(implicit ctx: Context): Tree = inAnnot {
       val saved = inJavaAnnot
       inJavaAnnot = annot.symbol is JavaDefined
       if (inJavaAnnot) checkValidJavaAnnotation(annot)
