@@ -489,13 +489,16 @@ object Erasure {
       val Apply(fun, args) = tree
       if (fun.symbol == defn.cbnArg)
         typedUnadapted(args.head, pt)
-      else typedExpr(fun, FunProto(args, pt, this)) match {
+      else {
+        val outers = outer.args(fun.asInstanceOf[tpd.Tree]) // can't use fun1 here because its type is already erased
+
+        typedExpr(fun, FunProto(args, pt, this)) match {
         case fun1: Apply => // arguments passed in prototype were already passed
           fun1
         case fun1 =>
           fun1.tpe.widen match {
             case mt: MethodType =>
-              val outers = outer.args(fun.asInstanceOf[tpd.Tree]) // can't use fun1 here because its type is already erased
+              // val outers = outer.args(funClone.asInstanceOf[tpd.Tree]) // can't use fun1 here because its type is already erased
               var args0 = outers ::: args ++ protoArgs(pt)
               if (args0.length > MaxImplementedFunctionArity && mt.paramInfos.length == 1) {
                 val bunchedArgs = untpd.JavaSeqLiteral(args0, TypeTree(defn.ObjectType))
@@ -508,7 +511,7 @@ object Erasure {
             case _ =>
               throw new MatchError(i"tree $tree has unexpected type of function ${fun1.tpe.widen}, was ${fun.typeOpt.widen}")
           }
-      }
+      }}
     }
 
     // The following four methods take as the proto-type the erasure of the pre-existing type,

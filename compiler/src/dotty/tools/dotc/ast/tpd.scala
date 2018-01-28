@@ -484,7 +484,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
         // case tree: Select if qualifier.tpe eq tree.qualifier.tpe =>
         //   tree1.withTypeUnchecked(tree.tpe)
         case _ => tree.tpe match {
-          case tpe: NamedType => tree1.withType(tpe.derivedSelect(qualifier.tpe.widenIfUnstable))
+          case tpe: NamedType if !alwaysCopy => tree1.withType(tpe.derivedSelect(qualifier.tpe.widenIfUnstable))
           case _ => tree1.withTypeUnchecked(tree.tpe)
         }
       }
