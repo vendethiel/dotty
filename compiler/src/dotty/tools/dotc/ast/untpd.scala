@@ -545,6 +545,15 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
         cpy.Literal(tree)(const)
       case TypeTree() =>
         tree.clone
+
+      // Need to transform op too, it's an Ident
+      case InfixOp(left, op, right) =>
+        cpy.InfixOp(tree)(transform(left), untpd.deepCopy(op), transform(right))
+      case PostfixOp(od, op) =>
+        cpy.PostfixOp(tree)(transform(od), untpd.deepCopy(op))
+      case PrefixOp(op, od) =>
+        cpy.PrefixOp(tree)(untpd.deepCopy(op), transform(od))
+
       case _ =>
         super.transform(tree)
     }
@@ -555,7 +564,7 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
     x
   }
 
-  abstract class UntypedTreeMap(cpy: UntypedTreeCopier = untpd.cpy) extends TreeMap(cpy) {
+  abstract class UntypedTreeMap(override val cpy: UntypedTreeCopier = untpd.cpy) extends TreeMap(cpy) {
     override def transform(tree: Tree)(implicit ctx: Context): Tree = tree match {
       case ModuleDef(name, impl) =>
         cpy.ModuleDef(tree)(name, transformSub(impl))
