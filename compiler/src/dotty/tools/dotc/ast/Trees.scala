@@ -150,16 +150,25 @@ object Trees {
             case _ =>
           }
 
+    private[this] final val mutate = false
+
     def withTypeUnchecked(tpe: Type)(implicit ctx: Context): ThisTree[Type] = {
       val tree =
         if (myTpe == null ||
           (myTpe.asInstanceOf[Type] eql tpe.asInstanceOf[Type]))
           this.asInstanceOf[Tree[Type]]
         else {
-          val c = clone.asInstanceOf[Tree[Type]]
-          if (!isInAnnot && ctx != null && ctx.isAfterTyper) {
-            this.asInstanceOf[ThisTree[Type]].overwriteType(PoisonType)
-          }
+          val c =
+            if (!isInAnnot && ctx != null && ctx.isAfterTyper) {
+              if (!mutate) {
+                this.asInstanceOf[ThisTree[Type]].overwriteType(PoisonType)
+                clone.asInstanceOf[Tree[Type]]
+              } else {
+                this.asInstanceOf[ThisTree[Type]]
+              }
+            } else {
+              clone.asInstanceOf[Tree[Type]]
+            }
           c
         }
       tree overwriteType tpe
