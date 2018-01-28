@@ -62,30 +62,30 @@ class ExpandSAMs extends MiniPhase {
         name  = nme.isDefinedAt,
         flags = Synthetic | Method,
         info = MethodType(paramNames, paramTypes, defn.BooleanType)).asTerm
-    val tru = Literal(Constant(true))
-    def isDefinedAtRhs(paramRefss: List[List[Tree]]) = applyRhs match {
-      case Match(selector, cases) =>
-        assert(selector.symbol == param.symbol)
-        val paramRef = paramRefss.head.head
-        // Again, the alternative
-        //     val List(List(paramRef)) = paramRefs
-        // fails with a similar self instantiation error
-        def translateCase(cdef: CaseDef): CaseDef =
-          cpy.CaseDef(cdef)(body = tru).changeOwner(applyFn, isDefinedAtFn)
-        val defaultSym = ctx.newSymbol(isDefinedAtFn, nme.WILDCARD, Synthetic, selector.tpe.widen)
-        val defaultCase =
-          CaseDef(
-            Bind(defaultSym, Underscore(selector.tpe.widen)),
-            EmptyTree,
-            Literal(Constant(false)))
-        val annotated = Annotated(paramRef, New(ref(defn.UncheckedAnnotType)))
-        cpy.Match(applyRhs)(annotated, cases.map(translateCase) :+ defaultCase)
-      case _ =>
-        tru
-    }
-    val isDefinedAtDef = transformFollowingDeep(DefDef(isDefinedAtFn, isDefinedAtRhs(_)))
+    val isDefinedAtDef = transformFollowingDeep(DefDef(isDefinedAtFn, isDefinedAtRhs(deepCopy(applyRhs), deepCopy(param), applyFn, isDefinedAtFn, _)))
     val anonCls = AnonClass(tpt.tpe :: Nil, List(applyFn, isDefinedAtFn), List(nme.apply, nme.isDefinedAt))
     cpy.Block(tree)(List(applyDef, isDefinedAtDef), anonCls)
+  }
+  private def tru(implicit ctx: Context): Tree = Literal(Constant(true))
+  private def isDefinedAtRhs(applyRhs: Tree, param: Tree, applyFn: Symbol, isDefinedAtFn: Symbol, paramRefss: List[List[Tree]])(implicit ctx: Context) = applyRhs match {
+    case Match(selector, cases) =>
+      assert(selector.symbol == param.symbol)
+      val paramRef = paramRefss.head.head
+      // Again, the alternative
+      //     val List(List(paramRef)) = paramRefs
+      // fails with a similar self instantiation error
+      def translateCase(cdef: CaseDef): CaseDef =
+        cpy.CaseDef(cdef)(body = tru).changeOwner(applyFn, isDefinedAtFn)
+      val defaultSym = ctx.newSymbol(isDefinedAtFn, nme.WILDCARD, Synthetic, selector.tpe.widen)
+      val defaultCase =
+        CaseDef(
+          Bind(defaultSym, Underscore(selector.tpe.widen)),
+          EmptyTree,
+          Literal(Constant(false)))
+      val annotated = Annotated(paramRef, New(ref(defn.UncheckedAnnotType)))
+      cpy.Match(applyRhs)(annotated, cases.map(translateCase) :+ defaultCase)
+    case _ =>
+      tru
   }
 
   private def checkRefinements(tpe: Type, pos: Position)(implicit ctx: Context): Type = tpe match {
