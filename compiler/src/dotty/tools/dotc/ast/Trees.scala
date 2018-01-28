@@ -282,6 +282,7 @@ object Trees {
         case tpe: ThisType => tpe.cls.denot
         case _ => NoDenotation
       }
+      case PoisonType => throw new UnAssignedTypeException(this)
       case _ => NoDenotation
     }
   }
