@@ -285,7 +285,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     val sym = ctx.newSymbol(owner, nme.WHILE_PREFIX, Flags.Label | Flags.Synthetic,
       MethodType(Nil, defn.UnitType), coord = cond.pos)
 
-    val call = Apply(ref(sym), Nil)
+    def call = Apply(ref(sym), Nil)
     val rhs = If(cond, Block(body, call), unitLiteral)
     Block(List(DefDef(sym, rhs)), call)
   }
