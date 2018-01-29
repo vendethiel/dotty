@@ -481,7 +481,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
         super.Apply(tree)(fun, args)
     }
 
-    private[this] final val linearSelect = true
+    private[this] final val linearSelect = false
     private[this] final val checkOnlySelect = linearSelect && true
     override def Select(tree: Tree)(qualifier: Tree, name: Name)(implicit ctx: Context): Select = tree match {
       case tree: Select if linearSelect && isLinearSafe =>
