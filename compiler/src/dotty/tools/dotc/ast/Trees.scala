@@ -18,6 +18,7 @@ import annotation.unchecked.uncheckedVariance
 import language.implicitConversions
 
 object Trees {
+  import annotation.unchecked.{uncheckedVariance => uV}
 
   // Note: it would be more logical to make Untyped = Nothing.
   // However, this interacts in a bad way with Scala's current type inference.
@@ -445,15 +446,23 @@ object Trees {
 
   abstract class GenericApply[-T >: Untyped] extends ProxyTree[T] with TermTree[T] {
     type ThisTree[-T >: Untyped] <: GenericApply[T]
-    val fun: Tree[T]
-    val args: List[Tree[T]]
+    var fun: Tree[T @uV]
+    var args: List[Tree[T @uV]]
     def forwardTo = fun
+
+    def init(fun: Tree[T @uV], args: List[Tree[T @uV]]): this.type = {
+      this.fun = fun
+      this.args = args
+      this.overwriteType(null)
+
+      this
+    }
   }
 
   var ApplyCount = 0
 
   /** fun(args) */
-  case class Apply[-T >: Untyped] private[ast] (fun: Tree[T], args: List[Tree[T]])
+  case class Apply[-T >: Untyped] private[ast] (var fun: Tree[T @uV], var args: List[Tree[T @uV]])
     extends GenericApply[T] {
     type ThisTree[-T >: Untyped] = Apply[T]
 
@@ -463,7 +472,7 @@ object Trees {
   var TypeApplyCount = 0
 
   /** fun[args] */
-  case class TypeApply[-T >: Untyped] private[ast] (fun: Tree[T], args: List[Tree[T]])
+  case class TypeApply[-T >: Untyped] private[ast] (var fun: Tree[T @uV], var args: List[Tree[T @uV]])
     extends GenericApply[T] {
     type ThisTree[-T >: Untyped] = TypeApply[T]
 

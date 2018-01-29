@@ -468,6 +468,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
         val tree1 =
           if (!isInAnnot && ctx.isAfterTyper) { // FIXME: condition duplicated with withTypeUnchecked
             val res = tree.clone.asInstanceOf[Apply]
+            tree.init(null, Nil)
             tree.overwriteType(PoisonType)
             res
           } else tree

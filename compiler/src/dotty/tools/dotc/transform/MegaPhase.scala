@@ -247,7 +247,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
         implicit val ctx = prepApply(tree, start)(outerCtx)
         val fun = transformTree(tree.fun, start)
         val args = transformTrees(tree.args, start)
-        goApply(cpy.Apply(tree)(fun, args), start)
+        goApply(linearCpy.Apply(tree)(fun, args), start)
       case tree: TypeTree =>
         implicit val ctx = prepTypeTree(tree, start)(outerCtx)
         goTypeTree(tree, start)
