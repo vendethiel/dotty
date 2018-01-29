@@ -154,6 +154,7 @@ object Trees {
     private[this] final val mutate = false
 
     def withTypeUnchecked(tpe: Type)(implicit ctx: Context): ThisTree[Type] = {
+      assert(myTpe != PoisonType)
       val tree =
         if (myTpe == null ||
           (myTpe.asInstanceOf[Type] eql tpe.asInstanceOf[Type]))
