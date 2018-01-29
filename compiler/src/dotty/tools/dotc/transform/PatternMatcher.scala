@@ -762,7 +762,7 @@ object PatternMatcher {
 
     /** The condition a test plan rewrites to */
     private def emitCondition(plan: TestPlan): Tree = {
-      val scrutinee = plan.scrutinee
+      def scrutinee = deepCopy(plan.scrutinee)
       (plan.test: @unchecked) match {
         case NonEmptyTest =>
           scrutinee
