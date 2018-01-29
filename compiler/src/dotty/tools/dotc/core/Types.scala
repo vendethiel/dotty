@@ -3563,8 +3563,12 @@ object Types {
   // ----- Annotated and Import types -----------------------------------------------
 
   /** An annotated type tpe @ annot */
-  case class AnnotatedType(tpe: Type, annot: Annotation) extends UncachedProxyType with ValueType {
+  case class AnnotatedType(tpe: Type, annot: Annotation) extends CachedProxyType with ValueType {
     // todo: cache them? but this makes only sense if annotations and trees are also cached.
+
+    // FIXME: simple cache for now, to work with cloning happening in TreeCopier
+    // because of dumbness in TypeAssigner
+    override def computeHash = doHash(annot, tpe)
 
     override def underlying(implicit ctx: Context): Type = tpe
 
