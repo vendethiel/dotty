@@ -357,6 +357,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
         val trees = transformTrees(tree.trees, start)
         goAlternative(cpy.Alternative(tree)(trees), start)
       case tree =>
+        assert(tree != null)
         implicit val ctx = prepOther(tree, start)(outerCtx)
         goOther(tree, start)
     }

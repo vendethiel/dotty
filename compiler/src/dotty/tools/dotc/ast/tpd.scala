@@ -465,10 +465,11 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
       case tree: Apply =>
         // if (!((fun eq tree.fun) && (args eq tree.args)))
         //   tree.init(fun, args)
+
         val tree1 =
           if (!isInAnnot && ctx.isAfterTyper) { // FIXME: condition duplicated with withTypeUnchecked
             val res = tree.clone.asInstanceOf[Apply]
-            tree.init(null, Nil)
+            // tree.init(null, Nil)
             tree.overwriteType(PoisonType)
             res
           } else tree
