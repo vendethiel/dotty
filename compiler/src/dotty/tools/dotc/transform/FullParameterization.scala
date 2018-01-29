@@ -210,7 +210,7 @@ trait FullParameterization {
           .subst(origVParams, argRefs.map(_.tpe))
           .substThisUnlessStatic(origClass, thisRef.tpe),
         treeMap = {
-          case tree: This if tree.symbol == origClass => thisRef
+          case tree: This if tree.symbol == origClass => deepCopy(thisRef)
           case tree => rewireTree(tree, Nil) orElse tree
         },
         oldOwners = origMeth :: Nil,
