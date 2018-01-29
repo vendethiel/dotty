@@ -491,7 +491,13 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
           tree.overwriteType(PoisonType)
           super.Select(tree1)(qualifier, name)
         } else {
-          ???
+          val oldTpe = tree.tpe
+          tree.reset(qualifier, name)
+          // duplication with TypedTreeCopier#Select
+          oldTpe match {
+            case tpe: NamedType => tree.withType(tpe.derivedSelect(qualifier.tpe.widenIfUnstable))
+            case tpe => tree.withTypeUnchecked(tpe)
+          }
         }
       case _ =>
         super.Select(tree)(qualifier, name)

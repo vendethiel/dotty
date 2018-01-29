@@ -412,11 +412,19 @@ object Trees {
   var SelectCount = 0
 
   /** qualifier.name, or qualifier#name, if qualifier is a type */
-  case class Select[-T >: Untyped] private[ast] (qualifier: Tree[T], name: Name)
+  case class Select[-T >: Untyped] private[ast] (var qualifier: Tree[T @uV], var name: Name)
     extends RefTree[T] {
     type ThisTree[-T >: Untyped] = Select[T]
 
     SelectCount += 1
+
+    def reset(qualifier: Tree[T @uV], name: Name): this.type = {
+      this.qualifier = qualifier
+      this.name = name
+      this.overwriteType(null)
+
+      this
+    }
   }
 
   class SelectWithSig[-T >: Untyped] private[ast] (qualifier: Tree[T], name: Name, val sig: Signature)
