@@ -145,8 +145,8 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
 
         val holderSymbol = ctx.newSymbol(x.symbol.owner, holderName, containerFlags, holderImpl.typeRef, coord = x.pos)
         val initSymbol = ctx.newSymbol(x.symbol.owner, initName, initFlags, MethodType(Nil, tpe), coord = x.pos)
-        val result = ref(holderSymbol).select(lazyNme.value).withPos(x.pos)
-        val flag = ref(holderSymbol).select(lazyNme.initialized)
+        def result = ref(holderSymbol).select(lazyNme.value).withPos(x.pos)
+        def flag = ref(holderSymbol).select(lazyNme.initialized)
         val initer = valueInitter.changeOwnerAfter(x.symbol, initSymbol, this)
         val initBody =
           adaptToType(
@@ -191,8 +191,8 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
     def mkNonThreadSafeDef(target: Tree, flag: Tree, rhs: Tree)(implicit ctx: Context) = {
       val setFlag = flag.becomes(Literal(Constants.Constant(true)))
       val setTargets = if (isWildcardArg(rhs)) Nil else target.becomes(rhs) :: Nil
-      val init = Block(setFlag :: setTargets, target.ensureApplied)
-      If(flag.ensureApplied, target.ensureApplied, init)
+      val init = Block(setFlag :: setTargets, deepCopy(target).ensureApplied)
+      If(deepCopy(flag).ensureApplied, deepCopy(target).ensureApplied, init)
     }
 
     /** Create non-threadsafe lazy accessor for not-nullable types  equivalent to such code
