@@ -459,22 +459,23 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
 
   val linearCpy: LinearTypedTreeCopier =
     new LinearTypedTreeCopier
-
   class LinearTypedTreeCopier extends TypedTreeCopier {
+    private[this] final val linearApply = false
+    private[this] final val checkOnlyApply = linearApply && false
+
+    // FIXME: condition duplicated with withTypeUnchecked
+    def isLinearSafe(implicit ctx: Context) = !isInAnnot && ctx.isAfterTyper
+
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
-      case tree: Apply =>
-        // if (!((fun eq tree.fun) && (args eq tree.args)))
-        //   tree.init(fun, args)
-
-        val tree1 =
-          if (!isInAnnot && ctx.isAfterTyper) { // FIXME: condition duplicated with withTypeUnchecked
-            val res = tree.clone.asInstanceOf[Apply]
-            // tree.init(null, Nil)
-            tree.overwriteType(PoisonType)
-            res
-          } else tree
-
-        super.Apply(tree1)(fun, args)
+      case tree: Apply if linearApply && isLinearSafe =>
+        if (checkOnlyApply) {
+          val tree1 = tree.clone
+          tree.overwriteType(PoisonType)
+          super.Apply(tree1)(fun, args)
+        } else {
+          tree.reset(fun, args)
+          ta.assignType(tree, fun, args)
+        }
       case _ =>
         super.Apply(tree)(fun, args)
     }

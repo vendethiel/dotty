@@ -151,7 +151,7 @@ object Trees {
             case _ =>
           }
 
-    private[this] final val mutate = false
+    private[this] final val linearNewType = false
 
     def withTypeUnchecked(tpe: Type)(implicit ctx: Context): ThisTree[Type] = {
       if (myTpe == PoisonType)
@@ -163,7 +163,7 @@ object Trees {
         else {
           val c =
             if (!isInAnnot && ctx != null && ctx.isAfterTyper) {
-              if (!mutate) {
+              if (!linearNewType) {
                 this.asInstanceOf[ThisTree[Type]].overwriteType(PoisonType)
                 clone.asInstanceOf[Tree[Type]]
               } else {
@@ -452,7 +452,7 @@ object Trees {
     var args: List[Tree[T @uV]]
     def forwardTo = fun
 
-    def init(fun: Tree[T @uV], args: List[Tree[T @uV]]): this.type = {
+    def reset(fun: Tree[T @uV], args: List[Tree[T @uV]]): this.type = {
       this.fun = fun
       this.args = args
       this.overwriteType(null)
