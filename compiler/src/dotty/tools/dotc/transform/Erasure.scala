@@ -223,7 +223,7 @@ object Erasure {
               evalOnce(tree) { t =>
                 If(t.select(defn.Object_eq).appliedTo(nullTree),
                   unboxedNull,
-                  unboxedTree(t))
+                  unboxedTree(deepCopy(t)))
               }
             } else unboxedTree(tree)
 
