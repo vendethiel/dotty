@@ -422,6 +422,7 @@ object Trees {
       this.qualifier = qualifier
       this.name = name
       this.overwriteType(null)
+      setPos(initialPos)
 
       this
     }
@@ -464,6 +465,7 @@ object Trees {
       this.fun = fun
       this.args = args
       this.overwriteType(null)
+      setPos(initialPos)
 
       this
     }
