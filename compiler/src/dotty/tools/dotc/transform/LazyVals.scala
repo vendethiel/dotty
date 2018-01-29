@@ -290,7 +290,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
           MethodType(List(nme.x_1), List(defn.ThrowableType), defn.IntType))
         val caseSymbol = ctx.newSymbol(methodSymbol, nme.DEFAULT_EXCEPTION_NAME, Flags.Synthetic, defn.ThrowableType)
         val triggerRetry = setFlagState.appliedTo(thiz, offset, initState, Literal(Constant(ord)))
-        val complete = setFlagState.appliedTo(thiz, offset, computedState, Literal(Constant(ord)))
+        val complete = deepCopy(setFlagState).appliedTo(thiz, offset, computedState, Literal(Constant(ord)))
 
         val handler = CaseDef(Bind(caseSymbol, ref(caseSymbol)), EmptyTree,
           Block(List(triggerRetry), Throw(ref(caseSymbol))
@@ -313,7 +313,7 @@ class LazyVals extends MiniPhase with IdentityDenotTransformer {
       }
 
       val waitSecond = {
-        val wait = waitOnLock.appliedTo(thiz, offset, ref(flagSymbol), Literal(Constant(ord)))
+        val wait = deepCopy(waitOnLock).appliedTo(thiz, offset, ref(flagSymbol), Literal(Constant(ord)))
         CaseDef(notifyState, EmptyTree, wait)
       }
 
