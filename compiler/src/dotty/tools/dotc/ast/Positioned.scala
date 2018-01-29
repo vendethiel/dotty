@@ -34,9 +34,7 @@ abstract class Positioned extends DotClass with Product {
    *  destructively and the item itself is returned.
    */
   def withPos(pos: Position): this.type = {
-    if (pos == curPos)
-      return this
-    val newpd = (if (curPos.isSynthetic) this else clone).asInstanceOf[Positioned]
+    val newpd = (if (pos == curPos || curPos.isSynthetic) this else clone).asInstanceOf[Positioned]
     newpd.setPos(pos)
     newpd.asInstanceOf[this.type]
   }
