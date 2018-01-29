@@ -460,12 +460,12 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   val linearCpy: LinearTypedTreeCopier =
     new LinearTypedTreeCopier
   class LinearTypedTreeCopier extends TypedTreeCopier {
-    private[this] final val linearApply = false
-    private[this] final val checkOnlyApply = linearApply && false
 
     // FIXME: condition duplicated with withTypeUnchecked
     def isLinearSafe(implicit ctx: Context) = !isInAnnot && ctx.isAfterTyper
 
+    private[this] final val linearApply = false
+    private[this] final val checkOnlyApply = linearApply && false
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
       case tree: Apply if linearApply && isLinearSafe =>
         if (checkOnlyApply) {
@@ -478,6 +478,21 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
         }
       case _ =>
         super.Apply(tree)(fun, args)
+    }
+
+    private[this] final val linearSelect = true
+    private[this] final val checkOnlySelect = linearSelect && true
+    override def Select(tree: Tree)(qualifier: Tree, name: Name)(implicit ctx: Context): Select = tree match {
+      case tree: Select if linearSelect && isLinearSafe =>
+        if (checkOnlySelect) {
+          val tree1 = tree.clone
+          tree.overwriteType(PoisonType)
+          super.Select(tree1)(qualifier, name)
+        } else {
+          ???
+        }
+      case _ =>
+        super.Select(tree)(qualifier, name)
     }
   }
 

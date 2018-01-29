@@ -209,7 +209,7 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
       case tree: Select =>
         implicit val ctx = prepSelect(tree, start)(outerCtx)
         val qual = transformTree(tree.qualifier, start)
-        goSelect(cpy.Select(tree)(qual, tree.name), start)
+        goSelect(linearCpy.Select(tree)(qual, tree.name), start)
       case tree: ValDef =>
         implicit val ctx = prepValDef(tree, start)(outerCtx)
         def mapValDef(implicit ctx: Context) = {
@@ -330,8 +330,9 @@ class MegaPhase(val miniPhases: Array[MiniPhase]) extends Phase {
       case tree: PackageDef =>
         implicit val ctx = prepPackageDef(tree, start)(outerCtx)
         def mapPackage(implicit ctx: Context) = {
+          val sym = tree.symbol
           val pid = transformSpecificTree(tree.pid, start)
-          val stats = transformStats(tree.stats, tree.symbol, start)
+          val stats = transformStats(tree.stats, sym, start)
           cpy.PackageDef(tree)(pid, stats)
         }
         goPackageDef(mapPackage(localContext), start)
