@@ -469,6 +469,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
       case tree: Apply if linearApply && isLinearSafe =>
         if (checkOnlyApply) {
+          tree.tpe // Check PoisonType
           val tree1 = tree.clone
           tree.overwriteType(PoisonType)
           super.Apply(tree1)(fun, args)
@@ -485,6 +486,7 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     override def Select(tree: Tree)(qualifier: Tree, name: Name)(implicit ctx: Context): Select = tree match {
       case tree: Select if linearSelect && isLinearSafe =>
         if (checkOnlySelect) {
+          tree.tpe // Check PoisonType
           val tree1 = tree.clone
           tree.overwriteType(PoisonType)
           super.Select(tree1)(qualifier, name)

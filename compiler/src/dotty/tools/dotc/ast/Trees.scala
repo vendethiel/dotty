@@ -254,7 +254,7 @@ object Trees {
   }
 
   class UnAssignedTypeException[T >: Untyped](tree: Tree[T])(implicit ctx: Context) extends RuntimeException {
-    override def getMessage: String = s"type of $tree#${tree.uniqueId} is not assigned in ${ctx.compilationUnit}"
+    override def getMessage: String = s"type of $tree#${tree.uniqueId} is not assigned in ${ctx.compilationUnit}, phase = ${ctx.phase}"
   }
 
   // ------ Categories of trees -----------------------------------
