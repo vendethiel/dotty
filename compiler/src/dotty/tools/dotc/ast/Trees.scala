@@ -395,6 +395,12 @@ object Trees {
     def isBackquoted: Boolean = false
 
     IdentCount += 1
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      IdentCount += 1
+      tree
+    }
   }
 
   class BackquotedIdent[-T >: Untyped] private[ast] (name: Name)
@@ -425,6 +431,12 @@ object Trees {
       setPos(initialPos)
 
       this
+    }
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      SelectCount += 1
+      tree
     }
   }
 
@@ -479,6 +491,12 @@ object Trees {
     type ThisTree[-T >: Untyped] = Apply[T]
 
     ApplyCount += 1
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      ApplyCount += 1
+      tree
+    }
   }
 
   var TypeApplyCount = 0
@@ -489,6 +507,12 @@ object Trees {
     type ThisTree[-T >: Untyped] = TypeApply[T]
 
     TypeApplyCount += 1
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      TypeApplyCount += 1
+      tree
+    }
   }
 
   /** const */
