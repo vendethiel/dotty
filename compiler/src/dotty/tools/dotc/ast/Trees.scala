@@ -183,9 +183,13 @@ object Trees {
      *  modifications. Should be used only in special circumstances (we
      *  need it for printing trees with optional type info).
      */
-    final def hasType: Boolean = myTpe != null
+    final def hasType(implicit ctx: Context): Boolean = {
+      // if (myTpe == PoisonType) throw new UnAssignedTypeException(this)
+      myTpe != null
+    }
 
-    final def typeOpt: Type = myTpe match {
+    final def typeOpt(implicit ctx: Context): Type = myTpe match {
+      // case x if x == PoisonType => throw new UnAssignedTypeException(this)
       case tp: Type => tp
       case _ => NoType
     }
@@ -254,7 +258,7 @@ object Trees {
   }
 
   class UnAssignedTypeException[T >: Untyped](tree: Tree[T])(implicit ctx: Context) extends RuntimeException {
-    override def getMessage: String = s"type of $tree#${tree.uniqueId} is not assigned in ${ctx.compilationUnit}, phase = ${ctx.phase}"
+    override def getMessage: String = s"type of $tree#${tree.uniqueId} is not assigned in ${if (ctx!= null) ctx.compilationUnit else "?"}, phase = ${if (ctx != null) ctx.phase else "?"}"
   }
 
   // ------ Categories of trees -----------------------------------
@@ -657,9 +661,9 @@ object Trees {
   case class TypeTree[-T >: Untyped] ()
     extends DenotingTree[T] with TypTree[T] {
     type ThisTree[-T >: Untyped] = TypeTree[T]
-    override def isEmpty = !hasType
+    override def isEmpty = !hasType(null)
     override def toString =
-      s"TypeTree${if (hasType) s"[$typeOpt]" else ""}"
+      s"TypeTree${if (hasType(null)) s"[${typeOpt(null)}]" else ""}"
   }
 
   /** ref.type */

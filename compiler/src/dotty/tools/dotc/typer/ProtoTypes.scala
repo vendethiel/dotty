@@ -558,7 +558,7 @@ object ProtoTypes {
   object dummyTreeOfType {
     def apply(tp: Type)(implicit ctx: Context): Tree = untpd.Literal(Constant(null)) withTypeUnchecked tp
     def unapply(tree: untpd.Tree): Option[Type] = tree match {
-      case Literal(Constant(null)) => Some(tree.typeOpt)
+      case Literal(Constant(null)) => Some(tree.typeOpt(null))
       case _ => None
     }
   }
