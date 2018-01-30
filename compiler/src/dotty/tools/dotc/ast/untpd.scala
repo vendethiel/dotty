@@ -413,8 +413,8 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
     // FIXME: condition duplicated with withTypeUnchecked
     def isLinearSafe(implicit ctx: Context) = !isInAnnot && ctx.isAfterTyper
 
-    private[this] final val linearApply = true
-    private[this] final val checkOnlyApply = linearApply && true
+    private[this] final val linearApply = false
+    private[this] final val checkOnlyApply = linearApply && false
     override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
       case tree: Apply if linearApply && isLinearSafe =>
         if (checkOnlyApply) {

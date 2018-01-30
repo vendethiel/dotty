@@ -419,6 +419,7 @@ object Erasure {
           qual
       }
 
+      val originalQualTpe = tree.qualifier.typeOpt
       def recur(qual: Tree): Tree = {
         val qualIsPrimitive = qual.tpe.widen.isPrimitiveValueType
         val symIsPrimitive = sym.owner.isPrimitiveValueClass
@@ -426,9 +427,9 @@ object Erasure {
           recur(box(qual))
         else if (!qualIsPrimitive && symIsPrimitive)
           recur(unbox(qual, sym.owner.typeRef))
-        else if (sym.owner eq defn.ArrayClass)
-          selectArrayMember(qual, erasure(tree.qualifier.typeOpt.widen.finalResultType))
-        else {
+        else if (sym.owner eq defn.ArrayClass) {
+          selectArrayMember(qual, erasure(originalQualTpe.widen.finalResultType))
+        } else {
           val qual1 = adaptIfSuper(qual)
           if (qual1.tpe.derivesFrom(sym.owner) || qual1.isInstanceOf[Super])
             select(qual1, sym)
@@ -507,7 +508,7 @@ object Erasure {
               }
               // Arguments are phantom if an only if the parameters are phantom, guaranteed by the separation of type lattices
               val args1 = args0.filterConserve(arg => !wasPhantom(arg.typeOpt)).zipWithConserve(mt.paramInfos)(typedExpr)
-              untpd.cpy.Apply(tree)(fun1, args1) withType mt.resultType
+              untpd.linearCpy.Apply(tree)(fun1, args1) withType mt.resultType
             case _ =>
               throw new MatchError(i"tree $tree has unexpected type of function ${fun1.tpe.widen}, was ${fun.typeOpt.widen}")
           }
