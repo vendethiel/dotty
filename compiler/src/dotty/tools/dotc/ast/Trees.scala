@@ -38,6 +38,25 @@ object Trees {
   type LazyTree = AnyRef     /* really: Tree | Lazy[Tree] */
   type LazyTreeList = AnyRef /* really: List[Tree] | Lazy[List[Tree]] */
 
+  private[this] val _callers = new collection.mutable.HashMap[StackTraceElement, Int]
+  def callers = _callers.toList.sortBy(_._2).reverse.mkString("\n")
+  def sumCallers = _callers.foldLeft(0)({ case (acc, (_, i)) => acc + i})
+  def clearCallers() = _callers.clear()
+  private[this] def updateCallers() = {
+    val e = Thread.currentThread.getStackTrace()
+      .tail
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.ast"))
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.transform.MegaPhase"))
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.util.Stats"))
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.core.Decorators"))
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.transform.MacroTransform"))
+      .filterNot(_.getClassName.contains("dotty.tools.dotc.reporting.trace"))
+      .filterNot(_.getClassName.startsWith("scala."))
+      .head
+    val count = _callers.getOrElse(e, 0)
+    _callers.update(e, count + 1)
+  }
+
   /** Trees take a parameter indicating what the type of their `tpe` field
    *  is. Two choices: `Type` or `Untyped`.
    *  Untyped trees have type `Tree[Untyped]`.
@@ -61,6 +80,8 @@ object Trees {
                                         with Cloneable {
 
     if (Stats.enabled) ntrees += 1
+
+    updateCallers()
 
     private def nxId = {
       nextId += 1
@@ -219,6 +240,9 @@ object Trees {
     override def clone: Tree[T] = {
       val tree = super.clone.asInstanceOf[Tree[T]]
       tree.myUniqueId = nxId
+
+      updateCallers()
+
       tree
     }
   }

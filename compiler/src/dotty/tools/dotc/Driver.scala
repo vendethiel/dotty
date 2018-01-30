@@ -27,6 +27,12 @@ class Driver extends DotClass {
       try {
         val run = compiler.newRun
         run.compile(fileNames)
+
+        println("# allocated trees: " + dotty.tools.dotc.ast.Trees.sumCallers)
+        println("Detail of allocated trees:")
+        println(dotty.tools.dotc.ast.Trees.callers)
+        dotty.tools.dotc.ast.Trees.clearCallers()
+
         run.printSummary()
       }
       catch {
