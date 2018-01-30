@@ -406,6 +406,30 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
 
 // --------- Copier/Transformer/Accumulator classes for untyped trees -----
 
+  val linearCpy: LinearUntypedTreeCopier =
+    new LinearUntypedTreeCopier
+  class LinearUntypedTreeCopier extends UntypedTreeCopier {
+
+    // FIXME: condition duplicated with withTypeUnchecked
+    def isLinearSafe(implicit ctx: Context) = !isInAnnot && ctx.isAfterTyper
+
+    private[this] final val linearApply = true
+    private[this] final val checkOnlyApply = linearApply && true
+    override def Apply(tree: Tree)(fun: Tree, args: List[Tree])(implicit ctx: Context): Apply = tree match {
+      case tree: Apply if linearApply && isLinearSafe =>
+        if (checkOnlyApply) {
+          tree.tpe // Check PoisonType
+          val tree1 = tree.clone
+          tree.asInstanceOf[tpd.Tree].overwriteType(PoisonType)
+          super.Apply(tree1)(fun, args)
+        } else {
+          tree.reset(fun, args)
+        }
+      case _ =>
+        super.Apply(tree)(fun, args)
+    }
+  }
+
   override val cpy: UntypedTreeCopier = new UntypedTreeCopier
   override val deepCpy: UntypedTreeDeepCopier = new UntypedTreeDeepCopier
 
