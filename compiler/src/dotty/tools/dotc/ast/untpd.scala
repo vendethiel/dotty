@@ -428,6 +428,42 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
       case _ =>
         super.Apply(tree)(fun, args)
     }
+
+    private[this] final val linearValDef = false
+    private[this] final val checkOnlyValDef = linearValDef && false
+    override def ValDef(tree: Tree)(name: TermName, tpt: Tree, rhs: LazyTree)(implicit ctx: Context): ValDef = tree match {
+      case tree: ValDef if linearValDef && isLinearSafe =>
+        if (checkOnlyValDef) {
+          tree.tpe // Check PoisonType
+          val tree1 = tree.clone
+          tree.asInstanceOf[tpd.Tree].overwriteType(PoisonType)
+          super.ValDef(tree1)(name, tpt, rhs)
+        } else {
+          tree.reset(name, tpt, rhs)
+        }
+      case _ =>
+        super.ValDef(tree)(name, tpt, rhs)
+    }
+    override def ValDef(tree: ValDef)(name: TermName, tpt: Tree, rhs: LazyTree)(implicit ctx: Context): ValDef =
+      ValDef(tree: Tree)(name, tpt, rhs)
+
+    private[this] final val linearDefDef = false
+    private[this] final val checkOnlyDefDef = linearDefDef && false
+    override def DefDef(tree: Tree)(name: TermName, tparams: List[TypeDef], vparamss: List[List[ValDef]], tpt: Tree, rhs: LazyTree)(implicit ctx: Context): DefDef = tree match {
+      case tree: DefDef if linearDefDef && isLinearSafe =>
+        if (checkOnlyDefDef) {
+          tree.tpe // Check PoisonType
+          val tree1 = tree.clone
+          tree.asInstanceOf[tpd.Tree].overwriteType(PoisonType)
+          super.DefDef(tree1)(name, tparams, vparamss, tpt, rhs)
+        } else {
+          tree.reset(name, tparams, vparamss, tpt, rhs)
+        }
+      case _ =>
+        super.DefDef(tree)(name, tparams, vparamss, tpt, rhs)
+    }
+    override def DefDef(tree: DefDef)(name: TermName, tparams: List[TypeDef], vparamss: List[List[ValDef]], tpt: Tree = tree.tpt, rhs: LazyTree)(implicit ctx: Context): DefDef =
+        DefDef(tree: Tree)(name, tparams, vparamss, tpt, rhs)
   }
 
   override val cpy: UntypedTreeCopier = new UntypedTreeCopier

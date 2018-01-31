@@ -752,7 +752,7 @@ object Trees {
   var ValDefCount = 0
 
   /** mods val name: tpt = rhs */
-  case class ValDef[-T >: Untyped] private[ast] (name: TermName, tpt: Tree[T], private var preRhs: LazyTree)
+  case class ValDef[-T >: Untyped] private[ast] (var name: TermName, var tpt: Tree[T @uV], private var preRhs: LazyTree)
     extends ValOrDefDef[T] {
     type ThisTree[-T >: Untyped] = ValDef[T]
     assert(isEmpty || tpt != genericEmptyTree)
@@ -760,6 +760,16 @@ object Trees {
     protected def force(x: AnyRef) = preRhs = x
 
     ValDefCount += 1
+
+    def reset(name: TermName, tpt: Tree[T @uV], preRhs: LazyTree): this.type = {
+      this.name = name
+      this.tpt = tpt
+      this.preRhs = preRhs
+      this.overwriteType(null)
+      setPos(initialPos)
+
+      this
+    }
 
     override def clone: Tree[T] = {
       val tree = super.clone
@@ -771,8 +781,8 @@ object Trees {
   var DefDefCount = 0
 
   /** mods def name[tparams](vparams_1)...(vparams_n): tpt = rhs */
-  case class DefDef[-T >: Untyped] private[ast] (name: TermName, tparams: List[TypeDef[T]],
-      vparamss: List[List[ValDef[T]]], tpt: Tree[T], private var preRhs: LazyTree)
+  case class DefDef[-T >: Untyped] private[ast] (var name: TermName, var tparams: List[TypeDef[T @uV]],
+      var vparamss: List[List[ValDef[T @uV]]], var tpt: Tree[T @uV], private var preRhs: LazyTree)
     extends ValOrDefDef[T] {
     type ThisTree[-T >: Untyped] = DefDef[T]
     assert(tpt != genericEmptyTree)
@@ -780,6 +790,18 @@ object Trees {
     protected def force(x: AnyRef) = preRhs = x
 
     DefDefCount += 1
+
+    def reset(name: TermName, tparams: List[TypeDef[T @uV]], vparamss: List[List[ValDef[T @uV]]], tpt: Tree[T @uV], preRhs: LazyTree): this.type = {
+      this.name = name
+      this.tparams = tparams
+      this.vparamss = vparamss
+      this.tpt = tpt
+      this.preRhs = preRhs
+      this.overwriteType(null)
+      setPos(initialPos)
+
+      this
+    }
 
     override def clone: Tree[T] = {
       val tree = super.clone
