@@ -464,6 +464,22 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
     }
     override def DefDef(tree: DefDef)(name: TermName, tparams: List[TypeDef], vparamss: List[List[ValDef]], tpt: Tree = tree.tpt, rhs: LazyTree)(implicit ctx: Context): DefDef =
         DefDef(tree: Tree)(name, tparams, vparamss, tpt, rhs)
+
+    private[this] final val linearSelect = false
+    private[this] final val checkOnlySelect = linearSelect && false
+    override def Select(tree: Tree)(qualifier: Tree, name: Name)(implicit ctx: Context): Select = tree match {
+      case tree: Select if linearSelect && isLinearSafe =>
+        if (checkOnlySelect) {
+          tree.tpe // Check PoisonType
+          val tree1 = tree.clone
+          tree.asInstanceOf[tpd.Tree].overwriteType(PoisonType)
+          super.Select(tree1)(qualifier, name)
+        } else {
+          tree.reset(qualifier, name)
+        }
+      case _ =>
+        super.Select(tree)(qualifier, name)
+    }
   }
 
   override val cpy: UntypedTreeCopier = new UntypedTreeCopier
