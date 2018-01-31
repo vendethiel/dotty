@@ -31,11 +31,15 @@ class Driver extends DotClass {
         println("Allocated Select: " + dotty.tools.dotc.ast.Trees.SelectCount)
         println("Allocated Apply: " + dotty.tools.dotc.ast.Trees.ApplyCount)
         println("Allocated TypeApply: " + dotty.tools.dotc.ast.Trees.TypeApplyCount)
+        println("Allocated ValDef: " + dotty.tools.dotc.ast.Trees.ValDefCount)
+        println("Allocated DefDef: " + dotty.tools.dotc.ast.Trees.DefDefCount)
 
         dotty.tools.dotc.ast.Trees.IdentCount = 0
         dotty.tools.dotc.ast.Trees.SelectCount = 0
         dotty.tools.dotc.ast.Trees.ApplyCount = 0
         dotty.tools.dotc.ast.Trees.TypeApplyCount = 0
+        dotty.tools.dotc.ast.Trees.ValDefCount = 0
+        dotty.tools.dotc.ast.Trees.DefDefCount = 0
 
         run.printSummary()
       }

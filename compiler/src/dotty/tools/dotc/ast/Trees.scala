@@ -749,6 +749,8 @@ object Trees {
     type ThisTree[-T >: Untyped] = UnApply[T]
   }
 
+  var ValDefCount = 0
+
   /** mods val name: tpt = rhs */
   case class ValDef[-T >: Untyped] private[ast] (name: TermName, tpt: Tree[T], private var preRhs: LazyTree)
     extends ValOrDefDef[T] {
@@ -756,7 +758,17 @@ object Trees {
     assert(isEmpty || tpt != genericEmptyTree)
     def unforced = preRhs
     protected def force(x: AnyRef) = preRhs = x
+
+    ValDefCount += 1
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      ValDefCount += 1
+      tree
+    }
   }
+
+  var DefDefCount = 0
 
   /** mods def name[tparams](vparams_1)...(vparams_n): tpt = rhs */
   case class DefDef[-T >: Untyped] private[ast] (name: TermName, tparams: List[TypeDef[T]],
@@ -766,6 +778,14 @@ object Trees {
     assert(tpt != genericEmptyTree)
     def unforced = preRhs
     protected def force(x: AnyRef) = preRhs = x
+
+    DefDefCount += 1
+
+    override def clone: Tree[T] = {
+      val tree = super.clone
+      DefDefCount += 1
+      tree
+    }
   }
 
   /** mods class name template     or
