@@ -543,7 +543,7 @@ object Erasure {
       defTree.tpt.asInstanceOf[TypeTree].withType(resultTpe)
 
     override def typedValDef(vdef: untpd.ValDef, sym: Symbol)(implicit ctx: Context): ValDef =
-      super.typedValDef(untpd.cpy.ValDef(vdef)(
+      super.typedValDef(untpd.linearCpy.ValDef(vdef)(
         tpt = untpd.TypedSplice(resultTpt(vdef, sym.info))), sym)
 
     /** Besides normal typing, this function also compacts anonymous functions
@@ -576,7 +576,7 @@ object Erasure {
         sym.resetFlag(Flags.ParamAccessor)
         rhs1 = PhantomErasure.erasedParameterRef
       }
-      val ddef1 = untpd.cpy.DefDef(ddef)(
+      val ddef1 = untpd.linearCpy.DefDef(ddef)(
         tparams = Nil,
         vparamss = vparamss1,
         tpt = untpd.TypedSplice(resultTpt(ddef, restpe)),
