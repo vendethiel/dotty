@@ -397,7 +397,7 @@ object Erasure {
       assert(sym.exists, origSym.showLocated)
 
       def select(qual: Tree, sym: Symbol): Tree =
-        untpd.cpy.Select(tree)(qual, sym.name).withType(NamedType(qual.tpe, sym))
+        untpd.linearCpy.Select(tree)(qual, sym.name).withType(NamedType(qual.tpe, sym))
 
       def selectArrayMember(qual: Tree, erasedPre: Type): Tree =
         if (erasedPre isRef defn.ObjectClass)
