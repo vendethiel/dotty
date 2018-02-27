@@ -647,6 +647,8 @@ class Typer extends Namer
                   val setterType = ensureAccessible(setterTypeRaw, isSuperSelection(lhsCore), tree.pos)
                   val lhs2 = untpd.rename(lhsCore, setterName).withType(setterType)
                   typedUnadapted(untpd.Apply(untpd.TypedSplice(lhs2), tree.rhs :: Nil))
+                case Select(x, nme.UNARY_~) =>
+                  ???
                 case _ =>
                   reassignmentToVal
               }

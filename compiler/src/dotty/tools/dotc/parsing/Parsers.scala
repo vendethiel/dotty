@@ -1052,7 +1052,7 @@ object Parsers {
      *                      |  `throw' Expr
      *                      |  `return' [Expr]
      *                      |  ForExpr
-     *                      |  [SimpleExpr `.'] id `=' Expr
+     *                      |  [~][SimpleExpr `.'] id `=' Expr
      *                      |  SimpleExpr1 ArgumentExprs `=' Expr
      *                      |  PostfixExpr [Ascription]
      *                      |  PostfixExpr `match' `{' CaseClauses `}'
@@ -1162,12 +1162,14 @@ object Parsers {
 
     def expr1Rest(t: Tree, location: Location.Value) = in.token match {
       case EQUALS =>
-         t match {
-           case Ident(_) | Select(_, _) | Apply(_, _) =>
-             atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
-           case _ =>
-             t
-         }
+        t match {
+          case Ident(_) | Select(_, _) | Apply(_, _) =>
+            atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
+          case PrefixOp(splice, _) if splice.name == nme.raw.TILDE =>
+            atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
+          case _ =>
+            t
+        }
       case COLON =>
         ascription(t, location)
       case MATCH =>
