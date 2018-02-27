@@ -628,6 +628,12 @@ class Definitions {
     lazy val QuotedExpr_runR = QuotedExprClass.requiredMethodRef(nme.run)
     def QuotedExpr_run(implicit ctx: Context) = QuotedExpr_runR.symbol
 
+  lazy val QuotedVarRefType = ctx.requiredClassRef("scala.quoted.VarRef")
+  def QuotedVarRefclass(implicit ctx: Context) = QuotedVarRefType.symbol.asClass
+
+    lazy val QuotedVarRef_spliceEq = QuotedVarRefclass.requiredMethod("~=".toTermName)
+    def QuotedVarRef_~=(implicit ctx: Context) = QuotedVarRef_spliceEq.symbol
+
   lazy val QuotedTypeType = ctx.requiredClassRef("scala.quoted.Type")
   def QuotedTypeClass(implicit ctx: Context) = QuotedTypeType.symbol.asClass
 

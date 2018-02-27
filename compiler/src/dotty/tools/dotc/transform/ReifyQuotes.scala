@@ -317,6 +317,11 @@ class ReifyQuotes extends MacroTransformWithImplicits {
             quotation(quotedTree, tree)
           case Select(body, _) if tree.symbol.isSplice =>
             splice(body, tree)
+
+          case Apply(fn: Select, lhs :: Nil) if fn.symbol eq defn.QuotedVarRef_~= =>
+            val varRef = fn.qualifier
+            Assign(splice(varRef, varRef), lhs)
+
           case Block(stats, _) =>
             val last = enteredSyms
             stats.foreach(markDef)

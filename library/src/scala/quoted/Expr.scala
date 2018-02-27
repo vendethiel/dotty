@@ -9,6 +9,10 @@ sealed abstract class Expr[T] {
   final def show(implicit runner: Runner[T]): String = runner.show(this)
 }
 
+sealed abstract class VarRef[T] extends Expr[T] {
+  def ~=(x: T): Unit = ()
+}
+
 object Expr {
   implicit def toExpr[T](x: T)(implicit ev: Liftable[T]): Expr[T] =
     ev.toExpr(x)
@@ -43,5 +47,10 @@ object Exprs {
   /** An Expr representing `'{(~f).apply(~x)}` but it is beta-reduced when the closure is known */
   final class FunctionAppliedTo[T, U](val f: Expr[T => U], val x: Expr[T]) extends Expr[U] {
     override def toString: String = s"Expr($f <applied to> $x)"
+  }
+
+  /** A VarRef backed by a tree. Only the current compiler trees are allowed. */
+  final class TreeVarRef[Tree](val tree: Tree) extends quoted.VarRef[Any] {
+    override def toString: String = s"VarExpr(<raw>)"
   }
 }

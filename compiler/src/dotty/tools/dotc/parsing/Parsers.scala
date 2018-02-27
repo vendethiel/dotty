@@ -1052,7 +1052,7 @@ object Parsers {
      *                      |  `throw' Expr
      *                      |  `return' [Expr]
      *                      |  ForExpr
-     *                      |  [~][SimpleExpr `.'] id `=' Expr
+     *                      |  [~][SimpleExpr `.'] id `=' Expr // TODO supprot '{ ~x = ... } ?
      *                      |  SimpleExpr1 ArgumentExprs `=' Expr
      *                      |  PostfixExpr [Ascription]
      *                      |  PostfixExpr `match' `{' CaseClauses `}'
@@ -1165,8 +1165,9 @@ object Parsers {
         t match {
           case Ident(_) | Select(_, _) | Apply(_, _) =>
             atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
-          case PrefixOp(splice, _) if splice.name == nme.raw.TILDE =>
-            atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
+          // TODO supprot '{ ~x = ... } ?
+          // case PrefixOp(splice, _) if splice.name == nme.raw.TILDE =>
+          //   atPos(startOffset(t), in.skipToken()) { Assign(t, expr()) }
           case _ =>
             t
         }

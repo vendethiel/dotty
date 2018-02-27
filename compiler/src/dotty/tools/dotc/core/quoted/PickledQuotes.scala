@@ -24,6 +24,11 @@ object PickledQuotes {
   def pickleQuote(tree: Tree)(implicit ctx: Context): scala.runtime.quoted.Unpickler.Pickled = {
     if (ctx.reporter.hasErrors) Nil
     else {
+      println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+      println(tree.show)
+      println(tree)
+      println()
+      println()
       val encapsulated = encapsulateQuote(tree)
       val pickled = pickle(encapsulated)
       TastyString.pickle(pickled)
@@ -35,6 +40,7 @@ object PickledQuotes {
     case expr: TastyExpr[_] => unpickleExpr(expr)
     case expr: ValueExpr[_] => Literal(Constant(expr.value))
     case expr: TreeExpr[Tree] @unchecked => expr.tree
+    case expr: TreeVarRef[Tree] @unchecked => expr.tree
     case expr: FunctionAppliedTo[_, _] =>
       functionAppliedTo(quotedExprToTree(expr.f), quotedExprToTree(expr.x))
   }
