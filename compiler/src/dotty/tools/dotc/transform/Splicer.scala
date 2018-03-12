@@ -6,6 +6,7 @@ import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.quoted._
 import dotty.tools.dotc.interpreter._
+import dotty.tools.dotc.util.Sandbox
 
 import scala.util.control.NonFatal
 
@@ -28,7 +29,7 @@ object Splicer {
   private def reflectiveSplice(tree: Tree)(implicit ctx: Context): Tree = {
     val interpreter = new Interpreter
     val interpreted =
-      try interpreter.interpretTree[scala.quoted.Expr[_]](tree)
+      try Sandbox.runInSecuredThread(interpreter.interpretTree[scala.quoted.Expr[_]](tree))
       catch { case ex: InvocationTargetException => handleTargetException(tree, ex); None }
     interpreted.fold(tree)(PickledQuotes.quotedExprToTree)
   }
