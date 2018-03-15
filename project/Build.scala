@@ -648,6 +648,7 @@ object Build {
     val args0: List[String] = spaceDelimited("<arg>").parsed.toList
     val decompile = args0.contains("-decompile")
     val debugFromTasty = args0.contains("-Ythrough-tasty")
+    val multiStage = args0.contains("-multi-stage")
     val args = args0.filter(arg => arg != "-repl" && arg != "-decompile" &&
         arg != "-with-compiler" && arg != "-Ythrough-tasty")
 
@@ -655,6 +656,7 @@ object Build {
       if (repl) "dotty.tools.repl.Main"
       else if (decompile) "dotty.tools.dotc.decompiler.Main"
       else if (debugFromTasty) "dotty.tools.dotc.fromtasty.Debug"
+      else if (multiStage) "dotty.tools.dotc.fromtasty.MultistageDriver"
       else "dotty.tools.dotc.Main"
 
     var extraClasspath = dottyLib

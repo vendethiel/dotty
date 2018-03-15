@@ -47,12 +47,14 @@ class Interpreter(implicit ctx: Context) {
         case obj: T => Some(obj)
         case obj =>
           // TODO upgrade to a full type tag check or something similar
-          ctx.error(s"Interpreted tree returned a result of an unexpected type. Expected ${ct.runtimeClass} but was ${obj.getClass}", tree.pos)
+          if (!ctx.settings.multiStage.value || ctx.settings.fromTasty.value)
+            ctx.error(s"Interpreted tree returned a result of an unexpected type. Expected ${ct.runtimeClass} but was ${obj.getClass}", tree.pos)
           None
       }
     } catch {
       case ex: StopInterpretation =>
-        ctx.error(ex.msg, ex.pos)
+        if (!ctx.settings.multiStage.value || ctx.settings.fromTasty.value)
+          ctx.error(ex.msg, ex.pos)
         None
     }
   }

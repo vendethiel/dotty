@@ -62,7 +62,7 @@ class ReifyQuotes extends MacroTransformWithImplicits {
   override def phaseName: String = "reifyQuotes"
 
   override def run(implicit ctx: Context): Unit =
-    if (ctx.compilationUnit.containsQuotesOrSplices) super.run
+    if (ctx.compilationUnit.containsQuotesOrSplices || ctx.settings.fromTasty.value) super.run
 
   protected def newTransformer(implicit ctx: Context): Transformer =
     new Reifier(inQuote = false, null, 0, new LevelInfo, new mutable.ListBuffer[Tree])

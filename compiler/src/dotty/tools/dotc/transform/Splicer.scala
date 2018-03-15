@@ -3,6 +3,7 @@ package transform
 
 import dotty.tools.dotc.ast.tpd
 import dotty.tools.dotc.core.Contexts._
+import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.quoted._
 import dotty.tools.dotc.interpreter._
 
@@ -22,7 +23,13 @@ object Splicer {
   /** Splice the Tree for a Quoted expression which is constructed via a reflective call to the given method */
   private def reflectiveSplice(tree: Tree)(implicit ctx: Context): Tree = {
     val interpreter = new Interpreter
-    interpreter.interpretTree[scala.quoted.Expr[_]](tree).map(PickledQuotes.quotedExprToTree).getOrElse(tree)
+    val a = interpreter.interpretTree[scala.quoted.Expr[_]](tree).map(PickledQuotes.quotedExprToTree).getOrElse(ref(defn.Predef_undefined))
+    println(tree.show)
+    println(a.show)
+    println()
+    println()
+    println()
+    a
   }
 
 }
