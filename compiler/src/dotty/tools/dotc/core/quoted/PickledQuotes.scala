@@ -1,4 +1,5 @@
-package dotty.tools.dotc.core.quoted
+package dotty.tools.dotc.core
+package quoted
 
 import dotty.tools.dotc.ast.Trees._
 import dotty.tools.dotc.ast.tpd
@@ -8,13 +9,11 @@ import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Flags._
 import dotty.tools.dotc.core.StdNames._
-import dotty.tools.dotc.core.NameKinds
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.tasty.{TastyPickler, TastyPrinter, TastyString}
 
 import scala.quoted.Types._
 import scala.quoted.Exprs._
-
 import scala.reflect.ClassTag
 
 object PickledQuotes {
@@ -31,7 +30,7 @@ object PickledQuotes {
   }
 
   /** Transform the expression into its fully spliced Tree */
-  def quotedExprToTree(expr: quoted.Expr[_])(implicit ctx: Context): Tree = expr match {
+  def quotedExprToTree(expr: scala.quoted.Expr[_])(implicit ctx: Context): Tree = expr match {
     case expr: TastyExpr[_] => unpickleExpr(expr)
     case expr: ValueExpr[_] => Literal(Constant(expr.value))
     case expr: TreeExpr[Tree] @unchecked => expr.tree
@@ -40,7 +39,7 @@ object PickledQuotes {
   }
 
   /** Transform the expression into its fully spliced TypeTree */
-  def quotedTypeToTree(expr: quoted.Type[_])(implicit ctx: Context): Tree = expr match {
+  def quotedTypeToTree(expr: scala.quoted.Type[_])(implicit ctx: Context): Tree = expr match {
     case expr: TastyType[_] => unpickleType(expr)
     case expr: TaggedType[_] => classTagToTypeTree(expr.ct)
     case expr: TreeType[Tree] @unchecked => expr.tree
@@ -50,10 +49,29 @@ object PickledQuotes {
   private def unpickleExpr(expr: TastyExpr[_])(implicit ctx: Context): Tree = {
     val tastyBytes = TastyString.unpickle(expr.tasty)
     val unpickled = unpickle(tastyBytes, expr.args)
-    unpickled match {
+    val quoted = unpickled match {
       case PackageDef(_, (vdef: ValDef) :: Nil) =>
         vdef.rhs.changeOwner(vdef.symbol, ctx.owner)
     }
+    val splices = expr.args
+    val a = new TreeMap() {
+      override def transform(tree: tpd.Tree)(implicit ctx: Context): Tree = tree match {
+        case tasty.TreePickler.Hole(idx, args) =>
+          val splice = splices(idx)
+          val reifiedArgs = args.map(arg => if (arg.isTerm) new TreeExpr(arg) else new TreeType(arg))
+          if (tree.isType) {
+            val quotedType = splice.asInstanceOf[Seq[Any] => scala.quoted.Type[_]](reifiedArgs)
+            PickledQuotes.quotedTypeToTree(quotedType)
+          } else {
+            val quotedExpr = splice.asInstanceOf[Seq[Any] => scala.quoted.Expr[_]](reifiedArgs)
+            PickledQuotes.quotedExprToTree(quotedExpr)
+          }
+        case _ => super.transform(tree)
+      }
+    }.transform(quoted)
+
+
+    a
   }
 
   /** Unpickle the tree contained in the TastyType */

@@ -554,6 +554,7 @@ class TreePickler(pickler: TastyPickler) {
           writeByte(HOLE)
           withLength {
             writeNat(idx)
+            pickleType(tree.tpe)
             args.foreach(pickleTree)
           }
       }
