@@ -82,7 +82,7 @@ class CheckRealizable(implicit ctx: Context) {
         if (r == Realizable) sym.setFlag(Stable)
         r
       }
-    case _: SingletonType | NoPrefix =>
+    case (_: SingletonType) | NoPrefix =>
       Realizable
     case tp =>
       def isConcrete(tp: Type): Boolean = tp.dealias match {

@@ -148,7 +148,7 @@ object Types {
     /** Does this type denote a stable reference (i.e. singleton type)? */
     final def isStable(implicit ctx: Context): Boolean = stripTypeVar match {
       case tp: TermRef => tp.termSymbol.isStable && tp.prefix.isStable || tp.info.isStable
-      case _: SingletonType | NoPrefix => true
+      case (_: SingletonType) | NoPrefix => true
       case tp: RefinedOrRecType => tp.parent.isStable
       case tp: ExprType => tp.resultType.isStable
       case tp: AnnotatedType => tp.tpe.isStable

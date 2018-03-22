@@ -58,7 +58,7 @@ class PlainFile(val givenPath: Path) extends AbstractFile {
     // Optimization: Assume that the file was not deleted and did not have permissions changed
     // between the call to `list` and the iteration. This saves a call to `exists`.
     def existsFast(path: Path) = path match {
-      case (_: Directory | _: File) => true
+      case (_: Directory) | (_: File) => true
       case _ => path.exists
     }
     givenPath.toDirectory.list.filter(existsFast).map(new PlainFile(_))
