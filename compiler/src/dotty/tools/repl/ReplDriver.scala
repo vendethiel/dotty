@@ -172,7 +172,7 @@ class ReplDriver(settings: Array[String],
         implicit val ctx: Context = state.run.runContext
         val file = new dotc.util.SourceFile("compl", expr)
         val srcPos = dotc.util.SourcePosition(file, Position(cursor))
-        val (startOffset, completions) = Interactive.completions(SourceTree(tree, file) :: Nil, srcPos)(ctx)
+        val (startOffset, completions) = Interactive.completions(SourceTree(Nil, tree, file) :: Nil, srcPos)(ctx)
         val query =
           if (startOffset < cursor) expr.substring(startOffset, cursor) else ""
 

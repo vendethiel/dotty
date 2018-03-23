@@ -10,7 +10,7 @@ import Contexts._, NameOps._, Symbols._
 import util._, util.Positions._
 
 /** A typechecked named `tree` coming from `source` */
-case class SourceTree(tree: tpd.NameTree, source: SourceFile) {
+case class SourceTree(topLevelImports: List[tpd.Import], tree: tpd.NameTree, source: SourceFile) {
   /** The position of `tree` */
   def pos(implicit ctx: Context): SourcePosition = source.atPos(tree.pos)
 
@@ -47,10 +47,11 @@ object SourceTree {
       import ast.Trees._
       def sourceTreeOfClass(tree: tpd.Tree): Option[SourceTree] = tree match {
         case PackageDef(_, stats) =>
-          stats.flatMap(sourceTreeOfClass).headOption
+          val imports = stats.collect { case imp: tpd.Import => imp }
+          stats.flatMap(sourceTreeOfClass(_).map(_.copy(topLevelImports = imports))).headOption
         case tree: tpd.TypeDef if tree.symbol == sym =>
           val sourceFile = new SourceFile(sym.sourceFile, Codec.UTF8)
-          Some(SourceTree(tree, sourceFile))
+          Some(SourceTree(Nil, tree, sourceFile))
         case _ => None
       }
       sourceTreeOfClass(sym.treeContaining(id))

@@ -173,14 +173,15 @@ class InteractiveDriver(val settings: List[String]) extends Driver {
   private def topLevelClassTrees(topTree: Tree, source: SourceFile): List[SourceTree] = {
     val trees = new mutable.ListBuffer[SourceTree]
 
-    def addTrees(tree: Tree): Unit = tree match {
+    def addTrees(topLevelImports: List[Import], tree: Tree): Unit = tree match {
       case PackageDef(_, stats) =>
-        stats.foreach(addTrees)
+        val imports = stats.collect { case imp: Import => imp }
+        stats.foreach(addTrees(imports, _))
       case tree: TypeDef =>
-        trees += SourceTree(tree, source)
+        trees += SourceTree(topLevelImports, tree, source)
       case _ =>
     }
-    addTrees(topTree)
+    addTrees(Nil, topTree)
 
     trees.toList
   }

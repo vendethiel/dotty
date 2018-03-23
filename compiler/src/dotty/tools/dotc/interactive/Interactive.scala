@@ -304,7 +304,7 @@ object Interactive {
     (implicit ctx: Context): List[SourceTree] = safely {
     val buf = new mutable.ListBuffer[SourceTree]
 
-    trees foreach { case SourceTree(topTree, source) =>
+    trees foreach { case SourceTree(_, topTree, source) =>
       new untpd.TreeTraverser {
         override def traverse(tree: untpd.Tree)(implicit ctx: Context) = {
           tree match {
@@ -316,7 +316,7 @@ object Interactive {
                    && !tree.pos.isZeroExtent
                    && (includeReferences || isDefinition(tree))
                    && treePredicate(tree))
-                buf += SourceTree(tree, source)
+                buf += SourceTree(Nil, tree, source)
               traverseChildren(tree)
             case tree: untpd.Inlined =>
               traverse(tree.call)
@@ -334,11 +334,13 @@ object Interactive {
    *  or `Nil` if no such path exists. If a non-empty path is returned it starts with
    *  the tree closest enclosing `pos` and ends with an element of `trees`.
    */
-  def pathTo(trees: List[SourceTree], pos: SourcePosition)(implicit ctx: Context): List[Tree] =
-    trees.find(_.pos.contains(pos)) match {
-      case Some(tree) => pathTo(tree.tree, pos.pos)
+  def pathTo(trees: List[SourceTree], pos: SourcePosition)(implicit ctx: Context): List[Tree] = {
+    val allTrees = trees.flatMap(t => t.tree :: t.topLevelImports)
+    allTrees.find(t => t.pos.contains(pos.pos)) match {
+      case Some(tree) => pathTo(tree, pos.pos)
       case None => Nil
     }
+  }
 
   def pathTo(tree: Tree, pos: Position)(implicit ctx: Context): List[Tree] =
     if (tree.pos.contains(pos))
