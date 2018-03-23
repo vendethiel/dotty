@@ -251,18 +251,40 @@ class DottyLanguageServer extends LanguageServer
     val enclTree = Interactive.enclosingTree(driver.openedTrees(uri), pos)
     val sym = Interactive.sourceSymbol(enclTree.symbol)
 
-    if (sym == NoSymbol) Nil.asJava
-    else {
-      val (trees, include) =
-        if (enclTree.isInstanceOf[MemberDef])
-          (driver.allTreesContaining(sym.name.sourceModuleName.toString),
-           Include.overriding | Include.overridden)
-        else
-          (SourceTree.fromSymbol(sym.topLevelClass.asClass).toList,
-           Include.overriding)
-      val defs = Interactive.namedTrees(trees, include, sym)
-      defs.map(d => location(d.namePos)).asJava
-    }
+    val defs =
+      if (sym == NoSymbol) Nil
+      else enclTree match {
+        case imp: Import =>
+          def lookup(name: Name): Symbol = {
+            imp.expr.tpe.member(name).symbol
+          }
+          val importedSyms = imp.selectors.flatMap {
+            case id: Ident if id.pos.contains(pos.pos) =>
+              lookup(id.name) :: lookup(id.name.toTypeName) :: Nil
+            case thicket @ Thicket((id: Ident) :: (_: Ident) :: Nil) if thicket.pos.contains(pos.pos) =>
+              lookup(id.name) :: lookup(id.name.toTypeName) :: Nil
+            case _ =>
+              Nil
+          }
+
+          importedSyms.flatMap { sym =>
+            val trees = driver.allTreesContaining(sym.name.sourceModuleName.toString)
+            val defSymbol = if (sym is Flags.ModuleVal) sym.moduleClass else sym
+            Interactive.namedTrees(trees, Include.overriding, defSymbol)
+          }
+
+        case _ =>
+          val (trees, include) =
+            if (enclTree.isInstanceOf[MemberDef])
+              (driver.allTreesContaining(sym.name.sourceModuleName.toString),
+                Include.overriding | Include.overridden)
+            else
+              (SourceTree.fromSymbol(sym.topLevelClass.asClass).toList,
+                Include.overriding)
+          Interactive.namedTrees(trees, include, sym)
+      }
+
+    defs.map(d => location(d.namePos)).asJava
   }
 
   override def references(params: ReferenceParams) = computeAsync { cancelToken =>
