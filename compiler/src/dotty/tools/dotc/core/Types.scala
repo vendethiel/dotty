@@ -521,7 +521,7 @@ object Types {
             case _ =>
               go(tp.superType)
           }
-        case tp: ThisType => // ??? inline
+        case tp: ThisType =>
           goThis(tp)
         case tp: RefinedType =>
           if (name eq tp.refinedName) goRefined(tp) else go(tp.parent)
