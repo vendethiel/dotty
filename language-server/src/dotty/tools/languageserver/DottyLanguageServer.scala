@@ -258,11 +258,11 @@ class DottyLanguageServer extends LanguageServer
           def lookup(name: Name): Symbol = {
             imp.expr.tpe.member(name).symbol
           }
-          val importedSyms = imp.selectors.flatMap {
-            case id: Ident if id.pos.contains(pos.pos) =>
-              lookup(id.name) :: lookup(id.name.toTypeName) :: Nil
-            case thicket @ Thicket((id: Ident) :: (_: Ident) :: Nil) if thicket.pos.contains(pos.pos) =>
-              lookup(id.name) :: lookup(id.name.toTypeName) :: Nil
+          val importedSyms = imp.selectors.find(_.pos.contains(pos.pos)) match {
+            case Some(id: Ident) =>
+              lookup(id.name.toTermName) :: lookup(id.name.toTypeName) :: Nil
+            case Some(Thicket((id: Ident) :: (_: Ident) :: Nil)) =>
+              lookup(id.name.toTermName) :: lookup(id.name.toTypeName) :: Nil
             case _ =>
               Nil
           }
