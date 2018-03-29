@@ -1,5 +1,13 @@
+# Should compile OK without the plugin
+> app/compile
+
+# Publish plugin locally
 > plugin/publishLocal
-> run
-> 'set initialCommands := "1 + 1" '
-# FIXME: does not work on the CI
-#> console
+
+# Enable plugin
+$ copy-file changes/build2.sbt build.sbt
+> reload
+
+# Should NOT compile with the plugin
+> clean
+-> app/compile
