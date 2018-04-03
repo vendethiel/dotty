@@ -345,7 +345,7 @@ class SpaceEngine(implicit ctx: Context) extends SpaceLogic {
       OrType(erase(tp1), erase(tp2))
     case AndType(tp1, tp2) =>
       AndType(erase(tp1), erase(tp2))
-    case tp: RefinedType =>
+    case tp: RefinedType if tp.refinedName.isTermName =>   // see pos/dependent-extractors.scala
       tp.derivedRefinedType(erase(tp.parent), tp.refinedName, WildcardType)
     case _ => tp
   }
